@@ -52,7 +52,7 @@ warn_unreachable = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["kiteconnect.*", "apscheduler.*", "scipy.*"]
+module = ["kiteconnect.*", "apscheduler.*", "scipy.*", "plotly.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

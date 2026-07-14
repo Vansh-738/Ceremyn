@@ -97,14 +97,15 @@ src/alphaquant/
 | M0 | Scaffolding: config, logging, Docker, CI | ✅ |
 | M1 | Domain models + core (market calendar, events, container) | ✅ |
 | M2 | Data layer: bhavcopy ingest, Kite provider, greeks/IV/PCR analytics | ✅ |
-| M3 | Strategy engine + built-in strategies | — |
-| M4 | Risk engine + kill switch | — |
-| M5 | Backtester + Indian cost model + metrics | — |
-| M6 | Paper trading (OMS, paper broker, scheduler) | — |
-| M7 | API + Plotly dashboard | — |
-| M8 | Trade journal + analytics | — |
-| M9 | LLM assistant (reports, reviews, explanations) | — |
-| M10 | Live trading (triple-gated) | — |
+| M3 | Strategy engine + built-in strategies (+ M3.5 architecture hardening) | ✅ |
+| M4 | Risk engine + kill switch | ✅ |
+| M5 | Backtester + Indian cost model + metrics | ✅ |
+| M6 | Research Lab: experiments, optimization, walk-forward, cross-validation, leaderboard, comparison, reports | ✅ |
+| M7 | Paper trading (OMS, paper broker, scheduler) | — |
+| M8 | API + Plotly dashboard | — |
+| M9 | Trade journal + analytics | — |
+| M10 | LLM assistant (reports, reviews, explanations) | — |
+| M11 | Live trading (triple-gated) | — |
 
 ## Disclaimer
 
