@@ -63,9 +63,7 @@ class KiteProvider:
 
     # -- instruments --------------------------------------------------------
 
-    async def fetch_option_contracts(
-        self, underlyings: Sequence[str]
-    ) -> list[OptionContract]:
+    async def fetch_option_contracts(self, underlyings: Sequence[str]) -> list[OptionContract]:
         """All NFO option contracts for the given index underlyings."""
         try:
             dump: list[dict[str, Any]] = await asyncio.to_thread(self._kite.instruments, "NFO")

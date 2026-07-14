@@ -40,9 +40,7 @@ class FakeInstrumentRepo:
         return [c for c in self.contracts if c.underlying == underlying and c.expiry == expiry]
 
     async def expiries(self, underlying: str, on_or_after: date) -> list[date]:
-        return sorted(
-            {c.expiry for c in self.contracts if c.underlying == underlying}
-        )
+        return sorted({c.expiry for c in self.contracts if c.underlying == underlying})
 
 
 class FakeSnapshotRepo:

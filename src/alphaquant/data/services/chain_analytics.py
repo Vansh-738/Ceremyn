@@ -24,9 +24,7 @@ class ChainAnalyticsService:
 
     def enrich(self, snapshot: OptionChainSnapshot) -> OptionChainSnapshot:
         """Attach IV + greeks to every entry that has a usable price."""
-        t = time_to_expiry_years(
-            (expiry_moment(snapshot) - snapshot.timestamp).total_seconds()
-        )
+        t = time_to_expiry_years((expiry_moment(snapshot) - snapshot.timestamp).total_seconds())
         spot = float(snapshot.spot)
         entries: list[ChainEntry] = []
         for entry in snapshot.entries:

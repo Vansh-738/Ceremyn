@@ -49,9 +49,7 @@ class WalkForwardAnalyzer:
                         event_list[index + train_size : index + train_size + validate_size]
                     ),
                     test=event_list[
-                        index
-                        + train_size
-                        + validate_size : index
+                        index + train_size + validate_size : index
                         + train_size
                         + validate_size
                         + test_size

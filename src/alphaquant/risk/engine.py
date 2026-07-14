@@ -120,8 +120,7 @@ class RiskEngine:
             category_risk[key] = max(category_risk[key], result.risk_level)
 
         weights = {
-            name: float(value)
-            for name, value in self.config.score_weights.model_dump().items()
+            name: float(value) for name, value in self.config.score_weights.model_dump().items()
         }
         total_weight = sum(weights.values())
         weighted_risk = sum(category_risk[name] * weight for name, weight in weights.items())

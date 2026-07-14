@@ -105,9 +105,7 @@ def test_margin_rule_fails_when_only_usage_ratio_is_breached(
     assert any("usage ratio" in violation for violation in result.violations)
 
 
-def test_expiry_rule_enforces_minimum_days_to_expiry(
-    base_settings, ist_now, portfolio
-) -> None:
+def test_expiry_rule_enforces_minimum_days_to_expiry(base_settings, ist_now, portfolio) -> None:
     base_settings.risk.time.allow_expiry_day = True
     base_settings.risk.time.min_days_to_expiry = 2
     expiry = ist_now.date() + timedelta(days=1)

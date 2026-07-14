@@ -26,15 +26,9 @@ def compute_statistics(
         return BacktestStatistics()
 
     equities = np.array([_to_float(point.equity) for point in equity_curve], dtype=float)
-    returns = (
-        np.diff(equities) / equities[:-1]
-        if len(equities) > 1
-        else np.array([], dtype=float)
-    )
+    returns = np.diff(equities) / equities[:-1] if len(equities) > 1 else np.array([], dtype=float)
     total_return = (
-        ((equities[-1] / _to_float(initial_cash)) - 1.0) * 100.0
-        if initial_cash > 0
-        else 0.0
+        ((equities[-1] / _to_float(initial_cash)) - 1.0) * 100.0 if initial_cash > 0 else 0.0
     )
     duration_days = max((equity_curve[-1].timestamp - equity_curve[0].timestamp).days, 1)
     cagr = (

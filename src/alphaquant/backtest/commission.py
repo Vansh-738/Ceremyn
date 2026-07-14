@@ -58,9 +58,7 @@ class IndianCostModel:
         gst = _money((brokerage + exchange) * self.config.gst_rate)
         sebi = _money(turnover * self.config.sebi_rate)
         stamp = (
-            _money(turnover * self.config.stamp_duty_buy_rate)
-            if side is Side.BUY
-            else Decimal("0")
+            _money(turnover * self.config.stamp_duty_buy_rate) if side is Side.BUY else Decimal("0")
         )
         return CostBreakdown(
             brokerage=brokerage,
