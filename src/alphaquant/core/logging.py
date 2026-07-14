@@ -26,11 +26,13 @@ def configure_logging(settings: Settings) -> None:
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
     ]
 
     renderer: structlog.typing.Processor
     if settings.environment == "prod":
+        # format_exc_info must precede the JSON renderer; ConsoleRenderer
+        # formats exceptions itself and must NOT be paired with it.
+        shared_processors.append(structlog.processors.format_exc_info)
         renderer = structlog.processors.JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer()
