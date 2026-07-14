@@ -8,6 +8,7 @@ from alphaquant.domain.chain import ChainEntry, OptionChainSnapshot
 from alphaquant.domain.enums import (
     TERMINAL_ORDER_STATUSES,
     Exchange,
+    KillSwitchState,
     OptionType,
     OrderStatus,
     OrderType,
@@ -21,6 +22,7 @@ from alphaquant.domain.greeks import Greeks
 from alphaquant.domain.instruments import Instrument, OptionContract
 from alphaquant.domain.market_data import Candle, Quote
 from alphaquant.domain.orders import VALID_TRANSITIONS, Fill, Order
+from alphaquant.domain.portfolio import PortfolioExposure, PortfolioGreeks, PortfolioSnapshot
 from alphaquant.domain.positions import Position, Trade
 from alphaquant.domain.signals import Signal, SignalLeg
 from alphaquant.domain.strategy import StrategyDefinition
@@ -35,6 +37,7 @@ __all__ = [
     "Fill",
     "Greeks",
     "Instrument",
+    "KillSwitchState",
     "OptionChainSnapshot",
     "OptionContract",
     "OptionType",
@@ -42,6 +45,9 @@ __all__ = [
     "OrderStatus",
     "OrderTransitionError",
     "OrderType",
+    "PortfolioExposure",
+    "PortfolioGreeks",
+    "PortfolioSnapshot",
     "Position",
     "ProductType",
     "Quote",

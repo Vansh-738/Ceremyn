@@ -56,6 +56,12 @@ class SignalAction(StrEnum):
     ADJUST = "ADJUST"
 
 
+class KillSwitchState(StrEnum):
+    DISARMED = "DISARMED"
+    ARMED = "ARMED"
+    TRIGGERED = "TRIGGERED"
+
+
 class TimeFrame(StrEnum):
     MINUTE = "minute"
     FIVE_MINUTE = "5minute"

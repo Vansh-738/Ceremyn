@@ -68,9 +68,9 @@ class IronCondor(Strategy[IronCondorParams]):
         ):
             return []
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.ENTER,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.ENTER,
                 legs=(
                     SignalLeg(contract=short_call.contract, side=Side.SELL, lots=p.lots),
                     SignalLeg(contract=short_put.contract, side=Side.SELL, lots=p.lots),
@@ -101,9 +101,9 @@ class IronCondor(Strategy[IronCondorParams]):
         if reason is None:
             return []
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.EXIT,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.EXIT,
                 legs=exit_legs(ctx.positions),
                 reason=reason,
             )

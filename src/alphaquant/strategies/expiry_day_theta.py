@@ -59,9 +59,9 @@ class ExpiryDayTheta(Strategy[ExpiryDayThetaParams]):
             return []
         assert call is not None and put is not None  # narrowed by the mark check
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.ENTER,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.ENTER,
                 legs=(
                     SignalLeg(contract=call.contract, side=Side.SELL, lots=p.lots),
                     SignalLeg(contract=put.contract, side=Side.SELL, lots=p.lots),
@@ -90,9 +90,9 @@ class ExpiryDayTheta(Strategy[ExpiryDayThetaParams]):
         if reason is None:
             return []
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.EXIT,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.EXIT,
                 legs=exit_legs(ctx.positions),
                 reason=reason,
             )

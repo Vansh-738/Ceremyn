@@ -81,3 +81,38 @@ root_package = "alphaquant"
 name = "Domain layer is independent"
 type = "independence"
 modules = ["alphaquant.domain"]
+
+[[tool.importlinter.contracts]]
+name = "Domain cannot import infrastructure"
+type = "forbidden"
+source_modules = ["alphaquant.domain"]
+forbidden_modules = [
+    "alphaquant.api",
+    "alphaquant.broker",
+    "alphaquant.data",
+    "alphaquant.execution",
+]
+
+[[tool.importlinter.contracts]]
+name = "Strategies cannot import execution"
+type = "forbidden"
+source_modules = ["alphaquant.strategies"]
+forbidden_modules = ["alphaquant.execution"]
+
+[[tool.importlinter.contracts]]
+name = "Strategies cannot import broker"
+type = "forbidden"
+source_modules = ["alphaquant.strategies"]
+forbidden_modules = ["alphaquant.broker"]
+
+[[tool.importlinter.contracts]]
+name = "LLM cannot import execution"
+type = "forbidden"
+source_modules = ["alphaquant.llm"]
+forbidden_modules = ["alphaquant.execution"]
+
+[[tool.importlinter.contracts]]
+name = "LLM cannot import risk"
+type = "forbidden"
+source_modules = ["alphaquant.llm"]
+forbidden_modules = ["alphaquant.risk"]

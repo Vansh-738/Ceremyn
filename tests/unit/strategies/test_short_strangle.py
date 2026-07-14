@@ -42,6 +42,10 @@ class TestEntry:
         signal = signals[0]
         assert signal.action is SignalAction.ENTER
         assert signal.strategy_id == "short_strangle_test"
+        assert signal.strategy_version == "1"
+        assert signal.underlying == "NIFTY"
+        assert signal.expiry == EXPIRY
+        assert signal.market_timestamp == NOW
         call_leg = next(leg for leg in signal.legs if leg.contract.is_call)
         put_leg = next(leg for leg in signal.legs if leg.contract.is_put)
         assert call_leg.side is Side.SELL and put_leg.side is Side.SELL

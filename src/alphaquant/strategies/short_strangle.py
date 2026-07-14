@@ -54,9 +54,9 @@ class ShortStrangle(Strategy[ShortStrangleParams]):
         if not (put.contract.strike < ctx.chain.spot < call.contract.strike):
             return []  # degenerate chain (e.g. too few strikes with greeks)
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.ENTER,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.ENTER,
                 legs=(
                     SignalLeg(contract=call.contract, side=Side.SELL, lots=p.lots),
                     SignalLeg(contract=put.contract, side=Side.SELL, lots=p.lots),
@@ -85,9 +85,9 @@ class ShortStrangle(Strategy[ShortStrangleParams]):
         if reason is None:
             return []
         return [
-            Signal(
-                strategy_id=self.definition.id,
-                action=SignalAction.EXIT,
+            self.emit(
+                ctx,
+                signal_type=SignalAction.EXIT,
                 legs=exit_legs(ctx.positions),
                 reason=reason,
             )
