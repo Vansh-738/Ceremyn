@@ -102,7 +102,7 @@ src/alphaquant/
 | M5 | Backtester + Indian cost model + metrics | ✅ |
 | M6 | Research Lab: experiments, optimization, walk-forward, cross-validation, leaderboard, comparison, reports | ✅ |
 | M7 | Feature Store: 19 cached, versioned, deterministic market features + engine/registry/cache/validation | ✅ |
-| M8 | Paper trading (OMS, paper broker, scheduler) | — |
+| M8 | Paper trading: real-time engine, paper broker (queue + latency), OMS, journal, monitor, reconciliation | ✅ |
 | M9 | API + Plotly dashboard | — |
 | M10 | Trade journal + analytics | — |
 | M11 | LLM assistant (reports, reviews, explanations) | — |
