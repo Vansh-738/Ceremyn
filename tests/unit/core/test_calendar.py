@@ -57,6 +57,8 @@ class TestExpiries:
     def test_default_rules(self) -> None:
         assert DEFAULT_EXPIRY_RULES["NIFTY"].frequency is ExpiryFrequency.WEEKLY
         assert DEFAULT_EXPIRY_RULES["BANKNIFTY"].frequency is ExpiryFrequency.MONTHLY
+        assert DEFAULT_EXPIRY_RULES["FINNIFTY"].frequency is ExpiryFrequency.MONTHLY
+        assert DEFAULT_EXPIRY_RULES["MIDCPNIFTY"].frequency is ExpiryFrequency.MONTHLY
 
     def test_next_weekly_expiry_is_tuesday(self, cal: MarketCalendar) -> None:
         # From Wednesday Jul 9 2025, next NIFTY weekly expiry: Tue Jul 15.
@@ -82,5 +84,5 @@ class TestExpiries:
         assert cal.next_expiry("BANKNIFTY", date(2025, 10, 29)) == date(2025, 11, 25)
 
     def test_unknown_underlying_raises(self, cal: MarketCalendar) -> None:
-        with pytest.raises(CalendarError, match="FINNIFTY"):
-            cal.next_expiry("FINNIFTY", date(2025, 7, 14))
+        with pytest.raises(CalendarError, match="NIFTYNXT50"):
+            cal.next_expiry("NIFTYNXT50", date(2025, 7, 14))

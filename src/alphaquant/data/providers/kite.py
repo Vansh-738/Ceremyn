@@ -26,6 +26,8 @@ logger = structlog.get_logger(__name__)
 SPOT_SYMBOLS = {
     "NIFTY": "NSE:NIFTY 50",
     "BANKNIFTY": "NSE:NIFTY BANK",
+    "FINNIFTY": "NSE:NIFTY FIN SERVICE",
+    "MIDCPNIFTY": "NSE:NIFTY MID SELECT",
 }
 
 _QUOTE_BATCH = 400  # Kite's quote endpoint caps around 500 symbols per call

@@ -33,6 +33,8 @@ class ExpiryRule(BaseModel):
 DEFAULT_EXPIRY_RULES: dict[str, ExpiryRule] = {
     "NIFTY": ExpiryRule(weekday=TUESDAY, frequency=ExpiryFrequency.WEEKLY),
     "BANKNIFTY": ExpiryRule(weekday=TUESDAY, frequency=ExpiryFrequency.MONTHLY),
+    "FINNIFTY": ExpiryRule(weekday=TUESDAY, frequency=ExpiryFrequency.MONTHLY),
+    "MIDCPNIFTY": ExpiryRule(weekday=TUESDAY, frequency=ExpiryFrequency.MONTHLY),
 }
 
 

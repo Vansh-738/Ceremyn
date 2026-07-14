@@ -51,7 +51,7 @@ class AnthropicSettings(BaseModel):
 
 
 class DataSettings(BaseModel):
-    underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY")
+    underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
     # Annualized risk-free rate used for greeks/IV (proxy: 91-day T-bill yield).
     risk_free_rate: float = 0.065
     # Cadence of intraday option-chain snapshots during market hours.

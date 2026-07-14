@@ -22,6 +22,8 @@ def test_import_linter_contracts_hold() -> None:
     assert "Strategies cannot import broker" in result.stdout
     assert "LLM cannot import execution" in result.stdout
     assert "LLM cannot import risk" in result.stdout
+    assert "Live cannot import broker" in result.stdout
+    assert "Live cannot import execution" in result.stdout
     assert "Risk cannot import broker" in result.stdout
     assert "Risk cannot import execution" in result.stdout
     assert "Risk cannot import strategies" in result.stdout
