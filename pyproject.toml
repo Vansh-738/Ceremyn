@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alphaquant"
+version = "0.1.0"
+description = "Institutional-grade AI-assisted options trading research platform for Indian markets"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "DTZ", # flake8-datetimez — naive datetimes are bugs in a trading system
+    "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["DTZ001", "DTZ005"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["alphaquant"]
+strict = true
+warn_unreachable = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["kiteconnect.*", "apscheduler.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: requires running Postgres/Redis (docker compose)",
+]
+
+[tool.coverage.run]
+source = ["src/alphaquant"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.importlinter]
+root_package = "alphaquant"
+
+# Architectural invariant: the domain layer is pure — it may not import any
+# other alphaquant package (infrastructure, services, or interfaces).
+[[tool.importlinter.contracts]]
+name = "Domain layer is independent"
+type = "independence"
+modules = ["alphaquant.domain"]
