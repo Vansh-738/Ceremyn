@@ -75,6 +75,21 @@ class TestSecrets:
         assert "change-me" not in str(settings.db.password)
 
 
+class TestRiskSettings:
+    def test_risk_defaults_are_available(self) -> None:
+        settings = make_settings()
+        assert settings.risk.enabled is True
+        assert settings.risk.margin.max_margin_usage_ratio == pytest.approx(0.8)
+        assert settings.risk.time.trading_start.isoformat() == "09:15:00"
+
+    def test_risk_thresholds_load_from_nested_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ALPHAQUANT_RISK__MARGIN__MAX_MARGIN_USAGE_RATIO", "0.65")
+        monkeypatch.setenv("ALPHAQUANT_RISK__TIME__ALLOW_EXPIRY_DAY", "true")
+        settings = make_settings()
+        assert settings.risk.margin.max_margin_usage_ratio == pytest.approx(0.65)
+        assert settings.risk.time.allow_expiry_day is True
+
+
 def test_get_settings_is_cached() -> None:
     get_settings.cache_clear()
     try:

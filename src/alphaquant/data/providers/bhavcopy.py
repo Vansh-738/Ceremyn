@@ -51,7 +51,9 @@ class BhavcopyClient:
         if response.status_code == 404:
             raise DataError(f"no bhavcopy published for {trade_date} (404) — holiday?")
         if response.status_code != 200:
-            raise DataError(f"bhavcopy download failed for {trade_date}: HTTP {response.status_code}")
+            raise DataError(
+                f"bhavcopy download failed for {trade_date}: HTTP {response.status_code}"
+            )
         return response.content
 
 

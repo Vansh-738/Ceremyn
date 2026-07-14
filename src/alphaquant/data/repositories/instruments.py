@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from alphaquant.domain import Exchange, OptionContract, OptionType
 from alphaquant.data.repositories.models import InstrumentRow
+from alphaquant.domain import Exchange, OptionContract, OptionType
 
 
 def _to_domain(row: InstrumentRow) -> OptionContract:

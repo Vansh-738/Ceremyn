@@ -116,3 +116,27 @@ name = "LLM cannot import risk"
 type = "forbidden"
 source_modules = ["alphaquant.llm"]
 forbidden_modules = ["alphaquant.risk"]
+
+[[tool.importlinter.contracts]]
+name = "Risk cannot import broker"
+type = "forbidden"
+source_modules = ["alphaquant.risk"]
+forbidden_modules = ["alphaquant.broker"]
+
+[[tool.importlinter.contracts]]
+name = "Risk cannot import execution"
+type = "forbidden"
+source_modules = ["alphaquant.risk"]
+forbidden_modules = ["alphaquant.execution"]
+
+[[tool.importlinter.contracts]]
+name = "Risk cannot import strategies"
+type = "forbidden"
+source_modules = ["alphaquant.risk"]
+forbidden_modules = ["alphaquant.strategies"]
+
+[[tool.importlinter.contracts]]
+name = "Risk cannot import llm"
+type = "forbidden"
+source_modules = ["alphaquant.risk"]
+forbidden_modules = ["alphaquant.llm"]
