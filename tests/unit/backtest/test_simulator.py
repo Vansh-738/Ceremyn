@@ -1,9 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
+from typing import cast
 
 from alphaquant.backtest.fills import ExecutionContext, PendingOrderState
 from alphaquant.backtest.simulator import ExecutionSimulator, SimulationConfig
-from alphaquant.domain import Candle, Signal, SignalLeg
+from alphaquant.domain import Candle, Order, Quote, Signal, SignalLeg
 from alphaquant.domain.enums import (
     OrderStatus,
     OrderType,
@@ -164,12 +166,16 @@ def test_unfilled_market_order_without_quote_stays_open(
 
 def test_sell_limit_and_low_volume_paths(timestamp_one: datetime) -> None:
     simulator = ExecutionSimulator(config=SimulationConfig(max_volume_participation=0.4))
-    contract = make_chain(
-        timestamp=timestamp_one,
-        last_price="100",
-        bid="99",
-        ask="101",
-    ).entries[0].contract
+    contract = (
+        make_chain(
+            timestamp=timestamp_one,
+            last_price="100",
+            bid="99",
+            ask="101",
+        )
+        .entries[0]
+        .contract
+    )
     sell_signal = Signal(
         strategy_id="test_backtest_strategy",
         strategy_version="1",
@@ -196,12 +202,16 @@ def test_sell_limit_and_low_volume_paths(timestamp_one: datetime) -> None:
 
 def test_simulator_helper_branches(timestamp_one: datetime) -> None:
     simulator = ExecutionSimulator()
-    contract = make_chain(
-        timestamp=timestamp_one,
-        last_price="100",
-        bid="99",
-        ask="101",
-    ).entries[0].contract
+    contract = (
+        make_chain(
+            timestamp=timestamp_one,
+            last_price="100",
+            bid="99",
+            ask="101",
+        )
+        .entries[0]
+        .contract
+    )
     sell_limit = Signal(
         strategy_id="test_backtest_strategy",
         strategy_version="1",
@@ -242,3 +252,106 @@ def test_simulator_helper_branches(timestamp_one: datetime) -> None:
     )
     stop_order = simulator.orders_from_signal(stop_sell_signal, created_at=timestamp_one)[0]
     assert simulator._stop_triggered(stop_order, None, candle) is True
+
+
+def test_simulator_covers_remaining_edge_paths(
+    signal: Signal,
+    timestamp_one: datetime,
+) -> None:
+    simulator = ExecutionSimulator(config=SimulationConfig(max_volume_participation=0.1))
+    order = simulator.orders_from_signal(signal, created_at=timestamp_one)[0]
+    contract = order.contract
+    candle = Candle(
+        tradingsymbol=contract.tradingsymbol,
+        timeframe=TimeFrame.MINUTE,
+        timestamp=timestamp_one,
+        open=Decimal("100"),
+        high=Decimal("105"),
+        low=Decimal("95"),
+        close=Decimal("100"),
+        volume=10,
+    )
+
+    assert simulator._available_quantity(None, 25) == 25
+    assert (
+        simulator._available_quantity(
+            Quote(
+                tradingsymbol=contract.tradingsymbol,
+                timestamp=timestamp_one,
+                bid=Decimal("99"),
+                ask=Decimal("101"),
+                last_price=Decimal("100"),
+                volume=0,
+            ),
+            25,
+        )
+        == 25
+    )
+    assert (
+        simulator._available_quantity(
+            Quote(
+                tradingsymbol=contract.tradingsymbol,
+                timestamp=timestamp_one,
+                bid=Decimal("99"),
+                ask=Decimal("101"),
+                last_price=Decimal("100"),
+                volume=1,
+            ),
+            25,
+        )
+        == 0
+    )
+
+    no_limit_order = order.model_copy(update={"limit_price": None})
+    assert simulator._limit_fill(no_limit_order, None, candle) is False
+    assert simulator._limit_price(no_limit_order, None) is None
+
+    stop_sell_order = order.model_copy(update={"side": Side.SELL, "trigger_price": Decimal("100")})
+    sell_quote = Quote(
+        tradingsymbol=contract.tradingsymbol,
+        timestamp=timestamp_one,
+        bid=Decimal("99"),
+        ask=Decimal("101"),
+        last_price=Decimal("100"),
+        volume=10,
+    )
+    assert simulator._stop_triggered(stop_sell_order, sell_quote, None) is True
+
+    stop_buy_order = order.model_copy(update={"trigger_price": Decimal("104")})
+    assert simulator._stop_triggered(stop_buy_order, None, candle) is True
+    assert simulator._evaluate_fillability(
+        order=stop_buy_order.model_copy(update={"order_type": OrderType.SL_MARKET}),
+        quote=None,
+        candle=Candle(
+            tradingsymbol=contract.tradingsymbol,
+            timeframe=TimeFrame.MINUTE,
+            timestamp=timestamp_one,
+            open=Decimal("100"),
+            high=Decimal("103"),
+            low=Decimal("95"),
+            close=Decimal("100"),
+            volume=10,
+        ),
+        triggered=False,
+    ) == (False, None, False)
+    assert (
+        simulator._stop_triggered(
+            stop_buy_order.model_copy(update={"trigger_price": Decimal("106")}),
+            None,
+            candle,
+        )
+        is False
+    )
+
+    unsupported_order = SimpleNamespace(
+        order_type="unsupported",
+        side=Side.BUY,
+        limit_price=None,
+        trigger_price=None,
+    )
+    assert simulator._evaluate_fillability(
+        order=cast(Order, unsupported_order),
+        quote=None,
+        candle=None,
+        triggered=True,
+    ) == (False, None, True)

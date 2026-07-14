@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from alphaquant.backtest.portfolio import BacktestPortfolio, PortfolioConfig
 from alphaquant.domain import Fill, Order
-from alphaquant.domain.enums import OrderType, Side
+from alphaquant.domain.enums import KillSwitchState, OrderType, Side
 from tests.unit.backtest.helpers import make_chain, make_contract
 
 
@@ -94,3 +94,35 @@ def test_portfolio_marks_margin_and_equity(timestamp_one: datetime) -> None:
 
     assert snapshot.margin_used > Decimal("0")
     assert snapshot.buying_power < snapshot.margin_used + portfolio.cash
+
+
+def test_portfolio_triggers_kill_switch_on_drawdown(timestamp_one: datetime) -> None:
+    contract = make_contract()
+    portfolio = BacktestPortfolio(
+        PortfolioConfig(
+            initial_cash=Decimal("100000"),
+            kill_switch_drawdown_limit=Decimal("100"),
+        )
+    )
+    order = Order(
+        contract=contract,
+        side=Side.BUY,
+        quantity=25,
+        order_type=OrderType.MARKET,
+        created_at=timestamp_one,
+    )
+    portfolio.apply_fill(
+        fill=Fill(order_id=order.id, quantity=25, price=Decimal("100"), timestamp=timestamp_one),
+        order=order,
+        strategy_id="strategy-a",
+        signal_id=None,
+        costs=Decimal("0"),
+    )
+
+    snapshot = portfolio.mark_to_market(
+        timestamp=timestamp_one,
+        last_prices={contract.tradingsymbol: Decimal("95")},
+    )
+
+    assert snapshot.drawdown == Decimal("2625")
+    assert snapshot.kill_switch_state is KillSwitchState.TRIGGERED
