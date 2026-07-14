@@ -130,6 +130,18 @@ source_modules = ["alphaquant.live"]
 forbidden_modules = ["alphaquant.execution"]
 
 [[tool.importlinter.contracts]]
+name = "OMS cannot import strategies"
+type = "forbidden"
+source_modules = ["alphaquant.oms"]
+forbidden_modules = ["alphaquant.strategies"]
+
+[[tool.importlinter.contracts]]
+name = "OMS cannot import paper"
+type = "forbidden"
+source_modules = ["alphaquant.oms"]
+forbidden_modules = ["alphaquant.paper"]
+
+[[tool.importlinter.contracts]]
 name = "Risk cannot import broker"
 type = "forbidden"
 source_modules = ["alphaquant.risk"]
