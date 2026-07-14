@@ -55,4 +55,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt && pip install --no-deps -e .
       - name: Integration tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://alphaquant:change-me@localhost:5432/alphaquant
         run: pytest tests/integration -q -m integration

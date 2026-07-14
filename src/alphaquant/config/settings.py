@@ -48,6 +48,14 @@ class AnthropicSettings(BaseModel):
     model: str = "claude-sonnet-5"
 
 
+class DataSettings(BaseModel):
+    underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY")
+    # Annualized risk-free rate used for greeks/IV (proxy: 91-day T-bill yield).
+    risk_free_rate: float = 0.065
+    # Cadence of intraday option-chain snapshots during market hours.
+    snapshot_interval_minutes: int = 5
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="ALPHAQUANT_",
@@ -69,6 +77,7 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(default_factory=RedisSettings)
     kite: KiteSettings = Field(default_factory=KiteSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
+    data: DataSettings = Field(default_factory=DataSettings)
 
     @property
     def effective_mode(self) -> TradingMode:

@@ -96,7 +96,7 @@ src/alphaquant/
 |-----------|-------|--------|
 | M0 | Scaffolding: config, logging, Docker, CI | ✅ |
 | M1 | Domain models + core (market calendar, events, container) | ✅ |
-| M2 | Data layer: bhavcopy ingest, Kite provider, greeks/IV/PCR analytics | — |
+| M2 | Data layer: bhavcopy ingest, Kite provider, greeks/IV/PCR analytics | ✅ |
 | M3 | Strategy engine + built-in strategies | — |
 | M4 | Risk engine + kill switch | — |
 | M5 | Backtester + Indian cost model + metrics | — |
