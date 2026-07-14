@@ -14,6 +14,7 @@ class StrategyDefinition(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: str = Field(min_length=1, pattern=r"^[a-z0-9_\-]+$")  # e.g. "short_strangle_v1"
+    strategy_type: str = Field(min_length=1)  # registry key of the implementing class
     name: str = Field(min_length=1)
     version: str = "1"
     description: str = ""

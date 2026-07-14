@@ -29,6 +29,6 @@ htmlcov/
 .DS_Store
 
 # Data & logs (never commit market data or runtime artifacts)
-data/
-logs/
+/data/
+/logs/
 *.log
