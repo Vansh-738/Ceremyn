@@ -101,11 +101,12 @@ src/alphaquant/
 | M4 | Risk engine + kill switch | ✅ |
 | M5 | Backtester + Indian cost model + metrics | ✅ |
 | M6 | Research Lab: experiments, optimization, walk-forward, cross-validation, leaderboard, comparison, reports | ✅ |
-| M7 | Paper trading (OMS, paper broker, scheduler) | — |
-| M8 | API + Plotly dashboard | — |
-| M9 | Trade journal + analytics | — |
-| M10 | LLM assistant (reports, reviews, explanations) | — |
-| M11 | Live trading (triple-gated) | — |
+| M7 | Feature Store: 19 cached, versioned, deterministic market features + engine/registry/cache/validation | ✅ |
+| M8 | Paper trading (OMS, paper broker, scheduler) | — |
+| M9 | API + Plotly dashboard | — |
+| M10 | Trade journal + analytics | — |
+| M11 | LLM assistant (reports, reviews, explanations) | — |
+| M12 | Live trading (triple-gated) | — |
 
 ## Disclaimer
 
