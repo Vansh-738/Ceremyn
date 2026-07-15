@@ -40,6 +40,10 @@ select = [
 [tool.ruff.lint.isort]
 known-first-party = ["alphaquant", "tests"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection markers are the idiomatic default-argument pattern.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Path"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["DTZ001", "DTZ005"]
 
@@ -91,6 +95,27 @@ forbidden_modules = [
     "alphaquant.broker",
     "alphaquant.data",
     "alphaquant.execution",
+]
+
+# The dashboard is read-only observability: it may read value/metric snapshots but must
+# never reach the order-placement / broker / live-connection code, so it can never place
+# an order or bypass the OMS. Enforced structurally here.
+[[tool.importlinter.contracts]]
+name = "Dashboard cannot place orders or bypass the OMS"
+type = "forbidden"
+source_modules = ["alphaquant.dashboard"]
+forbidden_modules = [
+    "alphaquant.oms.engine",
+    "alphaquant.oms.executor",
+    "alphaquant.oms.router",
+    "alphaquant.oms.broker",
+    "alphaquant.live.engine",
+    "alphaquant.live.kite",
+    "alphaquant.paper.broker",
+    "alphaquant.paper.engine",
+    "alphaquant.execution",
+    "alphaquant.broker",
+    "alphaquant.data.providers.kite",
 ]
 
 [[tool.importlinter.contracts]]

@@ -103,10 +103,11 @@ src/alphaquant/
 | M6 | Research Lab: experiments, optimization, walk-forward, cross-validation, leaderboard, comparison, reports | ✅ |
 | M7 | Feature Store: 19 cached, versioned, deterministic market features + engine/registry/cache/validation | ✅ |
 | M8 | Paper trading: real-time engine, paper broker (queue + latency), OMS, journal, monitor, reconciliation | ✅ |
-| M9 | API + Plotly dashboard | — |
-| M10 | Trade journal + analytics | — |
-| M11 | LLM assistant (reports, reviews, explanations) | — |
-| M12 | Live trading (triple-gated) | — |
+| M9 | Live Market Data Engine (streaming, heartbeat, reconnect, snapshots) | ✅ |
+| M10 | Order Management System (state machine, broker adapters, retries, idempotency, reconciliation) | ✅ |
+| M11 | Dashboard & Observability: read-only API + WebSocket, views, metrics, alerts, system health | ✅ |
+| M12 | LLM assistant (reports, reviews, explanations) | — |
+| M13 | Live trading (triple-gated) | — |
 
 ## Disclaimer
 
