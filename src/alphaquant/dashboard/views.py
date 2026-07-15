@@ -7,6 +7,7 @@ snapshots it needs so it is trivially unit-testable with fakes.
 from decimal import Decimal
 
 from alphaquant.dashboard.models import (
+    ExecutionView,
     ExperimentRow,
     ExposureView,
     FeatureStoreView,
@@ -281,3 +282,11 @@ def build_paper(monitor: MonitorSnapshot | None, snapshot: PortfolioSnapshot | N
 
 def build_logs(logs: tuple[LogRow, ...]) -> LogsView:
     return LogsView(logs=logs)
+
+
+def build_execution(
+    *, armed: bool, live_trading_permitted: bool, active_broker: str
+) -> ExecutionView:
+    return ExecutionView(
+        armed=armed, live_trading_permitted=live_trading_permitted, active_broker=active_broker
+    )

@@ -1,8 +1,10 @@
+from alphaquant.broker.simulated import SimulatedBroker
 from alphaquant.config import Settings
 from alphaquant.core.calendar import MarketCalendar
 from alphaquant.core.container import Container
 from alphaquant.core.events import EventBus
 from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
+from alphaquant.execution import GatedBrokerAdapter, KiteBroker, LiveTradingGate
 from alphaquant.features.engine import FeatureEngine
 from alphaquant.live.engine import LiveMarketDataEngine
 from alphaquant.live.reconnect import ReconnectManager
@@ -38,6 +40,9 @@ RUNTIME_ENGINE_ATTRS = (
     "feature_cache",
     "feature_engine",
     "null_broker",
+    "simulated_broker",
+    "live_trading_gate",
+    "gated_broker",
     "oms_engine",
     "paper_engine",
     "live_engine",
@@ -58,6 +63,9 @@ def test_runtime_engine_types() -> None:
     assert isinstance(container.reconnect_manager, ReconnectManager)
     assert isinstance(container.risk_engine, ObservableRiskEngine)
     assert isinstance(container.feature_engine, FeatureEngine)
+    assert isinstance(container.simulated_broker, SimulatedBroker)
+    assert isinstance(container.live_trading_gate, LiveTradingGate)
+    assert isinstance(container.gated_broker, GatedBrokerAdapter)
     assert isinstance(container.oms_engine, OrderManagementEngine)
     assert isinstance(container.paper_engine, PaperTradingEngine)
     assert isinstance(container.live_engine, LiveMarketDataEngine)
@@ -70,11 +78,23 @@ def test_runtime_engines_share_one_risk_engine() -> None:
     assert container.paper_engine.risk_engine is container.risk_engine
 
 
-def test_oms_engine_reconciles_clean_with_no_broker() -> None:
+def test_oms_engine_reconciles_clean_with_gated_fallback_broker() -> None:
     container = make_container()
     report = container.oms_engine.reconcile()
     assert report.reconciled is True
     assert report.missing_orders == ()
+
+
+def test_oms_engine_is_wired_with_the_gated_broker_only() -> None:
+    container = make_container()
+    assert container.oms_engine.router.brokers == (container.gated_broker,)
+
+
+def test_gated_broker_uses_the_shared_simulated_fallback() -> None:
+    container = make_container()
+    # No gates open by default: OMS's own broker calls resolve to the same
+    # SimulatedBroker singleton the container wires everywhere else.
+    assert container.gated_broker.fetch_cash() == container.simulated_broker.fetch_cash()
 
 
 def test_runtime_engines_never_touch_the_database() -> None:
@@ -84,3 +104,20 @@ def test_runtime_engines_never_touch_the_database() -> None:
     # `_db` is the cached_property backing `.engine`/`.session_factory`; it must stay
     # unresolved since nothing in the runtime-engine wiring needs Postgres.
     assert "_db" not in container.__dict__
+
+
+def test_kite_broker_is_never_touched_without_credentials() -> None:
+    container = make_container()
+    for attr in RUNTIME_ENGINE_ATTRS:
+        getattr(container, attr)
+    # No ALPHAQUANT_KITE__API_KEY in this dev environment: `kite_broker` would raise
+    # BrokerError if constructed, so it must stay untouched until live routing is
+    # actually permitted (see `execution.gated_broker.GatedBrokerAdapter`).
+    assert "kite_broker" not in container.__dict__
+
+
+def test_kite_broker_constructs_when_credentials_are_present() -> None:
+    settings = Settings(_env_file=None, kite={"api_key": "test-key"})  # type: ignore[call-arg]
+    container = Container(settings)
+    assert isinstance(container.kite_broker, KiteBroker)
+    assert container.kite_broker is container.kite_broker

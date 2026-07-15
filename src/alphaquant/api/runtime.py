@@ -134,6 +134,22 @@ class _ResearchSourceAdapter:
         return self._container.experiment_store.list_all()
 
 
+class _ExecutionSourceAdapter:
+    """Gate #3 status only — never the gate itself, never a broker handle."""
+
+    def __init__(self, container: Container) -> None:
+        self._container = container
+
+    def is_armed(self) -> bool:
+        return self._container.live_trading_gate.is_armed
+
+    def live_trading_permitted(self) -> bool:
+        return self._container.live_trading_gate.permits_live_trading(self._container.settings)
+
+    def active_broker_name(self) -> str:
+        return "kite" if self.live_trading_permitted() else "simulated"
+
+
 def build_dashboard_sources(container: Container) -> DashboardSources:
     """The composition edge: wraps `container`'s engines in read-only port adapters."""
     return DashboardSources(
@@ -143,4 +159,5 @@ def build_dashboard_sources(container: Container) -> DashboardSources:
         features=_FeatureSourceAdapter(container),
         paper=_PaperSourceAdapter(container),
         research=_ResearchSourceAdapter(container),
+        execution=_ExecutionSourceAdapter(container),
     )

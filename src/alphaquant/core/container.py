@@ -5,7 +5,6 @@ never instantiate each other's collaborators; they receive them from here
 (directly, or via FastAPI dependencies that delegate to the container).
 """
 
-from decimal import Decimal
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -19,6 +18,7 @@ from alphaquant.core.events import EventBus
 # so that importing the container never drags in heavy infra modules.
 if TYPE_CHECKING:
     from alphaquant.broker.adapter import NullBrokerAdapter
+    from alphaquant.broker.simulated import SimulatedBroker
     from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
     from alphaquant.data.providers.kite import KiteProvider
     from alphaquant.data.repositories.candles import CandleRepository
@@ -30,6 +30,9 @@ if TYPE_CHECKING:
     from alphaquant.data.services.chain_analytics import ChainAnalyticsService
     from alphaquant.data.services.ingest import BhavcopyIngestService
     from alphaquant.data.services.snapshots import ChainService, ChainSnapshotJob
+    from alphaquant.execution.gate import LiveTradingGate
+    from alphaquant.execution.gated_broker import GatedBrokerAdapter
+    from alphaquant.execution.kite_broker import KiteBroker
     from alphaquant.features.cache import InMemoryFeatureCache
     from alphaquant.features.engine import FeatureEngine
     from alphaquant.live.engine import LiveMarketDataEngine
@@ -178,18 +181,48 @@ class Container:
         return NullBrokerAdapter()
 
     @cached_property
-    def oms_engine(self) -> "OrderManagementEngine":
-        from alphaquant.backtest.portfolio import PortfolioConfig
-        from alphaquant.oms.engine import OrderManagementEngine
-        from alphaquant.oms.positions import OMSPortfolio
+    def simulated_broker(self) -> "SimulatedBroker":
+        from alphaquant.broker.simulated import SimulatedBroker
 
-        # Zero initial cash matches the null broker's zero cash, so reconciliation
-        # reads clean until a real broker (M13) is wired in.
+        # Real market data when it's available (via the live engine's cache), honest
+        # unfilled orders when it isn't — never fabricated fills.
+        return SimulatedBroker(market_data=self.live_engine.cache)
+
+    @cached_property
+    def kite_broker(self) -> "KiteBroker":
+        from alphaquant.execution.kite_broker import KiteBroker
+
+        # Raises BrokerError without ALPHAQUANT_KITE__API_KEY, exactly like
+        # `kite_provider`. Never touched unless `live_trading_gate` actually permits
+        # live routing (see `gated_broker`'s lazy factory), so a missing key never
+        # breaks OMS construction outside live mode.
+        return KiteBroker.from_settings(self.settings)
+
+    @cached_property
+    def live_trading_gate(self) -> "LiveTradingGate":
+        from alphaquant.execution.gate import LiveTradingGate
+
+        return LiveTradingGate()
+
+    @cached_property
+    def gated_broker(self) -> "GatedBrokerAdapter":
+        from alphaquant.execution.gated_broker import GatedBrokerAdapter
+
+        return GatedBrokerAdapter(
+            live_factory=lambda: self.kite_broker,
+            fallback=self.simulated_broker,
+            gate=self.live_trading_gate,
+            settings=self.settings,
+        )
+
+    @cached_property
+    def oms_engine(self) -> "OrderManagementEngine":
+        from alphaquant.oms.engine import OrderManagementEngine
+
         return OrderManagementEngine(
             risk_engine=self.risk_engine,
-            brokers={"none": self.null_broker},
-            default_broker="none",
-            portfolio=OMSPortfolio(PortfolioConfig(initial_cash=Decimal("0"))),
+            brokers={"execution": self.gated_broker},
+            default_broker="execution",
         )
 
     @cached_property

@@ -1,6 +1,11 @@
 from alphaquant.dashboard.backend import DashboardService, DashboardSources
 from alphaquant.dashboard.models import Channel
-from tests.unit.dashboard.conftest import FakePaper, FakePortfolio, make_portfolio_snapshot
+from tests.unit.dashboard.conftest import (
+    FakeExecution,
+    FakePaper,
+    FakePortfolio,
+    make_portfolio_snapshot,
+)
 
 
 class TestFullService:
@@ -20,6 +25,21 @@ class TestFullService:
     def test_logs_view(self, service: DashboardService) -> None:
         assert len(service.logs().logs) == 1
 
+    def test_execution_view_reflects_the_source(self, service: DashboardService) -> None:
+        assert service.execution().armed is False
+        assert service.execution().active_broker == "simulated"
+
+
+class TestExecutionView:
+    def test_reflects_armed_and_permitted_source(self) -> None:
+        service = DashboardService(
+            DashboardSources(execution=FakeExecution(armed=True, permitted=True))
+        )
+        view = service.execution()
+        assert view.armed is True
+        assert view.live_trading_permitted is True
+        assert view.active_broker == "kite"
+
 
 class TestEmptyService:
     def test_all_views_default_without_sources(self) -> None:
@@ -38,6 +58,8 @@ class TestEmptyService:
         assert service.health().healthy is False
         assert service.logs().logs == ()
         assert service.metrics().pnl == 0.0
+        assert service.execution().armed is False
+        assert service.execution().active_broker == "simulated"
         assert service.alerts().count == 0
 
 

@@ -169,6 +169,21 @@ type = "forbidden"
 source_modules = ["alphaquant.oms"]
 forbidden_modules = ["alphaquant.paper"]
 
+# OMS receives BrokerAdapter instances via DI (concrete types constructed at the
+# composition root) and codes only against the protocol it defines itself in
+# oms/broker.py. This makes "do not leak broker-specific logic into OMS" a CI check.
+[[tool.importlinter.contracts]]
+name = "OMS cannot import broker"
+type = "forbidden"
+source_modules = ["alphaquant.oms"]
+forbidden_modules = ["alphaquant.broker"]
+
+[[tool.importlinter.contracts]]
+name = "OMS cannot import execution"
+type = "forbidden"
+source_modules = ["alphaquant.oms"]
+forbidden_modules = ["alphaquant.execution"]
+
 [[tool.importlinter.contracts]]
 name = "Risk cannot import broker"
 type = "forbidden"

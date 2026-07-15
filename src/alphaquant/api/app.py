@@ -20,6 +20,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 import alphaquant
+from alphaquant.api.execution import build_execution_router
 from alphaquant.api.runtime import build_dashboard_sources
 from alphaquant.config import Settings, get_settings
 from alphaquant.core.container import Container
@@ -32,6 +33,7 @@ from alphaquant.dashboard.models import WSFrame
 from alphaquant.dashboard.websocket import ConnectionManager
 
 DASHBOARD_PREFIX = "/dashboard"
+EXECUTION_PREFIX = "/execution"
 
 
 class _FrameSink:
@@ -114,6 +116,13 @@ def create_app(
         build_dashboard_router(service, settings=dashboard_settings, manager=manager),
         prefix=DASHBOARD_PREFIX,
     )
+    if container is not None:
+        # Separate from /dashboard by construction: the dashboard router is built above
+        # from read-only sources alone and never sees the gate or a broker.
+        app.include_router(
+            build_execution_router(container.live_trading_gate, settings),
+            prefix=EXECUTION_PREFIX,
+        )
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
     app.state.dashboard_service = service

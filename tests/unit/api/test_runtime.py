@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from alphaquant.api.runtime import build_dashboard_sources
-from alphaquant.config import Settings
+from alphaquant.config import Settings, TradingMode
 from alphaquant.core.container import Container
 from alphaquant.core.timeutils import now_utc
 
@@ -12,6 +12,7 @@ _PORT_METHODS = {
     "features": ("latest_features", "cache_hits", "cache_misses", "cache_size"),
     "paper": ("monitor", "portfolio_snapshot"),
     "research": ("experiments",),
+    "execution": ("is_armed", "live_trading_permitted", "active_broker_name"),
 }
 
 
@@ -109,8 +110,39 @@ def test_research_source_starts_empty() -> None:
     assert sources.research.experiments() == ()
 
 
+def test_execution_source_zero_state() -> None:
+    sources = build_dashboard_sources(make_container())
+    assert sources.execution is not None
+    assert sources.execution.is_armed() is False
+    assert sources.execution.live_trading_permitted() is False
+    assert sources.execution.active_broker_name() == "simulated"
+
+
+def test_execution_source_reflects_armed_state() -> None:
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None, trading_mode=TradingMode.LIVE, live_trading_enabled=True
+    )
+    container = Container(settings)
+    container.live_trading_gate.arm(settings=settings, reason="ops approved")
+    sources = build_dashboard_sources(container)
+    assert sources.execution is not None
+    assert sources.execution.is_armed() is True
+    assert sources.execution.live_trading_permitted() is True
+    assert sources.execution.active_broker_name() == "kite"
+
+
+def test_execution_source_never_touches_kite_credentials() -> None:
+    container = make_container()
+    sources = build_dashboard_sources(container)
+    assert sources.execution is not None
+    sources.execution.is_armed()
+    sources.execution.live_trading_permitted()
+    sources.execution.active_broker_name()
+    assert "kite_broker" not in container.__dict__
+
+
 def test_sources_do_not_build_engines_eagerly() -> None:
     container = make_container()
     build_dashboard_sources(container)
-    for attr in ("oms_engine", "paper_engine", "live_engine", "risk_engine"):
+    for attr in ("oms_engine", "paper_engine", "live_engine", "risk_engine", "kite_broker"):
         assert attr not in container.__dict__, attr

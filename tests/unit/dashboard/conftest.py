@@ -262,6 +262,21 @@ class FakeLogs:
         )[:limit]
 
 
+class FakeExecution:
+    def __init__(self, *, armed: bool = False, permitted: bool = False) -> None:
+        self._armed = armed
+        self._permitted = permitted
+
+    def is_armed(self) -> bool:
+        return self._armed
+
+    def live_trading_permitted(self) -> bool:
+        return self._permitted
+
+    def active_broker_name(self) -> str:
+        return "kite" if self._permitted else "simulated"
+
+
 @pytest.fixture
 def full_sources() -> DashboardSources:
     return DashboardSources(
@@ -280,6 +295,7 @@ def full_sources() -> DashboardSources:
         paper=FakePaper(),
         research=FakeResearch(),
         logs=FakeLogs(),
+        execution=FakeExecution(),
     )
 
 

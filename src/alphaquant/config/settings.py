@@ -50,6 +50,13 @@ class AnthropicSettings(BaseModel):
     model: str = "claude-sonnet-5"
 
 
+class ExecutionSettings(BaseModel):
+    # Validates gate #3 (runtime arming). The armed state itself never lives here —
+    # only the shared secret required to set it. Empty by default: arming is refused
+    # (no secret can match) until this is explicitly configured.
+    arming_secret: SecretStr = SecretStr("")
+
+
 class DataSettings(BaseModel):
     underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
     # Annualized risk-free rate used for greeks/IV (proxy: 91-day T-bill yield).
@@ -160,6 +167,7 @@ class Settings(BaseSettings):
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     data: DataSettings = Field(default_factory=DataSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)
+    execution: ExecutionSettings = Field(default_factory=ExecutionSettings)
 
     @property
     def effective_mode(self) -> TradingMode:

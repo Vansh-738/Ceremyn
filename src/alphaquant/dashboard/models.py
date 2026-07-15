@@ -27,6 +27,7 @@ class Channel(StrEnum):
     LOGS = "logs"
     METRICS = "metrics"
     ALERTS = "alerts"
+    EXECUTION = "execution"
 
 
 class AlertSeverity(StrEnum):
@@ -321,6 +322,16 @@ class MetricsView(BaseModel):
     heartbeat_delay_seconds: float = 0.0
     feature_cache_hit_rate: float = 0.0
     experiment_count: int = 0
+
+
+class ExecutionView(BaseModel):
+    """Gate #3 (runtime arming) status only — read-only, never a broker or order type."""
+
+    model_config = ConfigDict(frozen=True)
+
+    armed: bool = False
+    live_trading_permitted: bool = False
+    active_broker: str = "simulated"
 
 
 class OverviewView(BaseModel):

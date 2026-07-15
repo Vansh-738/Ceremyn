@@ -21,6 +21,7 @@ from alphaquant.dashboard.metrics import build_metrics
 from alphaquant.dashboard.models import (
     AlertsView,
     Channel,
+    ExecutionView,
     FeatureStoreView,
     HealthView,
     LiveMarketView,
@@ -106,6 +107,14 @@ class LogSource(Protocol):
     def recent_logs(self, limit: int) -> tuple[LogRow, ...]: ...
 
 
+class ExecutionSource(Protocol):
+    """Gate #3 status only — never a broker handle, never order-affecting."""
+
+    def is_armed(self) -> bool: ...
+    def live_trading_permitted(self) -> bool: ...
+    def active_broker_name(self) -> str: ...
+
+
 @dataclass(frozen=True)
 class DashboardSources:
     """The set of read ports wired at the composition edge. Any may be absent."""
@@ -118,6 +127,7 @@ class DashboardSources:
     paper: PaperSource | None = None
     research: ResearchSource | None = None
     logs: LogSource | None = None
+    execution: ExecutionSource | None = None
 
 
 class DashboardService:
@@ -203,6 +213,16 @@ class DashboardService:
         source = self.sources.logs
         logs = source.recent_logs(self.settings.page_size) if source else ()
         return views.build_logs(logs)
+
+    def execution(self) -> ExecutionView:
+        source = self.sources.execution
+        if source is None:
+            return ExecutionView()
+        return views.build_execution(
+            armed=source.is_armed(),
+            live_trading_permitted=source.live_trading_permitted(),
+            active_broker=source.active_broker_name(),
+        )
 
     def metrics(self) -> MetricsView:
         oms_metrics = self.sources.oms.oms_metrics() if self.sources.oms else None
@@ -295,5 +315,6 @@ class DashboardService:
             Channel.LOGS: self.logs,
             Channel.METRICS: self.metrics,
             Channel.ALERTS: self.alerts,
+            Channel.EXECUTION: self.execution,
         }
         return dispatch[channel]()

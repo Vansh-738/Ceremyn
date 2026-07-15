@@ -63,11 +63,16 @@ class TestMountedDashboard:
             assert frame["kind"] == "snapshot"
             assert frame["channel"] == "overview"
 
-    def test_no_write_routes_on_whole_app(self) -> None:
+    def test_no_write_routes_under_dashboard(self) -> None:
+        # Scoped to /dashboard specifically: the dashboard itself must stay read-only.
+        # /execution/* is a deliberately separate, gated admin surface (see
+        # TestRuntimeWiring below) and is expected to carry POST routes.
         app = make_app()
         methods: set[str] = set()
         for route in app.routes:  # type: ignore[attr-defined]
-            methods |= getattr(route, "methods", set()) or set()
+            path = getattr(route, "path", "")
+            if path.startswith("/dashboard"):
+                methods |= getattr(route, "methods", set()) or set()
         assert methods <= {"GET", "HEAD"}
 
 
@@ -112,3 +117,36 @@ class TestRuntimeWiring:
             assert frame["kind"] == "event"
             assert frame["channel"] == "health"
             assert frame["payload"]["event"] == "HeartbeatLost"
+
+
+class TestExecutionRouterSeparation:
+    """`/execution` (arm/disarm — state-mutating) is a deliberately separate, gated admin
+    surface. The dashboard only ever gets a read-only GET view of the same gate state
+    (`/dashboard/api/execution`) via the normal read-port pattern — never the arm/disarm
+    actions themselves."""
+
+    def test_arm_and_disarm_are_not_reachable_under_dashboard(self) -> None:
+        app = make_app()
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert "/execution/status" in paths
+        assert "/execution/arm" in paths
+        assert "/execution/disarm" in paths
+        assert "/dashboard/api/execution/arm" not in paths
+        assert "/dashboard/api/execution/disarm" not in paths
+
+    def test_dashboard_execution_channel_is_read_only(self) -> None:
+        app = make_app()
+        for route in app.routes:  # type: ignore[attr-defined]
+            if getattr(route, "path", "") == "/dashboard/api/execution":
+                assert getattr(route, "methods", set()) <= {"GET", "HEAD"}
+                return
+        raise AssertionError("expected /dashboard/api/execution to be mounted")
+
+    def test_execution_router_absent_when_dashboard_service_is_explicit(self) -> None:
+        # No container -> no live_trading_gate to wire -> no /execution routes at all.
+        app = create_app(
+            Settings(_env_file=None),  # type: ignore[call-arg]
+            dashboard_service=DashboardService(DashboardSources()),
+        )
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert not any(path.startswith("/execution") for path in paths)

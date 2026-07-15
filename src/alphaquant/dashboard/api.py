@@ -127,6 +127,10 @@ def build_dashboard_router(
     def logs() -> dict[str, Any]:
         return service.logs().model_dump(mode="json")
 
+    @router.get("/api/execution", dependencies=[view_dashboard])
+    def execution() -> dict[str, Any]:
+        return service.execution().model_dump(mode="json")
+
     @router.websocket("/ws")
     async def ws(
         websocket: WebSocket,
