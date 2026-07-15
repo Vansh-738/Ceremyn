@@ -1,8 +1,9 @@
-"""Read-only dashboard API: GET endpoints, the WebSocket route, and the HTML shell.
+"""Read-only dashboard API: GET endpoints, the WebSocket route, and the served shell.
 
 Every route is read-only. There is no POST/PUT/DELETE and no order/broker endpoint —
 the dashboard can only observe. `build_dashboard_router` returns a router that the main
-app can mount with one `include_router`; `create_dashboard_app` builds a standalone app.
+application mounts under `/dashboard`; `create_dashboard_app` builds a standalone app used
+only in tests. The professional HTML shell lives in `dashboard.shell`.
 """
 
 import asyncio
@@ -25,7 +26,7 @@ from fastapi.responses import HTMLResponse
 from alphaquant.dashboard.backend import DashboardService
 from alphaquant.dashboard.config import DashboardSettings
 from alphaquant.dashboard.events import SnapshotDiffer
-from alphaquant.dashboard.models import Channel
+from alphaquant.dashboard.models import Channel, WSFrame
 from alphaquant.dashboard.permissions import (
     AuthError,
     ForbiddenError,
@@ -34,34 +35,8 @@ from alphaquant.dashboard.permissions import (
     authorize,
     bearer_token,
 )
+from alphaquant.dashboard.shell import SHELL_HTML
 from alphaquant.dashboard.websocket import ConnectionManager, broadcast_changes
-
-# Minimal single-page shell: opens the WebSocket, subscribes to the active view's channel,
-# and renders pushed frames (tables + Plotly charts from the CDN). API-first — any richer
-# SPA can consume the same JSON/WS.
-SHELL_HTML = """<!doctype html>
-<html><head><meta charset="utf-8"><title>AlphaQuant Observability</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<style>body{font-family:system-ui,sans-serif;margin:0;display:flex}
-nav{background:#1a202c;color:#fff;width:180px;min-height:100vh;padding:1rem}
-nav a{display:block;color:#cbd5e0;text-decoration:none;padding:6px 4px;cursor:pointer}
-nav a:hover{color:#fff}main{flex:1;padding:1.5rem}pre{background:#f7fafc;padding:1rem;overflow:auto}
-</style></head><body>
-<nav id="nav"></nav>
-<main><h2 id="title">Overview</h2><div id="chart"></div><pre id="content">connecting...</pre></main>
-<script>
-const CHANNELS=["overview","portfolio","orders","positions","live","features","risk",
-"oms","research","paper","health","logs","metrics","alerts"];
-let active="overview";
-const nav=document.getElementById("nav");
-CHANNELS.forEach(c=>{const a=document.createElement("a");a.textContent=c;
-a.onclick=()=>{active=c;document.getElementById("title").textContent=c};nav.appendChild(a)});
-const proto=location.protocol==="https:"?"wss":"ws";
-const ws=new WebSocket(`${proto}://${location.host}/ws`);
-ws.onmessage=(e)=>{const f=JSON.parse(e.data);
- if(f.channel===active){document.getElementById("content").textContent=JSON.stringify(f.payload,null,2);}};
-</script></body></html>
-"""
 
 
 def _auth_dependency(
@@ -84,11 +59,9 @@ def build_dashboard_router(
     *,
     settings: DashboardSettings | None = None,
     manager: ConnectionManager | None = None,
-    differ: SnapshotDiffer | None = None,
 ) -> APIRouter:
     settings = settings or service.settings
     manager = manager or ConnectionManager()
-    differ = differ or SnapshotDiffer()
     router = APIRouter()
 
     view_dashboard = Depends(_auth_dependency(Permission.VIEW_DASHBOARD, settings))
@@ -168,7 +141,11 @@ def build_dashboard_router(
         selected = _parse_channels(channels)
         await websocket.accept()
         connection = manager.add(websocket, selected)
-        for frame in differ.snapshot_all(service, selected):
+        # Initial full snapshot for the subscribed channels; the shared broadcaster then
+        # pushes only changed channels (see run_broadcaster).
+        for channel in selected:
+            payload = service.channel_payload(channel)
+            frame = WSFrame(kind="snapshot", channel=channel.value, payload=payload)
             await websocket.send_json(frame.model_dump(mode="json"))
         try:
             while True:
@@ -213,13 +190,13 @@ def create_dashboard_app(
     settings: DashboardSettings | None = None,
     enable_broadcaster: bool = False,
 ) -> FastAPI:
+    """Standalone dashboard app (used in tests). Production mounts the router into the
+    single application via `build_dashboard_router` — see `alphaquant.api.app`."""
     settings = settings or service.settings
     manager = ConnectionManager()
     differ = SnapshotDiffer()
     app = FastAPI(title=settings.title)
-    app.include_router(
-        build_dashboard_router(service, settings=settings, manager=manager, differ=differ)
-    )
+    app.include_router(build_dashboard_router(service, settings=settings, manager=manager))
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
 

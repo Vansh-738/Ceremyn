@@ -46,6 +46,9 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", 
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["DTZ001", "DTZ005"]
+# The dashboard shell is a single inlined HTML/CSS/JS document, not Python prose:
+# line-length and ambiguous-unicode rules do not apply to that markup blob.
+"src/alphaquant/dashboard/shell.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
