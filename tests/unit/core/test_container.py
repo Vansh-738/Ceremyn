@@ -14,6 +14,7 @@ from alphaquant.llm.watchlist import InMemoryWatchlistStore
 from alphaquant.oms.engine import OrderManagementEngine
 from alphaquant.paper.engine import PaperTradingEngine
 from alphaquant.research.experiment_manager import ExperimentManager
+from alphaquant.runtime.orchestrator import RuntimeOrchestrator
 
 
 def make_container() -> Container:
@@ -53,6 +54,7 @@ RUNTIME_ENGINE_ATTRS = (
     "experiment_manager",
     "conversation_store",
     "watchlist_store",
+    "orchestrator",
 )
 
 
@@ -77,6 +79,7 @@ def test_runtime_engine_types() -> None:
     assert isinstance(container.experiment_manager, ExperimentManager)
     assert isinstance(container.conversation_store, InMemoryConversationStore)
     assert isinstance(container.watchlist_store, InMemoryWatchlistStore)
+    assert isinstance(container.orchestrator, RuntimeOrchestrator)
 
 
 def test_runtime_engines_share_one_risk_engine() -> None:
@@ -144,3 +147,22 @@ def test_llm_client_constructs_when_credentials_are_present() -> None:
     container = Container(settings)
     assert isinstance(container.llm_client, ClaudeClient)
     assert container.llm_client is container.llm_client
+
+
+def test_oms_engine_journal_is_persisted_and_stable_across_containers(
+    tmp_path, monkeypatch
+) -> None:
+    """`oms_engine` must use a durable, stably-named journal (not the default
+    in-memory one, not a random-uuid session id) so a restart re-opens the *same*
+    file rather than starting fresh empty every time."""
+    from alphaquant.oms.journal import JSONJournalStore
+
+    monkeypatch.chdir(tmp_path)  # `JSONJournalStore`'s default root is a relative path
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    first = Container(settings).oms_engine
+    second = Container(settings).oms_engine  # a fresh process/container, same settings
+
+    assert isinstance(first.journal.store, JSONJournalStore)
+    assert first.journal.session_id == second.journal.session_id == f"oms-{settings.environment}"
+    assert first.journal.store.path == second.journal.store.path

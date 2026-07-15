@@ -91,8 +91,12 @@ def create_app(
         # The snapshot broadcaster pushes changed channels to connected dashboard clients
         # on a fixed poll; the event bridge (when a container is wired) pushes live engine
         # events (heartbeat/reconnect/market open-close) the instant they're published.
+        # The orchestrator (also only when a real container exists — the dashboard-service
+        # test bypass never touches an engine) owns the actual trading lifecycle: starting
+        # the live feed, driving strategies through risk/OMS, and graceful shutdown.
         if container is not None:
             EventBridge().register(container.event_bus, _FrameSink(manager))
+            await container.orchestrator.start()
         task = asyncio.create_task(run_broadcaster(service, differ, manager, dashboard_settings))
         try:
             yield
@@ -100,6 +104,8 @@ def create_app(
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+            if container is not None:
+                await container.orchestrator.stop()
 
     app = FastAPI(title="AlphaQuant", version=alphaquant.__version__, lifespan=lifespan)
 

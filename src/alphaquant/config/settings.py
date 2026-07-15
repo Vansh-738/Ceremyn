@@ -57,6 +57,12 @@ class ExecutionSettings(BaseModel):
     arming_secret: SecretStr = SecretStr("")
 
 
+class RuntimeSettings(BaseModel):
+    # Cadence of the orchestrator's maintenance loop: fill polling, heartbeat
+    # staleness checks, and reconciliation.
+    poll_interval_seconds: float = Field(default=2.0, gt=0)
+
+
 class DataSettings(BaseModel):
     underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
     # Annualized risk-free rate used for greeks/IV (proxy: 91-day T-bill yield).
@@ -168,6 +174,7 @@ class Settings(BaseSettings):
     data: DataSettings = Field(default_factory=DataSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)
     execution: ExecutionSettings = Field(default_factory=ExecutionSettings)
+    runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
 
     @property
     def effective_mode(self) -> TradingMode:

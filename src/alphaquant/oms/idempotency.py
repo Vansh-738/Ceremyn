@@ -1,6 +1,7 @@
 """Idempotency support for OMS submissions."""
 
 from collections import defaultdict
+from collections.abc import Iterable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,3 +33,15 @@ class InMemoryIdempotencyStore:
 
     def duplicate_count(self, request_hash: str) -> int:
         return self._duplicate_counts[request_hash]
+
+    def seed(self, records: Iterable[tuple[str, UUID]]) -> None:
+        """Pre-populate reservations from restored state (e.g. after a restart).
+
+        Never overwrites an existing reservation — restoring is additive, not
+        authoritative over anything already reserved in this process.
+        """
+        for request_hash, oms_order_id in records:
+            self._records.setdefault(
+                request_hash,
+                IdempotencyRecord(request_hash=request_hash, oms_order_id=oms_order_id),
+            )

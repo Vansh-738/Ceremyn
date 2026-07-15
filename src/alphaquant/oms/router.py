@@ -4,7 +4,9 @@ from collections.abc import Mapping
 
 from alphaquant.oms.broker import BrokerAdapter
 from alphaquant.oms.exceptions import OMSBrokerCapabilityError, OMSValidationError
-from alphaquant.oms.orders import OMSOrder
+from alphaquant.oms.orders import OMSOrder, PlanOrderRole
+
+_BRACKET_ROLES = frozenset({PlanOrderRole.TAKE_PROFIT, PlanOrderRole.STOP_LOSS})
 
 
 class BrokerRouter:
@@ -20,7 +22,7 @@ class BrokerRouter:
 
     def route(self, oms_order: OMSOrder) -> BrokerAdapter:
         broker = self._brokers[self._default_broker]
-        if oms_order.role is not oms_order.role.ENTRY and not broker.capabilities.supports_brackets:
+        if oms_order.role in _BRACKET_ROLES and not broker.capabilities.supports_brackets:
             raise OMSBrokerCapabilityError(
                 f"broker {broker.name} does not support bracket child orders"
             )

@@ -41,6 +41,7 @@ class PlanOrderRole(StrEnum):
     ENTRY = "entry"
     TAKE_PROFIT = "take_profit"
     STOP_LOSS = "stop_loss"
+    COMPENSATION = "compensation"
 
 
 class OrderIntent(BaseModel):

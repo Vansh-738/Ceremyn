@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -7,13 +8,17 @@ from alphaquant.oms import (
     BrokerCapabilities,
     BrokerExecutionReport,
     BrokerOrderStatus,
+    JSONJournalStore,
     OMSDuplicateRequestError,
     OMSExecutionState,
+    OMSJournal,
     OMSKillSwitchActiveError,
     OrderManagementEngine,
+    PlanOrderRole,
 )
-from alphaquant.risk import RiskEngine
-from tests.unit.oms.conftest import T0, FakeBroker, make_signal
+from alphaquant.oms.compensation import compensate_siblings
+from alphaquant.risk import RiskDecision, RiskEngine
+from tests.unit.oms.conftest import T0, FakeBroker, make_multi_leg_signal, make_signal
 
 
 def make_engine(
@@ -150,3 +155,140 @@ def test_bracket_children_fail_to_activate_when_kill_switch_armed(risk_engine: R
         )
     )
     assert engine.orders[child.oms_order_id].execution_state is OMSExecutionState.FAILED
+
+
+def test_multi_leg_signal_compensates_siblings_when_one_leg_is_rejected(
+    risk_engine: RiskEngine,
+) -> None:
+    signal = make_multi_leg_signal(legs=4)
+    rejected_symbol = signal.legs[2].contract.tradingsymbol
+    broker = FakeBroker(reject_tradingsymbols=frozenset({rejected_symbol}))
+    engine = make_engine(risk_engine, broker)
+
+    orders = engine.submit_signal(signal, now=T0)
+
+    rejected_leg = next(o for o in orders if o.order.contract.tradingsymbol == rejected_symbol)
+    assert rejected_leg.execution_state is OMSExecutionState.FAILED
+
+    surviving_legs = [o for o in orders if o.order.contract.tradingsymbol != rejected_symbol]
+    assert len(surviving_legs) == 3
+    # Every surviving leg was still resting (unfilled) when the rejection landed, so
+    # compensation cancels each one outright rather than submitting a closing order.
+    for leg in surviving_legs:
+        assert engine.orders[leg.oms_order_id].execution_state is OMSExecutionState.CANCELLED
+
+
+def test_submit_correlated_signals_compensates_across_signals_on_risk_rejection(
+    risk_engine: RiskEngine,
+) -> None:
+    """Calendar-Spread-shaped: two single-leg signals sharing a correlation_id, the
+    second rejected by risk after the first is already live -- the first must be
+    unwound rather than left as a naked leg."""
+
+    class RejectSecondSignal(RiskEngine):
+        def __init__(self, settings: object) -> None:
+            super().__init__(settings)  # type: ignore[arg-type]
+            self.calls = 0
+
+        def validate(self, portfolio, signal, *, evaluated_at=None):  # type: ignore[no-untyped-def]
+            self.calls += 1
+            if self.calls == 2:
+                return RiskDecision(
+                    approved=False,
+                    risk_score=0.0,
+                    violations=["test: reject second leg"],
+                    timestamp=evaluated_at or T0,
+                )
+            return super().validate(portfolio, signal, evaluated_at=evaluated_at)
+
+    from tests.unit.oms.conftest import permissive_settings
+
+    correlation_id = uuid4()
+    near_leg = make_signal(correlation_id=correlation_id)
+    far_leg = make_signal(correlation_id=correlation_id)
+    broker = FakeBroker()
+    engine = make_engine(RejectSecondSignal(permissive_settings()), broker)
+
+    orders = engine.submit_correlated_signals([near_leg, far_leg], now=T0)
+
+    entries = [o for o in orders if o.role is PlanOrderRole.ENTRY]
+    assert len(entries) == 1  # only the first signal's leg was ever accepted
+    # It was still resting (unfilled) when its sibling was rejected, so it gets
+    # cancelled rather than closed with an offsetting order.
+    assert engine.orders[entries[0].oms_order_id].execution_state is OMSExecutionState.CANCELLED
+
+
+def test_bypass_kill_switch_lets_a_filled_leg_be_flattened_while_new_orders_stay_blocked(
+    risk_engine: RiskEngine,
+) -> None:
+    """Once a leg has actually filled, compensating it means submitting a real
+    offsetting order — and that must go through even if something (e.g. an automatic
+    drawdown trip) has since armed the kill switch, while genuinely new signals stay
+    blocked as normal."""
+    broker = FakeBroker()
+    engine = make_engine(risk_engine, broker)
+    (order,) = engine.submit_signal(make_signal(), now=T0)
+    filled = engine.process_execution_report(
+        BrokerExecutionReport(
+            external_order_id=order.external_order_id or "",
+            status=BrokerOrderStatus.FILLED,
+            broker_timestamp=T0 + timedelta(seconds=1),
+            fill_id="fill-1",
+            last_fill_quantity=order.order.quantity,
+            fill_price=Decimal("150"),
+            remaining_quantity=0,
+        )
+    )
+    assert filled.execution_state is OMSExecutionState.FILLED
+
+    engine.arm_kill_switch("automatic drawdown trip", at=T0 + timedelta(seconds=2))
+    compensate_siblings(engine, [filled], at=T0 + timedelta(seconds=3))
+
+    compensations = [o for o in engine.orders.values() if o.role is PlanOrderRole.COMPENSATION]
+    assert len(compensations) == 1
+    assert compensations[0].parent_order_id == filled.oms_order_id
+    assert compensations[0].execution_state in {
+        OMSExecutionState.PENDING,
+        OMSExecutionState.FILLED,
+    }
+
+    # A brand new signal is still correctly blocked -- the bypass is scoped to
+    # compensation only, never a general kill-switch override.
+    with pytest.raises(OMSKillSwitchActiveError):
+        engine.submit_signal(make_signal(correlation_id=None), now=T0 + timedelta(seconds=4))
+
+
+def test_restore_from_journal_rebuilds_state_across_engine_instances(
+    risk_engine: RiskEngine, tmp_path
+) -> None:
+    store = JSONJournalStore("restart-session", root=tmp_path)
+    journal_a = OMSJournal("restart-session", store=store)
+    broker = FakeBroker()
+    engine_a = OrderManagementEngine(
+        risk_engine=risk_engine,
+        brokers={"fake": broker},
+        default_broker="fake",
+        journal=journal_a,
+    )
+    signal = make_signal()
+    (order,) = engine_a.submit_signal(signal, now=T0)
+
+    store_b = JSONJournalStore("restart-session", root=tmp_path)
+    journal_b = OMSJournal("restart-session", store=store_b)
+    engine_b = OrderManagementEngine(
+        risk_engine=risk_engine,
+        brokers={"fake": FakeBroker()},
+        default_broker="fake",
+        journal=journal_b,
+    )
+    engine_b.restore_from_journal()
+
+    assert order.oms_order_id in engine_b.orders
+    assert engine_b.orders[order.oms_order_id].request_hash == order.request_hash
+    if order.external_order_id is not None:
+        assert engine_b.external_index[order.external_order_id] == order.oms_order_id
+    # The idempotency reservation is restored too: resubmitting the *same* signal
+    # (same signal_id, hence same request_hash) against the "restarted" engine is
+    # suppressed rather than duplicated.
+    with pytest.raises(OMSDuplicateRequestError):
+        engine_b.submit_signal(signal, now=T0)

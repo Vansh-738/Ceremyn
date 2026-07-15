@@ -47,6 +47,7 @@ class FakeKite:
 
     def orders(self) -> list[dict[str, Any]]:
         self._maybe_fail()
+        tag = (self.place_order_kwargs or {}).get("tag", "hash-1")
         return [
             {
                 "order_id": "KITE-1",
@@ -55,6 +56,7 @@ class FakeKite:
                 "pending_quantity": 0,
                 "average_price": 121.5,
                 "order_timestamp": datetime(2026, 7, 15, 9, 45),
+                "tag": tag,
             }
         ]
 
@@ -136,7 +138,7 @@ def test_submit_maps_order_to_kite_call() -> None:
         "order_type": "MARKET",
         "price": None,
         "trigger_price": None,
-        "tag": "strategy-1",
+        "tag": "hash-1",
     }
 
 
@@ -265,21 +267,31 @@ def test_capabilities() -> None:
 
 
 def test_lookup_order_finds_matching_request_hash() -> None:
-    class KiteWithHash(FakeKite):
-        def orders(self) -> list[dict[str, Any]]:
-            entries = super().orders()
-            entries[0]["status_message"] = "hash-1"
-            return entries
-
-    broker = KiteBroker(KiteWithHash())
+    broker = KiteBroker(FakeKite())
     command = make_submit_command()
-    # fetch_orders never carries request_hash from Kite; lookup_order only matches when
-    # a snapshot's request_hash equals the command's — verify the "no match" and "match"
-    # branches directly against the private mapper isn't needed, so patch fetch_orders.
     snapshots = broker.fetch_orders()
     matching = snapshots[0].model_copy(update={"request_hash": command.request_hash})
     broker.fetch_orders = lambda: (matching,)  # type: ignore[method-assign]
     assert broker.lookup_order(command) is matching
+
+
+def test_lookup_order_recovers_from_kite_tag_without_local_state() -> None:
+    """The exact regression this fix targets: a submission whose response was lost
+    (so this process never locally recorded anything) must still be found, because
+    the idempotency key travels in Kite's own `tag` field, not local memory."""
+    command = make_submit_command()
+
+    class KiteAlreadyHoldingTheOrder(FakeKite):
+        def orders(self) -> list[dict[str, Any]]:
+            entries = super().orders()
+            entries[0]["tag"] = command.request_hash
+            return entries
+
+    fresh_broker = KiteBroker(KiteAlreadyHoldingTheOrder())  # never called .submit()
+    found = fresh_broker.lookup_order(command)
+    assert found is not None
+    assert found.external_order_id == "KITE-1"
+    assert found.request_hash == command.request_hash
 
 
 class TestParseTimestamp:

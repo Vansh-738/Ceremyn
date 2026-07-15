@@ -1,5 +1,6 @@
 """Order management engine."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -10,10 +11,17 @@ from alphaquant.backtest.commission import IndianCostModel
 from alphaquant.core.timeutils import now_utc
 from alphaquant.domain import Signal
 from alphaquant.oms.broker import BrokerAdapter, BrokerExecutionReport
+from alphaquant.oms.compensation import compensate_siblings as _compensate_siblings_impl
+from alphaquant.oms.compensation import (
+    mark_submission_failed,
+    needs_compensation,
+)
+from alphaquant.oms.compensation import submit_correlated_signals as _submit_correlated_impl
 from alphaquant.oms.events import OMSEvent, OMSEventType
 from alphaquant.oms.exceptions import (
     OMSDuplicateRequestError,
     OMSKillSwitchActiveError,
+    OMSNonRetryableBrokerError,
     OMSRiskRejectedError,
 )
 from alphaquant.oms.executor import BrokerExecutor
@@ -34,6 +42,7 @@ from alphaquant.oms.orders import (
 )
 from alphaquant.oms.positions import OMSPortfolio
 from alphaquant.oms.reconciliation import OMSReconciler, ReconciliationReport
+from alphaquant.oms.restore import rebuild_oms_state
 from alphaquant.oms.retry import RetryPolicy
 from alphaquant.oms.router import BrokerRouter
 from alphaquant.oms.validators import OMSValidator
@@ -129,18 +138,45 @@ class OrderManagementEngine:
                         payload={"request_hash": existing.request_hash},
                     )
                 )
-                self.orders[duplicate] = suppressed
+                self._persist_order(suppressed, at=timestamp)
                 self.metrics.record_duplicate()
                 raise OMSDuplicateRequestError(existing.request_hash)
-            self.orders[oms_order.oms_order_id] = oms_order
+            self._persist_order(oms_order, at=timestamp)
             if oms_order.parent_order_id is not None:
                 self._children.setdefault(oms_order.parent_order_id, []).append(
                     oms_order.oms_order_id
                 )
             if planned_order.submit_immediately:
-                oms_order = self._submit_existing_order(oms_order.oms_order_id, at=timestamp)
+                try:
+                    oms_order = self._submit_existing_order(oms_order.oms_order_id, at=timestamp)
+                except OMSNonRetryableBrokerError as exc:
+                    # The broker itself rejected this specific leg (bad margin, invalid
+                    # instrument, ...) — record it as a failed leg rather than letting the
+                    # exception abort the remaining legs of a multi-leg plan; compensation
+                    # below decides what happens to any siblings already live/filled.
+                    oms_order = mark_submission_failed(
+                        self, oms_order.oms_order_id, reason=str(exc), at=timestamp
+                    )
             orders.append(self.orders[oms_order.oms_order_id])
+
+        if needs_compensation(orders):
+            _compensate_siblings_impl(self, orders, at=timestamp)
         return tuple(orders)
+
+    def submit_correlated_signals(
+        self,
+        signals: Sequence[Signal],
+        *,
+        now: datetime | None = None,
+    ) -> tuple[OMSOrder, ...]:
+        """Submit every signal from one strategy tick as a cohesive group.
+
+        See `oms.compensation.submit_correlated_signals` for the full rationale —
+        kept as a thin delegate here so callers keep using `engine.submit_correlated_
+        signals(...)` while the implementation lives alongside the rest of the
+        compensation logic.
+        """
+        return _submit_correlated_impl(self, signals, now=now)
 
     def cancel_order(
         self,
@@ -170,7 +206,7 @@ class OrderManagementEngine:
         for event in result.events:
             order = order.with_event(event)
             self._record_event(event)
-        self.orders[oms_order_id] = order
+        self._persist_order(order, at=command.requested_at)
         return order
 
     def replace_order(
@@ -203,14 +239,14 @@ class OrderManagementEngine:
         for event in result.events:
             order = order.with_event(event)
             self._record_event(event)
-        self.orders[oms_order_id] = order
+        self._persist_order(order, at=command.requested_at)
         return order
 
     def process_execution_report(self, report: BrokerExecutionReport) -> OMSOrder:
         oms_order_id = self.external_index[report.external_order_id]
         order = self.orders[oms_order_id]
         updated, fill, duplicate = self.fill_processor.process(order, report)
-        self.orders[oms_order_id] = updated
+        self._persist_order(updated, at=report.broker_timestamp)
         if duplicate:
             self.metrics.record_duplicate()
         self.metrics.record_broker_health(success=True)
@@ -319,8 +355,11 @@ class OrderManagementEngine:
             self._record_event(order.event_log[-1])
         return order
 
-    def _submit_existing_order(self, oms_order_id: UUID, *, at: datetime) -> OMSOrder:
-        if self.kill_switch.armed:
+    def _submit_existing_order(
+        self, oms_order_id: UUID, *, at: datetime, bypass_kill_switch: bool = False
+    ) -> OMSOrder:
+        kill_switch_armed = self.kill_switch.armed and not bypass_kill_switch
+        if kill_switch_armed:
             raise OMSKillSwitchActiveError(self.kill_switch.reason or "OMS kill switch is armed")
         order = self.orders[oms_order_id]
         broker = self.router.route(order)
@@ -337,7 +376,7 @@ class OrderManagementEngine:
         self.validator.validate_submit(
             command,
             broker.capabilities,
-            kill_switch_armed=self.kill_switch.armed,
+            kill_switch_armed=kill_switch_armed,
         )
         self.journal.record_command(command)
         self.ledger.append(
@@ -368,7 +407,7 @@ class OrderManagementEngine:
             self.metrics.record_rejection()
         if order.external_order_id is not None:
             self.external_index[order.external_order_id] = order.oms_order_id
-        self.orders[oms_order_id] = order
+        self._persist_order(order, at=at)
         return order
 
     def _activate_children(self, parent_order_id: UUID, *, at: datetime) -> None:
@@ -387,7 +426,7 @@ class OrderManagementEngine:
                             },
                         )
                     )
-                    self.orders[child_id] = failed
+                    self._persist_order(failed, at=at)
                     self._record_event(failed.event_log[-1])
                     continue
                 self._submit_existing_order(child_id, at=at)
@@ -401,3 +440,20 @@ class OrderManagementEngine:
                 payload=event.model_dump(mode="json"),
             )
         )
+
+    def _persist_order(self, order: OMSOrder, *, at: datetime) -> None:
+        self.orders[order.oms_order_id] = order
+        self.journal.record_order_snapshot(order, at=at)
+
+    def restore_from_journal(self) -> None:
+        """Rebuild `orders`/`external_index`/`_children`/idempotency from the journal.
+
+        Pure local-disk state rebuild — never touches a broker. Call once after
+        construction (e.g. at the composition root); intentionally not automatic in
+        `__init__` so bare-constructed engines (tests) never do file I/O by surprise.
+        """
+        state = rebuild_oms_state(self.journal.store)
+        self.orders = dict(state.orders)
+        self.external_index = dict(state.external_index)
+        self._children = {parent: list(child_ids) for parent, child_ids in state.children.items()}
+        self.idempotency.seed(state.idempotency_seed)

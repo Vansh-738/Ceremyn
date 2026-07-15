@@ -24,7 +24,8 @@ from alphaquant.oms.exceptions import (
     OMSValidationError,
 )
 from alphaquant.oms.ledger import OMSLedger
-from alphaquant.oms.orders import OMSOrder, ReplaceOrderCommand, SubmitOrderCommand
+from alphaquant.oms.orders import OMSOrder, PlanOrderRole, ReplaceOrderCommand, SubmitOrderCommand
+from alphaquant.oms.router import BrokerRouter
 from tests.unit.oms.conftest import T0, FakeBroker, make_signal
 from tests.unit.oms.test_support import make_oms_order
 
@@ -181,6 +182,31 @@ def test_journal_json_store_metrics_positions_and_reconcile(tmp_path) -> None:
     assert report.reconciled is True
 
 
+def test_order_snapshot_round_trips_through_journal(tmp_path) -> None:
+    from alphaquant.oms.journal import JSONJournalStore
+    from alphaquant.oms.restore import rebuild_oms_state
+
+    store = JSONJournalStore("session", root=tmp_path)
+    journal = OMSJournal("session", store=store)
+
+    parent = make_oms_order()
+    child = make_oms_order().model_copy(
+        update={"parent_order_id": parent.oms_order_id, "request_hash": "child-hash"}
+    )
+    # A later snapshot for the same order supersedes the earlier one (append-only log).
+    journal.record_order_snapshot(parent, at=T0)
+    updated_parent = parent.model_copy(update={"external_order_id": "ext-parent-final"})
+    journal.record_order_snapshot(updated_parent, at=T0)
+    journal.record_order_snapshot(child, at=T0)
+
+    state = rebuild_oms_state(store)
+    assert set(state.orders) == {parent.oms_order_id, child.oms_order_id}
+    assert state.orders[parent.oms_order_id].external_order_id == "ext-parent-final"
+    assert state.external_index["ext-parent-final"] == parent.oms_order_id
+    assert state.children[parent.oms_order_id] == [child.oms_order_id]
+    assert (parent.request_hash, parent.oms_order_id) in state.idempotency_seed
+
+
 def test_validators_and_router_guard_capabilities() -> None:
     validator = OMSValidator()
     order = make_oms_order()
@@ -221,3 +247,24 @@ def test_validators_and_router_guard_capabilities() -> None:
             BrokerCapabilities(supports_replace=False),
             kill_switch_armed=False,
         )
+
+
+def test_router_only_gates_bracket_roles_on_supports_brackets() -> None:
+    """Regression: `route()` used to raise for *any* non-ENTRY role (including the new
+    COMPENSATION role) whenever `supports_brackets` was False — a compensation order has
+    nothing to do with bracket children and must route like a normal ENTRY order."""
+    broker = FakeBroker(capabilities=BrokerCapabilities(supports_brackets=False))
+    router = BrokerRouter({"only": broker}, default_broker="only")
+    entry_order = make_oms_order()
+    assert router.route(entry_order) is broker
+
+    compensation_order = entry_order.model_copy(update={"role": PlanOrderRole.COMPENSATION})
+    assert router.route(compensation_order) is broker
+
+    take_profit_order = entry_order.model_copy(update={"role": PlanOrderRole.TAKE_PROFIT})
+    with pytest.raises(OMSBrokerCapabilityError):
+        router.route(take_profit_order)
+
+    stop_loss_order = entry_order.model_copy(update={"role": PlanOrderRole.STOP_LOSS})
+    with pytest.raises(OMSBrokerCapabilityError):
+        router.route(stop_loss_order)

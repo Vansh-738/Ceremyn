@@ -33,6 +33,7 @@ class OMSEventType(StrEnum):
     RECONCILIATION_COMPLETED = "reconciliation_completed"
     KILL_SWITCH_ARMED = "kill_switch_armed"
     KILL_SWITCH_DISARMED = "kill_switch_disarmed"
+    COMPENSATION_SUBMITTED = "compensation_submitted"
 
 
 class OMSEvent(BaseModel):

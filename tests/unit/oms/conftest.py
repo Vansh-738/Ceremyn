@@ -19,6 +19,7 @@ from alphaquant.oms import (
     OMSRetryableError,
 )
 from alphaquant.oms.broker import BrokerCancelResult, BrokerReplaceResult
+from alphaquant.oms.exceptions import OMSNonRetryableBrokerError
 from alphaquant.risk import RiskEngine
 from tests.unit.backtest.helpers import make_contract
 
@@ -54,6 +55,31 @@ def make_signal(*, style: str = "market", correlation_id: UUID | None = None) ->
     )
 
 
+def make_multi_leg_signal(*, legs: int = 4, correlation_id: UUID | None = None) -> Signal:
+    """An Iron-Condor-shaped signal: several distinct-strike legs in one Signal."""
+    return Signal(
+        strategy_id="strategy-1",
+        signal_type=SignalAction.ENTER,
+        created_at=T0,
+        market_timestamp=T0,
+        correlation_id=correlation_id,
+        metadata={"execution": {"style": "market"}},
+        legs=tuple(
+            SignalLeg(
+                contract=make_contract(
+                    symbol=f"NIFTY26JUL{25000 + index * 100}CE",
+                    expiry=EXPIRY,
+                    strike=str(25000 + index * 100),
+                ),
+                side=Side.BUY,
+                lots=1,
+            )
+            for index in range(legs)
+        ),
+        reason="enter",
+    )
+
+
 class FakeBroker:
     def __init__(
         self,
@@ -61,11 +87,13 @@ class FakeBroker:
         name: str = "fake",
         capabilities: BrokerCapabilities | None = None,
         fail_first_submit: bool = False,
+        reject_tradingsymbols: frozenset[str] = frozenset(),
     ) -> None:
         self._name = name
         self._capabilities = capabilities or BrokerCapabilities(supports_replace=True)
         self._fail_first_submit = fail_first_submit
         self._submit_attempts = 0
+        self._reject_tradingsymbols = reject_tradingsymbols
         self.orders: dict[str, BrokerOrderSnapshot] = {}
         self.reports: list[BrokerExecutionReport] = []
         self.positions: dict[str, int] = {}
@@ -84,6 +112,8 @@ class FakeBroker:
         self._submit_attempts += 1
         if self._fail_first_submit and self._submit_attempts == 1:
             raise OMSRetryableError("temporary timeout")
+        if command.order.contract.tradingsymbol in self._reject_tradingsymbols:
+            raise OMSNonRetryableBrokerError("broker rejected this leg")
         external_order_id = f"ext-{command.oms_order_id}"
         snapshot = BrokerOrderSnapshot(
             external_order_id=external_order_id,

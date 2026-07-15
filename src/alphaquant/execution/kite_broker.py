@@ -74,10 +74,6 @@ class KiteBroker:
         self._kite = kite
         self._name = name
         self._variety = variety
-        # Kite has no concept of AlphaQuant's request_hash/correlation_id, so idempotent
-        # lookup requires tracking submissions locally, same as `SimulatedBroker`.
-        self._request_hash_by_order: dict[str, str] = {}
-        self._correlation_by_order: dict[str, str | None] = {}
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "KiteBroker":
@@ -110,13 +106,15 @@ class KiteBroker:
             order_type=order.order_type.value,
             price=float(order.limit_price) if order.limit_price is not None else None,
             trigger_price=float(order.trigger_price) if order.trigger_price is not None else None,
-            tag=command.strategy_id[:20] or None,
+            # The tag is the idempotency key, not a label: Kite stores it server-side and
+            # returns it on every `orders()` call, so `lookup_order` can recover it from
+            # Kite itself even when this process never locally recorded the submission
+            # (e.g. the call below raised before returning). Truncated to Kite's ~20-char
+            # tag limit — unverified against a live/sandbox account, same caveat class as
+            # the rest of this class (see PROJECT_CONTEXT.md).
+            tag=command.request_hash[:20],
         )
         external_id = str(order_id)
-        self._request_hash_by_order[external_id] = command.request_hash
-        self._correlation_by_order[external_id] = (
-            str(command.correlation_id) if command.correlation_id else None
-        )
         return BrokerSubmissionResult(
             external_order_id=external_id, broker_timestamp=command.requested_at
         )
@@ -152,12 +150,14 @@ class KiteBroker:
         return BrokerReplaceResult(accepted=True, broker_timestamp=command.requested_at)
 
     def lookup_order(self, command: SubmitOrderCommand) -> BrokerOrderSnapshot | None:
-        expected_correlation = str(command.correlation_id) if command.correlation_id else None
+        # Queries Kite's own order book rather than any local bookkeeping, so this works
+        # even when `submit()` raised before this process recorded anything (the exact
+        # "timeout after Kite already accepted the order" case retries must detect) and
+        # even after a process restart. `request_hash` alone is sufficient: it already
+        # incorporates `correlation_id` (see `OrderPlanner.request_hash`), so no separate
+        # correlation match is needed.
         for snapshot in self.fetch_orders():
-            if (
-                snapshot.correlation_id == expected_correlation
-                and snapshot.request_hash == command.request_hash
-            ):
+            if snapshot.request_hash == command.request_hash:
                 return snapshot
         return None
 
@@ -215,8 +215,8 @@ class KiteBroker:
             filled_quantity=int(entry.get("filled_quantity") or 0),
             remaining_quantity=int(entry.get("pending_quantity") or 0),
             average_price=_decimal_or_none(entry.get("average_price")),
-            correlation_id=self._correlation_by_order.get(external_id),
-            request_hash=self._request_hash_by_order.get(external_id),
+            # Recovered straight from Kite's own response — no local bookkeeping needed.
+            request_hash=str(entry.get("tag") or "") or None,
             message=str(entry.get("status_message") or ""),
         )
 

@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from alphaquant.paper.engine import PaperTradingEngine
     from alphaquant.research.experiment_manager import ExperimentManager
     from alphaquant.research.experiment_store import JSONExperimentStore
+    from alphaquant.runtime.orchestrator import RuntimeOrchestrator
 
 
 class Container:
@@ -221,12 +222,25 @@ class Container:
     @cached_property
     def oms_engine(self) -> "OrderManagementEngine":
         from alphaquant.oms.engine import OrderManagementEngine
+        from alphaquant.oms.journal import JSONJournalStore, OMSJournal
 
-        return OrderManagementEngine(
+        # A stable session id (not a random uuid4) so a restart re-opens the *same*
+        # journal file rather than starting a fresh, empty one — the whole point of
+        # persisting it. `restore_from_journal()` rebuilds `orders`/`external_index`/
+        # `_children`/idempotency purely from local disk; it never touches a broker
+        # (the broker round-trip reconciliation happens once in
+        # `RuntimeOrchestrator.start()`, which is the component whose job is actually
+        # reaching out to the world on startup).
+        session_id = f"oms-{self.settings.environment}"
+        journal = OMSJournal(session_id, store=JSONJournalStore(session_id))
+        engine = OrderManagementEngine(
             risk_engine=self.risk_engine,
             brokers={"execution": self.gated_broker},
             default_broker="execution",
+            journal=journal,
         )
+        engine.restore_from_journal()
+        return engine
 
     @cached_property
     def paper_engine(self) -> "PaperTradingEngine":
@@ -261,6 +275,22 @@ class Container:
             feature_engine=self.feature_engine,
             heartbeat=self.heartbeat_monitor,
             reconnect=self.reconnect_manager,
+        )
+
+    @cached_property
+    def orchestrator(self) -> "RuntimeOrchestrator":
+        from alphaquant.runtime.orchestrator import RuntimeOrchestrator
+
+        # Empty strategies by default — same safe posture as `paper_engine`: which
+        # strategies actually trade is a product decision, not part of runtime wiring.
+        # No streaming client either (no Kite session-auth flow exists yet, see
+        # PROJECT_CONTEXT.md), so the tick consumer stays correctly wired but inert
+        # until both are configured.
+        return RuntimeOrchestrator(
+            live_engine=self.live_engine,
+            oms_engine=self.oms_engine,
+            strategies=(),
+            poll_interval_seconds=self.settings.runtime.poll_interval_seconds,
         )
 
     @cached_property

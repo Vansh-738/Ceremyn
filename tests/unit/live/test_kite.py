@@ -17,6 +17,11 @@ class FakeTicker:
         self.unsubscribed: list[list[int]] = []
         self.modes: list[tuple[str, list[int]]] = []
         self.on_ticks: Any = None
+        self.on_connect: Any = None
+        self.on_close: Any = None
+        self.on_error: Any = None
+        self.on_reconnect: Any = None
+        self.on_noreconnect: Any = None
 
     def connect(self, threaded=False) -> None:
         self.connected = threaded
@@ -34,12 +39,25 @@ class FakeTicker:
         self.modes.append((mode, list(instrument_tokens)))
 
 
+class FakeLiveEngine:
+    def __init__(self) -> None:
+        self.reconnect_succeeded_count = 0
+        self.reconnect_failed_reasons: list[str] = []
+
+    async def on_reconnect_succeeded(self, *, when: datetime | None = None) -> None:
+        self.reconnect_succeeded_count += 1
+
+    async def on_reconnect_failed(self, reason: str, *, when: datetime | None = None) -> None:
+        self.reconnect_failed_reasons.append(reason)
+
+
 @pytest.mark.asyncio
 async def test_kite_streaming_client_delegates_and_binds_stream() -> None:
     ticker = FakeTicker()
     client = KiteStreamingClient(ticker)
     stream = AsyncTickStream()
-    client.bind_stream(stream)
+    engine = FakeLiveEngine()
+    client.bind_stream(stream, engine=engine)  # type: ignore[arg-type]
     client.connect()
     client.subscribe([1, 2])
     client.set_mode("full", [1, 2])
@@ -64,3 +82,28 @@ async def test_kite_streaming_client_delegates_and_binds_stream() -> None:
     assert ticker.unsubscribed == [[2]]
     assert ticker.modes == [("full", [1, 2])]
     assert batch.ticks[0]["instrument_token"] == 1
+
+
+@pytest.mark.asyncio
+async def test_bind_stream_wires_reconnect_lifecycle_to_the_engine() -> None:
+    ticker = FakeTicker()
+    client = KiteStreamingClient(ticker)
+    engine = FakeLiveEngine()
+    client.bind_stream(AsyncTickStream(), engine=engine)  # type: ignore[arg-type]
+
+    ticker.on_connect(None, {})
+    await asyncio.sleep(0.01)  # let the threadsafe-scheduled task run to completion
+    assert engine.reconnect_succeeded_count == 1
+
+    ticker.on_noreconnect(None)
+    await asyncio.sleep(0.01)
+    assert engine.reconnect_failed_reasons == ["kite ticker exhausted its own reconnect attempts"]
+
+    # Attempt-in-progress and transport noise are logged only, not routed to the
+    # engine — check_heartbeat() (silence-based) is the single source of truth.
+    ticker.on_close(None, 1006, "abnormal closure")
+    ticker.on_error(None, 1006, "abnormal closure")
+    ticker.on_reconnect(None, 1)
+    await asyncio.sleep(0.01)
+    assert engine.reconnect_succeeded_count == 1
+    assert len(engine.reconnect_failed_reasons) == 1

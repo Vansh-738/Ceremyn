@@ -11,7 +11,12 @@ from alphaquant.core.timeutils import now_utc
 from alphaquant.domain import Fill, PortfolioSnapshot, Signal
 from alphaquant.domain.market_data import _require_aware
 from alphaquant.oms.events import OMSEvent
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from alphaquant.oms.orders import (
+    CancelOrderCommand,
+    OMSOrder,
+    ReplaceOrderCommand,
+    SubmitOrderCommand,
+)
 from alphaquant.risk import RiskDecision
 
 
@@ -24,6 +29,7 @@ class JournalEntryKind(StrEnum):
     POSITION = "position"
     RECONCILIATION = "reconciliation"
     KILL_SWITCH = "kill_switch"
+    ORDER_SNAPSHOT = "order_snapshot"
 
 
 class JournalEntry(BaseModel):
@@ -146,3 +152,7 @@ class OMSJournal:
             {"armed": armed, "reason": reason},
             at=at,
         )
+
+    def record_order_snapshot(self, order: OMSOrder, *, at: datetime) -> None:
+        """Append the order's full current state — the source restart-recovery reads."""
+        self._record(JournalEntryKind.ORDER_SNAPSHOT, order.model_dump(mode="json"), at=at)
