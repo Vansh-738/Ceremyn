@@ -5,6 +5,7 @@ never instantiate each other's collaborators; they receive them from here
 (directly, or via FastAPI dependencies that delegate to the container).
 """
 
+from decimal import Decimal
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,8 @@ from alphaquant.core.events import EventBus
 # Type-checking-only imports: runtime imports inside the properties stay lazy
 # so that importing the container never drags in heavy infra modules.
 if TYPE_CHECKING:
+    from alphaquant.broker.adapter import NullBrokerAdapter
+    from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
     from alphaquant.data.providers.kite import KiteProvider
     from alphaquant.data.repositories.candles import CandleRepository
     from alphaquant.data.repositories.chains import (
@@ -27,6 +30,14 @@ if TYPE_CHECKING:
     from alphaquant.data.services.chain_analytics import ChainAnalyticsService
     from alphaquant.data.services.ingest import BhavcopyIngestService
     from alphaquant.data.services.snapshots import ChainService, ChainSnapshotJob
+    from alphaquant.features.cache import InMemoryFeatureCache
+    from alphaquant.features.engine import FeatureEngine
+    from alphaquant.live.engine import LiveMarketDataEngine
+    from alphaquant.live.reconnect import ReconnectManager
+    from alphaquant.oms.engine import OrderManagementEngine
+    from alphaquant.paper.engine import PaperTradingEngine
+    from alphaquant.research.experiment_manager import ExperimentManager
+    from alphaquant.research.experiment_store import JSONExperimentStore
 
 
 class Container:
@@ -123,3 +134,107 @@ class Container:
             self.calendar,
             self.settings.data.underlyings,
         )
+
+    # -- runtime engines (live, OMS, paper, risk, features, research) -------
+    #
+    # None of these touch Postgres/Redis/Kite: the dev environment has no DB and no
+    # broker credentials, so the runtime must construct and start cleanly without them.
+    # Each engine is a `cached_property` singleton, resolved lazily on first use.
+
+    @cached_property
+    def heartbeat_monitor(self) -> "ReadableHeartbeatMonitor":
+        from alphaquant.core.instrumentation import ReadableHeartbeatMonitor
+
+        return ReadableHeartbeatMonitor()
+
+    @cached_property
+    def reconnect_manager(self) -> "ReconnectManager":
+        from alphaquant.live.reconnect import ReconnectManager
+
+        return ReconnectManager()
+
+    @cached_property
+    def risk_engine(self) -> "ObservableRiskEngine":
+        from alphaquant.core.instrumentation import ObservableRiskEngine
+
+        return ObservableRiskEngine(self.settings)
+
+    @cached_property
+    def feature_cache(self) -> "InMemoryFeatureCache":
+        from alphaquant.features.cache import InMemoryFeatureCache
+
+        return InMemoryFeatureCache()
+
+    @cached_property
+    def feature_engine(self) -> "FeatureEngine":
+        from alphaquant.features.engine import FeatureEngine
+
+        return FeatureEngine(cache=self.feature_cache)
+
+    @cached_property
+    def null_broker(self) -> "NullBrokerAdapter":
+        from alphaquant.broker.adapter import NullBrokerAdapter
+
+        return NullBrokerAdapter()
+
+    @cached_property
+    def oms_engine(self) -> "OrderManagementEngine":
+        from alphaquant.backtest.portfolio import PortfolioConfig
+        from alphaquant.oms.engine import OrderManagementEngine
+        from alphaquant.oms.positions import OMSPortfolio
+
+        # Zero initial cash matches the null broker's zero cash, so reconciliation
+        # reads clean until a real broker (M13) is wired in.
+        return OrderManagementEngine(
+            risk_engine=self.risk_engine,
+            brokers={"none": self.null_broker},
+            default_broker="none",
+            portfolio=OMSPortfolio(PortfolioConfig(initial_cash=Decimal("0"))),
+        )
+
+    @cached_property
+    def paper_engine(self) -> "PaperTradingEngine":
+        from alphaquant.paper.engine import PaperTradingEngine
+
+        # No strategies configured by default: which strategies to run in paper
+        # mode is a product decision, not part of runtime wiring.
+        return PaperTradingEngine(
+            strategies=[],
+            risk_engine=self.risk_engine,
+            feature_engine=self.feature_engine,
+        )
+
+    @cached_property
+    def live_engine(self) -> "LiveMarketDataEngine":
+        from alphaquant.live.engine import LiveMarketDataEngine
+        from alphaquant.live.feed import UnderlyingDefinition
+
+        # No Kite credentials/instrument master in this environment, so there are no
+        # real index tokens. Negative sentinel tokens keep the subscription plan
+        # non-empty (required) without fabricating market data; no `client` is passed,
+        # so `.start()` stays a no-op and nothing produces fake ticks.
+        underlyings = tuple(
+            UnderlyingDefinition(name=name, index_symbol=name, index_token=-(position + 1))
+            for position, name in enumerate(self.settings.data.underlyings)
+        )
+        return LiveMarketDataEngine(
+            underlyings=underlyings,
+            contracts=(),
+            analytics=self.chain_analytics,
+            event_bus=self.event_bus,
+            feature_engine=self.feature_engine,
+            heartbeat=self.heartbeat_monitor,
+            reconnect=self.reconnect_manager,
+        )
+
+    @cached_property
+    def experiment_store(self) -> "JSONExperimentStore":
+        from alphaquant.research.experiment_store import JSONExperimentStore
+
+        return JSONExperimentStore()
+
+    @cached_property
+    def experiment_manager(self) -> "ExperimentManager":
+        from alphaquant.research.experiment_manager import ExperimentManager
+
+        return ExperimentManager(self.experiment_store)

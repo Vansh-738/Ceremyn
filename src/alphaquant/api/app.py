@@ -6,8 +6,10 @@ dashboard under `/dashboard` (UI at `/dashboard/`, JSON at `/dashboard/api/*`, l
 at `/dashboard/ws`). There is no second FastAPI application.
 
 The dashboard is presentation only: it is wired with read-only sources and can never place an
-order. Until the live/OMS/paper engines are wired into the composition root, the dashboard
-renders with empty sources (structure with no data) and populates as those sources connect.
+order. By default it reads from a `Container` (the composition root, `core/container.py`)
+built from `settings` — the live/OMS/paper/risk/feature/research engines are real, singleton
+instances; they render honest zero-state until something actually happens (no fabricated
+data). Passing an explicit `dashboard_service` (tests only) bypasses the container entirely.
 """
 
 import asyncio
@@ -18,15 +20,33 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 import alphaquant
+from alphaquant.api.runtime import build_dashboard_sources
 from alphaquant.config import Settings, get_settings
+from alphaquant.core.container import Container
 from alphaquant.core.logging import configure_logging
 from alphaquant.dashboard.api import build_dashboard_router, run_broadcaster
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
+from alphaquant.dashboard.backend import DashboardService
 from alphaquant.dashboard.config import DashboardSettings
-from alphaquant.dashboard.events import SnapshotDiffer
+from alphaquant.dashboard.events import EventBridge, SnapshotDiffer
+from alphaquant.dashboard.models import WSFrame
 from alphaquant.dashboard.websocket import ConnectionManager
 
 DASHBOARD_PREFIX = "/dashboard"
+
+
+class _FrameSink:
+    """Adapts `ConnectionManager` to `EventBridge`'s `FrameSink` protocol.
+
+    `ConnectionManager.broadcast` returns the number of clients it reached (used by the
+    snapshot broadcaster to count sends); `FrameSink.broadcast` returns `None`. This just
+    discards that count for the event-bridge path, without changing `ConnectionManager`.
+    """
+
+    def __init__(self, manager: ConnectionManager) -> None:
+        self._manager = manager
+
+    async def broadcast(self, frame: WSFrame) -> None:
+        await self._manager.broadcast(frame)
 
 
 class SystemStatus(BaseModel):
@@ -40,6 +60,7 @@ class SystemStatus(BaseModel):
 def create_app(
     settings: Settings | None = None,
     *,
+    container: Container | None = None,
     dashboard_service: DashboardService | None = None,
     dashboard_settings: DashboardSettings | None = None,
 ) -> FastAPI:
@@ -47,13 +68,24 @@ def create_app(
     configure_logging(settings)
 
     dashboard_settings = dashboard_settings or DashboardSettings()
-    service = dashboard_service or DashboardService(DashboardSources(), dashboard_settings)
+    # An explicit `dashboard_service` (tests only) bypasses the composition root
+    # entirely — no container is built, so nothing here touches an engine.
+    if dashboard_service is not None:
+        service = dashboard_service
+        container = None
+    else:
+        container = container or Container(settings)
+        service = DashboardService(build_dashboard_sources(container), dashboard_settings)
     manager = ConnectionManager()
     differ = SnapshotDiffer()
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        # The snapshot broadcaster pushes changed channels to connected dashboard clients.
+        # The snapshot broadcaster pushes changed channels to connected dashboard clients
+        # on a fixed poll; the event bridge (when a container is wired) pushes live engine
+        # events (heartbeat/reconnect/market open-close) the instant they're published.
+        if container is not None:
+            EventBridge().register(container.event_bus, _FrameSink(manager))
         task = asyncio.create_task(run_broadcaster(service, differ, manager, dashboard_settings))
         try:
             yield
@@ -85,4 +117,5 @@ def create_app(
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
     app.state.dashboard_service = service
+    app.state.container = container
     return app
