@@ -1,15 +1,17 @@
 """FastAPI application factory — the single production application.
 
 This is the only production entry point (`uvicorn alphaquant.api.main:app`). It serves the
-health/system endpoints, the Swagger docs (`/docs`), and mounts the read-only observability
-dashboard under `/dashboard` (UI at `/dashboard/`, JSON at `/dashboard/api/*`, live updates
-at `/dashboard/ws`). There is no second FastAPI application.
+health/system endpoints, the Swagger docs (`/docs`), and mounts three independent routers:
+the read-only observability dashboard (`/dashboard`), the triple-gated live-trading admin
+surface (`/execution`, M13), and the read-only LLM assistant (`/llm`, M12). There is no
+second FastAPI application, and each router is structurally separate from the others.
 
 The dashboard is presentation only: it is wired with read-only sources and can never place an
-order. By default it reads from a `Container` (the composition root, `core/container.py`)
-built from `settings` — the live/OMS/paper/risk/feature/research engines are real, singleton
-instances; they render honest zero-state until something actually happens (no fabricated
-data). Passing an explicit `dashboard_service` (tests only) bypasses the container entirely.
+order. By default everything reads from a `Container` (the composition root,
+`core/container.py`) built from `settings` — the live/OMS/paper/risk/feature/research engines
+are real, singleton instances; they render honest zero-state until something actually happens
+(no fabricated data). Passing an explicit `dashboard_service` (tests only) bypasses the
+container entirely — and with it, `/execution` and `/llm`, which both need a real container.
 """
 
 import asyncio
@@ -21,6 +23,8 @@ from pydantic import BaseModel
 
 import alphaquant
 from alphaquant.api.execution import build_execution_router
+from alphaquant.api.llm import build_llm_router
+from alphaquant.api.llm_runtime import build_assistant
 from alphaquant.api.runtime import build_dashboard_sources
 from alphaquant.config import Settings, get_settings
 from alphaquant.core.container import Container
@@ -34,6 +38,7 @@ from alphaquant.dashboard.websocket import ConnectionManager
 
 DASHBOARD_PREFIX = "/dashboard"
 EXECUTION_PREFIX = "/execution"
+LLM_PREFIX = "/llm"
 
 
 class _FrameSink:
@@ -122,6 +127,15 @@ def create_app(
         app.include_router(
             build_execution_router(container.live_trading_gate, settings),
             prefix=EXECUTION_PREFIX,
+        )
+        # Also separate from /dashboard and /execution: the assistant is read-only and
+        # incapable of ordering by construction (see alphaquant.llm's own docstring), but
+        # it's still its own router so a future change to one surface can't leak into another.
+        app.include_router(
+            build_llm_router(
+                build_assistant(container, service), container.watchlist_store, dashboard_settings
+            ),
+            prefix=LLM_PREFIX,
         )
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ

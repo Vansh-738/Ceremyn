@@ -37,6 +37,9 @@ if TYPE_CHECKING:
     from alphaquant.features.engine import FeatureEngine
     from alphaquant.live.engine import LiveMarketDataEngine
     from alphaquant.live.reconnect import ReconnectManager
+    from alphaquant.llm.client import ClaudeClient
+    from alphaquant.llm.conversation import InMemoryConversationStore
+    from alphaquant.llm.watchlist import InMemoryWatchlistStore
     from alphaquant.oms.engine import OrderManagementEngine
     from alphaquant.paper.engine import PaperTradingEngine
     from alphaquant.research.experiment_manager import ExperimentManager
@@ -271,3 +274,29 @@ class Container:
         from alphaquant.research.experiment_manager import ExperimentManager
 
         return ExperimentManager(self.experiment_store)
+
+    # -- LLM assistant (M12) -------------------------------------------------
+    #
+    # `llm_client` is the only one of these that touches the network — and only when
+    # actually called; construction just needs ALPHAQUANT_ANTHROPIC__API_KEY, exactly like
+    # `kite_broker` needs ALPHAQUANT_KITE__API_KEY. `conversation_store`/`watchlist_store`
+    # are session-scoped and in-memory only, by design (never persisted, never lives in
+    # configuration).
+
+    @cached_property
+    def llm_client(self) -> "ClaudeClient":
+        from alphaquant.llm.client import ClaudeClient
+
+        return ClaudeClient.from_settings(self.settings)
+
+    @cached_property
+    def conversation_store(self) -> "InMemoryConversationStore":
+        from alphaquant.llm.conversation import InMemoryConversationStore
+
+        return InMemoryConversationStore()
+
+    @cached_property
+    def watchlist_store(self) -> "InMemoryWatchlistStore":
+        from alphaquant.llm.watchlist import InMemoryWatchlistStore
+
+        return InMemoryWatchlistStore()

@@ -18,11 +18,12 @@ class Role(StrEnum):
 class Permission(StrEnum):
     VIEW_DASHBOARD = "view_dashboard"
     VIEW_LOGS = "view_logs"
+    USE_LLM = "use_llm"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
-    Role.VIEWER: frozenset({Permission.VIEW_DASHBOARD}),
-    Role.ADMIN: frozenset({Permission.VIEW_DASHBOARD, Permission.VIEW_LOGS}),
+    Role.VIEWER: frozenset({Permission.VIEW_DASHBOARD, Permission.USE_LLM}),
+    Role.ADMIN: frozenset({Permission.VIEW_DASHBOARD, Permission.VIEW_LOGS, Permission.USE_LLM}),
 }
 
 

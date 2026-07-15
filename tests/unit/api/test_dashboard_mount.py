@@ -150,3 +150,27 @@ class TestExecutionRouterSeparation:
         )
         paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
         assert not any(path.startswith("/execution") for path in paths)
+
+
+class TestLLMRouterSeparation:
+    """`/llm` (the analysis-only assistant, M12) is a deliberately separate router. It reads
+    through the same `DashboardService` the dashboard renders from, but is never reachable
+    under `/dashboard`, and mounting it never pulls execution/OMS write surfaces along with it."""
+
+    def test_llm_routes_are_not_reachable_under_dashboard(self) -> None:
+        app = make_app()
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert "/llm/chat" in paths
+        assert "/llm/watchlist/{session_id}" in paths
+        assert not any(path.startswith("/dashboard/llm") for path in paths)
+        assert not any(path.startswith("/dashboard") and "/llm" in path for path in paths)
+
+    def test_llm_router_absent_when_dashboard_service_is_explicit(self) -> None:
+        # No container -> no Assistant to build (needs Container's engines/stores) -> no
+        # /llm routes at all, same as /execution.
+        app = create_app(
+            Settings(_env_file=None),  # type: ignore[call-arg]
+            dashboard_service=DashboardService(DashboardSources()),
+        )
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert not any(path.startswith("/llm") for path in paths)

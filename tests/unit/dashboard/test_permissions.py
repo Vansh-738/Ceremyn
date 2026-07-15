@@ -54,6 +54,13 @@ class TestPermissions:
     def test_authorize_admin_logs(self) -> None:
         assert authorize("ADMIN", Permission.VIEW_LOGS, settings()) is Role.ADMIN
 
+    def test_viewer_can_use_llm(self) -> None:
+        assert role_has(Role.VIEWER, Permission.USE_LLM)
+        assert authorize("VIEW", Permission.USE_LLM, settings()) is Role.VIEWER
+
+    def test_admin_can_use_llm(self) -> None:
+        assert role_has(Role.ADMIN, Permission.USE_LLM)
+
 
 class TestBearerToken:
     def test_extracts_token(self) -> None:

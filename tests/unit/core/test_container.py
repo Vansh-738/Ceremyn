@@ -8,6 +8,9 @@ from alphaquant.execution import GatedBrokerAdapter, KiteBroker, LiveTradingGate
 from alphaquant.features.engine import FeatureEngine
 from alphaquant.live.engine import LiveMarketDataEngine
 from alphaquant.live.reconnect import ReconnectManager
+from alphaquant.llm.client import ClaudeClient
+from alphaquant.llm.conversation import InMemoryConversationStore
+from alphaquant.llm.watchlist import InMemoryWatchlistStore
 from alphaquant.oms.engine import OrderManagementEngine
 from alphaquant.paper.engine import PaperTradingEngine
 from alphaquant.research.experiment_manager import ExperimentManager
@@ -48,6 +51,8 @@ RUNTIME_ENGINE_ATTRS = (
     "live_engine",
     "experiment_store",
     "experiment_manager",
+    "conversation_store",
+    "watchlist_store",
 )
 
 
@@ -70,6 +75,8 @@ def test_runtime_engine_types() -> None:
     assert isinstance(container.paper_engine, PaperTradingEngine)
     assert isinstance(container.live_engine, LiveMarketDataEngine)
     assert isinstance(container.experiment_manager, ExperimentManager)
+    assert isinstance(container.conversation_store, InMemoryConversationStore)
+    assert isinstance(container.watchlist_store, InMemoryWatchlistStore)
 
 
 def test_runtime_engines_share_one_risk_engine() -> None:
@@ -121,3 +128,19 @@ def test_kite_broker_constructs_when_credentials_are_present() -> None:
     container = Container(settings)
     assert isinstance(container.kite_broker, KiteBroker)
     assert container.kite_broker is container.kite_broker
+
+
+def test_llm_client_is_never_touched_without_credentials() -> None:
+    container = make_container()
+    for attr in RUNTIME_ENGINE_ATTRS:
+        getattr(container, attr)
+    # No ALPHAQUANT_ANTHROPIC__API_KEY in this dev environment: `llm_client` would raise
+    # LLMProviderError if constructed, so nothing in ordinary runtime wiring may touch it.
+    assert "llm_client" not in container.__dict__
+
+
+def test_llm_client_constructs_when_credentials_are_present() -> None:
+    settings = Settings(_env_file=None, anthropic={"api_key": "demo-key"})  # type: ignore[call-arg]
+    container = Container(settings)
+    assert isinstance(container.llm_client, ClaudeClient)
+    assert container.llm_client is container.llm_client
