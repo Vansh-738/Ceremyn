@@ -1,11 +1,16 @@
 from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.dashboard.models import Channel
+from alphaquant.dashboard.models import Channel, StrategyEntry
 from tests.unit.dashboard.conftest import (
     FakeExecution,
     FakePaper,
     FakePortfolio,
     make_portfolio_snapshot,
 )
+
+
+class FakeStrategies:
+    def catalog(self) -> tuple[StrategyEntry, ...]:
+        return (StrategyEntry(strategy_type="iron_fly", class_name="IronFly"),)
 
 
 class TestFullService:
@@ -39,6 +44,18 @@ class TestExecutionView:
         assert view.armed is True
         assert view.live_trading_permitted is True
         assert view.active_broker == "kite"
+
+
+class TestStrategiesView:
+    def test_reflects_the_source(self) -> None:
+        service = DashboardService(DashboardSources(strategies=FakeStrategies()))
+        view = service.strategies()
+        assert len(view.strategies) == 1
+        assert view.strategies[0].strategy_type == "iron_fly"
+
+    def test_empty_without_a_source(self) -> None:
+        service = DashboardService(DashboardSources())
+        assert service.strategies().strategies == ()
 
 
 class TestEmptyService:

@@ -1,10 +1,10 @@
 # AlphaQuant — Project Context
 
 > Single source of truth for resuming work with minimal context loss. Last updated after
-> M12 (LLM Assistant), which followed M13 (Broker Integration) and the runtime-wiring commit
-> (`0528a27`) that preceded it — milestones landed out of numeric order; M13 was built first,
-> M12 second. Pair this with `CLAUDE.md` (enforced conventions) and `README.md` (setup +
-> roadmap).
+> M14 (Institutional Options Strategy Library), which followed M12 (LLM Assistant), M13
+> (Broker Integration), and the runtime-wiring commit (`0528a27`) that preceded them —
+> milestones have landed out of numeric order all session (M13 → M12 → M14). Pair this with
+> `CLAUDE.md` (enforced conventions) and `README.md` (setup + roadmap).
 
 ---
 
@@ -44,11 +44,13 @@ extensive backtesting, paper-before-live, production-quality code.
 | — | Runtime wiring: `core/container.py` constructs live/OMS/paper/risk/feature/research as real singletons; dashboard consumes real (if empty) state instead of `DashboardSources()` | ✅ |
 | M13 | Broker integration: real `KiteBroker`, `SimulatedBroker` fallback, triple-gate arming (`LiveTradingGate` + `GatedBrokerAdapter`), `/execution` admin API | ✅ |
 | M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, 12 capabilities, SSE streaming, `/llm` API, incapable of execution by construction | ✅ |
+| M14 | Institutional Options Strategy Library: shared declarative multi-leg engine + 6 new strategies (Iron Fly, Short Straddle, Vertical Spread + Bull Put/Bear Call presets, Calendar Spread) on top of the 3 existing (Iron Condor, Short Strangle, Expiry-Day Theta) — 9 total, adjustment rules, multi-expiry backtest support, dashboard + LLM catalog integration | ✅ |
 
-**Quality (all green):** 811 passed, 0 failed (unit suite; DB-gated integration tests skip
-locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict` (188 files), `lint-imports`
-(17 contracts, all KEPT) all clean. Overall coverage ~96.1% (CI gate is 85%); every M12 file is
-at 100% individually — see §11 for the (pre-existing, unrelated) DB-gated exceptions.
+**Quality (all green):** 912 passed, 0 failed (unit suite; DB-gated integration tests skip
+locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict` (197 files), `lint-imports`
+(17 contracts, all KEPT — no new contracts needed for M14) all clean. Overall coverage ~96%
+(CI gate is 85%); every M14 file is at 100% individually — see §12 for the (pre-existing,
+unrelated) exceptions.
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.
@@ -84,14 +86,21 @@ singleton, resolved on first use, never touching Postgres, Kite, or Anthropic un
 specific engine actually needs to (`kite_broker`/`kite_provider`/`llm_client` all raise without
 credentials — deliberately never touched by default; the same lazy-factory shape used for
 `GatedBrokerAdapter.live_factory` is reused for `Assistant`'s `client_factory`). `api/runtime.py`
-adapts the container's engines into the dashboard's read-only ports; `api/llm_runtime.py` adapts
-them (plus the already-built `DashboardService`) into the LLM assistant's read-only ports;
-`api/app.py::create_app()` wires all three and mounts `/execution` and `/llm` alongside
-`/dashboard`, each a structurally separate router.
+adapts the container's engines into the dashboard's read-only ports (plus, since M14, a
+`_StrategySourceAdapter` that needs no engine at all — a pure `strategies.catalog_entries()`
+read); `api/llm_runtime.py` adapts them (plus the already-built `DashboardService`) into the LLM
+assistant's read-only ports; `api/app.py::create_app()` wires all three and mounts `/execution`
+and `/llm` alongside `/dashboard`, each a structurally separate router.
 
-**Import-linter contracts (17, all KEPT)** — the load-bearing ones:
+**Import-linter contracts (17, all KEPT — unchanged by M14, none needed)** — the load-bearing
+ones:
 - `domain` is independent and cannot import infrastructure.
-- `strategies` cannot import `execution`/`broker`.
+- **`strategies` cannot import `execution`/`broker`** — held throughout M14: all 6 new strategy
+  files import only `alphaquant.domain` and their own package, same discipline as the 3
+  pre-existing ones, confirmed by `lint-imports` staying at 17/17 with zero new contracts.
+  `dashboard → alphaquant.strategies` (added for the M14 strategy-catalog channel, §11) was
+  already permitted — `strategies` was never in the "Dashboard cannot place orders" forbidden
+  list, since it has no execution-adjacent imports of its own to leak.
 - **`llm` cannot import `execution`/`risk`** — and because import-linter's `ForbiddenContract`
   checks transitively, this already forbids every package that itself reaches `risk`:
   `oms`, `paper`, `live`, `research`, `backtest`, `dashboard.backend` (confirmed by direct grep
@@ -151,7 +160,12 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
    `/execution` are separate FastAPI routers** — `api/llm.py` never references `api/execution.py`
    or `LiveTradingGate`; the only object shared between them is the read-only `Container`.
 4. **Identical strategy/risk code across backtest, paper, and live** — the runners drive the
-   same interfaces; never fork strategy logic per mode.
+   same interfaces; never fork strategy logic per mode. Held through M14: all 6 new strategies
+   are plain `Strategy[P]` subclasses driven by the same `StrategyContext`/`on_chain` interface
+   as the 3 pre-existing ones — no new runner-specific branching. The one deliberate exception is
+   Calendar Spread's cross-expiry data need (`ctx.other_expiries`): backtest populates it,
+   paper/live do not yet (§11), so the *strategy* is identical everywhere, but it structurally
+   degrades to never entering in paper/live today rather than acting on an incomplete chain.
 
 ---
 
@@ -181,14 +195,36 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   `services/pricing.py` (Black-Scholes price/greeks, Brent IV), `services/chain_analytics.py`
   (`iv_rank`, `iv_percentile`, `max_pain`, `atm_iv`, enrich), `services/ingest.py`,
   `services/snapshots.py` (`ChainService`, `ChainSnapshotJob`).
-- **`strategies/`** (565) — `base.py` (`Strategy` ABC + `StrategyContext` + `emit`), `registry.py`
-  (`register`, `create`, `available_types`), `common.py` (delta selection, exits), 3 built-ins:
-  `short_strangle`, `iron_condor`, `expiry_day_theta`.
+- **`strategies/`** (M14: 9 registered strategy types total) — `base.py` (`Strategy` ABC +
+  `StrategyContext` + `emit`; M14-added `other_expiries: Mapping[date, OptionChainSnapshot]`,
+  additive/empty-default, only Calendar Spread reads it), `registry.py` (`register`, `create`,
+  `available_types`, M14-added `strategy_class(type)` + `catalog_entries()` — the single shared
+  basis both the dashboard's and LLM's strategy-catalog DTOs build from), `common.py`
+  (delta/ATM selection, marks, credit-only `premium_exit_reason`; M14-added sign-safe
+  `net_pnl_pct`/`exit_reason_from_pnl_pct`, correct for both net-credit *and* net-debit
+  positions — needed because the original `premium_exit_reason` silently never fires for a
+  debit position). **M14's shared declarative multi-leg engine** (new, built for the 6 new
+  strategies only — the 3 pre-existing ones are untouched): `legs.py` (`LegSpec` — delta or ATM
+  selection, `resolve_legs`), `rules.py` (`EntryFilter`, `ExitRule`, `AdjustmentRule` +
+  `entry_allowed`/`evaluate_exit`/`evaluate_adjustment` pure evaluators), `multi_leg.py`
+  (`drive(strategy, ctx, params)` — the shared enter/exit/adjust driver every new strategy's
+  `on_chain` delegates to). **9 registered strategies**: `iron_condor`, `short_strangle`,
+  `expiry_day_theta` (M3, untouched) + `iron_fly`, `short_straddle`, `vertical_spread` (generic
+  2-leg credit/debit engine), `bull_put_spread`/`bear_call_spread` (thin presets over
+  `vertical_spread.py`, enforce `short_delta > long_delta` + fixed `option_type`),
+  `calendar_spread` (M14, standalone — not on the multi_leg engine, since its legs cross two
+  expiries; emits a *pair* of correlated single-leg `Signal`s sharing one `correlation_id`
+  rather than one multi-leg signal, because `Signal` requires every leg to share one expiry).
+  Adjustment rules (roll a breached short leg further OTM) are opt-in/off-by-default on the new
+  engine — a genuinely new capability, not retrofitted onto the 3 pre-existing strategies.
 - **`risk/`** (1139) — `engine.py` (`RiskEngine.evaluate/validate(portfolio, signal) →
   RiskDecision`), rule pipeline (`rules/`: drawdown, event, exposure, greeks, liquidity, margin,
   position, time, volatility), `registry.py`, `context.py`, `models.py`.
 - **`backtest/`** (1463) — `runner.py` (`BacktestRunner.run(events) → BacktestReport`), `engine.py`
-  (event-driven), `simulator.py` (`ExecutionSimulator`: market/limit/stop, partial fills),
+  (event-driven; M14: `latest_chains: dict[date, OptionChainSnapshot]` tracks one chain per
+  expiry alongside the pre-existing single `latest_chain`, feeding `StrategyContext.
+  other_expiries` on every `_run_strategy` call — additive, only Calendar Spread reads it),
+  `simulator.py` (`ExecutionSimulator`: market/limit/stop, partial fills),
   `fills.py` (`PendingOrderState`/`VirtualFill`/`ExecutionContext`), `portfolio.py`
   (`BacktestPortfolio` — the canonical accounting), `commission.py` (Indian cost model),
   `slippage.py`, `metrics.py` (`compute_statistics`), `statistics.py`, `walkforward.py`,
@@ -221,19 +257,24 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   `positions.py` (`OMSPortfolio`), `reconciliation.py` (`ReconciliationReport`), `state_machine.py`,
   `validators.py`, `events.py`.
 - **`dashboard/`** — read-only observability (see §9), including the M13 `execution` channel
-  (gate #3 status only, read-only), and (M12) `permissions.py`'s `Permission.USE_LLM` (granted
-  to both `Role.VIEWER` and `Role.ADMIN` — reused as-is by `/llm`'s auth, no new auth surface).
+  (gate #3 status only, read-only), (M12) `permissions.py`'s `Permission.USE_LLM` (granted
+  to both `Role.VIEWER` and `Role.ADMIN` — reused as-is by `/llm`'s auth, no new auth surface),
+  and (M14) `models.py::StrategyEntry`/`StrategyView` + `backend.py::StrategySource` protocol +
+  `DashboardService.strategies()` — a small new `GET /dashboard/api/strategies` channel listing
+  all 9 registered strategies + their JSON-schema params, mirroring the LLM's catalog tool.
 - **`api/`** — `app.py` (`create_app` — the single application: health/system + Swagger + mounts
   the dashboard at `/dashboard` and, when a container is wired, the admin router at
   `/execution` and the LLM assistant at `/llm`), `main.py` (`app = create_app()`; uvicorn entry),
   `runtime.py` (`build_dashboard_sources(container)` — composition-edge adapters translating
-  `Container` engines into the dashboard's read ports, including `_ExecutionSourceAdapter`),
+  `Container` engines into the dashboard's read ports, including `_ExecutionSourceAdapter` and,
+  since M14, `_StrategySourceAdapter` — the one adapter here that needs no `Container` engine at
+  all, a pure `strategies.catalog_entries()` read),
   `execution.py` (`build_execution_router` — `POST /execution/arm`, `POST /execution/disarm`,
   `GET /execution/status`; structurally separate from `/dashboard`, never imported by it),
   `llm_runtime.py` (M12 — `_ExperimentDetailAdapter`, `_RecapAdapter`; `build_assistant(container,
   dashboard_service) → Assistant`, wiring `container.llm_client` as a **lazy factory**, never
   touched at mount time), `llm.py` (M12 — `build_llm_router`; SSE endpoints, structurally
-  separate from both `/dashboard` and `/execution`). See §10 for the full M12 write-up.
+  separate from both `/dashboard` and `/execution`). See §10 for the M12 write-up, §11 for M14.
 - **`broker/`** — `NullBrokerAdapter` (raises on submit; used as a placeholder/test double),
   `SimulatedBroker` (the real safe-fallback broker OMS actually uses whenever ungated — reuses
   `paper.broker.PaperBroker` + `oms.positions.OMSPortfolio`).
@@ -243,8 +284,13 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   `providers.py` (structural Protocols: `DashboardReader` — duck-typed by the real
   `DashboardService`, `llm` never imports `alphaquant.dashboard`; `ExperimentDetailReader`,
   `RecapReader`), `snapshots.py` (`ExperimentDetailBrief`, `RecapBrief`, `StrategyCatalogEntry` —
-  new frozen DTOs for the two data needs nothing else in the platform exposed), `tools.py` (16
-  read-only tool definitions + dispatch table + `ToolResult(data, source)`), `assistant.py`
+  frozen DTOs; M14 added a `params_schema: dict[str, Any]` field, populated from each
+  strategy's `params_model.model_json_schema()`, so strategy-explanation answers can describe
+  configurable parameters for any of the 9 registered strategies with zero per-strategy code),
+  `tools.py` (16 read-only tool definitions + dispatch table + `ToolResult(data, source)`; M14
+  removed a hardcoded `_STRATEGY_CLASSES` dict that duplicated the registry — `get_strategy_
+  catalog` now derives from `strategies.catalog_entries()` directly, so new strategies need zero
+  `llm/` changes to appear in the catalog), `assistant.py`
   (`Assistant` — the single Claude tool-calling loop implementing all 12 capabilities;
   `chat/daily_recap/session_recap/generate_report/compare_experiments`; `StreamEvent`),
   `conversation.py` / `watchlist.py` (session-scoped, in-memory-only stores; bounded/LRU —
@@ -282,7 +328,14 @@ registered `test_backtest_strategy`).
 - Run one backtest: `BacktestRunner(strategy, definition, risk_engine, config).run(events) →
   BacktestReport` (`backtest/runner.py`).
 - Build a strategy: `create(StrategyDefinition) → Strategy`; `Strategy.on_chain(StrategyContext)
-  → list[Signal]`.
+  → list[Signal]`; `strategies.available_types()` / `strategy_class(type)` /
+  `catalog_entries()` (M14) to enumerate/introspect all 9 registered types.
+- Shared multi-leg engine (M14, `strategies/multi_leg.py`): `drive(strategy, ctx, params) →
+  list[Signal]` — the common enter/exit/adjust driver 5 of the 6 new strategies configure
+  instead of hand-implementing; `params` just needs `.lots` + `.legs: tuple[LegSpec,...]` +
+  `.entry: EntryFilter` + `.exit_rule: ExitRule` + `.adjustment: AdjustmentRule` (structural,
+  not a required base class). `legs.resolve_legs(chain, specs, lots) → tuple[SignalLeg,...] |
+  None`. `rules.entry_allowed/evaluate_exit/evaluate_adjustment`.
 - Risk check: `RiskEngine.evaluate(PortfolioSnapshot, Signal, evaluated_at=) → RiskDecision`
   (`.approved`, `.risk_score`, `.violations`).
 - Features: `FeatureEngine().compute_all(FeatureContext(as_of, underlying, chain, iv_history,
@@ -418,7 +471,77 @@ still mount and stream a clean error frame). Watchlist example: `curl -X POST
 
 ---
 
-## 11. Outstanding issues / known gaps
+## 11. Options Strategy Library (M14) — how it works
+
+Nine registered institutional multi-leg strategies total: 3 pre-existing (Iron Condor, Short
+Strangle, Expiry-Day Theta, all M3, untouched) + 6 new (Iron Fly, Short Straddle, Vertical
+Spread, Bull Put Spread, Bear Call Spread, Calendar Spread). Reuses Backtesting, Research Lab,
+Risk Engine, OMS, Paper Trading, Dashboard, and LLM Assistant with zero changes to any of
+them — confirmed during design review that `OrderPlanner`/`ExecutionSimulator` already build
+one order per leg generically (proven by the pre-existing 4-leg Iron Condor), `RiskEngine`
+evaluates any `Signal` shape generically, and Research Lab's `ExperimentManager`/`Optimizer` are
+fully generic over `strategy_type` strings.
+
+- **A shared declarative multi-leg engine, not 6 copy-pasted strategies.** `strategies/legs.py`
+  (`LegSpec` — delta-target or ATM selection) + `strategies/rules.py` (`EntryFilter`, `ExitRule`,
+  `AdjustmentRule` + pure evaluators) + `strategies/multi_leg.py` (`drive()` — the shared
+  enter/exit/adjust driver) let each of Iron Fly, Short Straddle, Vertical Spread declare *what*
+  legs/rules it wants via a flat, grid-search-friendly params model (same shape as the
+  pre-existing `IronCondorParams`) rather than hand-implementing chain lookups and P&L math
+  again. `bull_put_spread.py`/`bear_call_spread.py` are ~30-line presets subclassing
+  `VerticalSpreadParams`, fixing `option_type` and validating the credit-spread delta ordering
+  the name promises — zero duplicated logic between the generic engine and its two named
+  presets.
+- **A real, pre-existing bug this milestone fixed without touching the old code**: the
+  pre-existing `common.premium_exit_reason` silently never fires for a net-*debit* position
+  (guards `credit <= 0: return None` — correct for the 3 original credit-only strategies, wrong
+  once a debit strategy exists). New, additive `common.net_pnl_pct`/`exit_reason_from_pnl_pct`
+  compute P&L% correctly for both credit and debit entries; `premium_exit_reason` itself is
+  untouched, still used by the 3 original strategies exactly as before.
+- **Calendar Spread needed a genuine, scoped architecture extension**: `OptionChainSnapshot`
+  is single-expiry by design, and neither `BacktestEngine` nor `PaperTradingEngine` tracked more
+  than one "current" chain before M14. `StrategyContext` gained `other_expiries: Mapping[date,
+  OptionChainSnapshot]` (additive, empty default — the other 8 strategies never read it);
+  `BacktestEngine` gained `latest_chains: dict[date, OptionChainSnapshot]` alongside the
+  pre-existing single `latest_chain`, feeding `other_expiries` on every strategy invocation.
+  **Backtest/research only** — paper/live intentionally out of scope this milestone (§12) since
+  the live/paper data pipeline (`ChainService`/`ChainSnapshotJob`/`MarketTick`) only ever
+  snapshots one expiry per underlying; wiring true multi-expiry paper/live support is separate,
+  larger work. In paper/live mode Calendar Spread simply sees an empty `other_expiries` and
+  never enters — an honest degrade, not a crash, matching the platform's "never fabricate data"
+  philosophy already established for the dashboard/LLM.
+- **A domain constraint discovered mid-implementation, resolved without touching `domain/`**:
+  `Signal._derive_scope` (`domain/signals.py`) requires every leg within one `Signal` to share a
+  single expiry — a deliberate, foundational invariant. A calendar spread's near+far legs can
+  therefore never live in one `Signal`. `CalendarSpread` instead emits a *pair* of correlated
+  single-leg `Signal`s (same `correlation_id`, one per expiry) on both entry and exit. Structural
+  consequence: the risk engine evaluates each leg's signal independently rather than as one
+  atomic 2-leg decision — unlike every other multi-leg strategy here, it's possible in principle
+  for one Calendar Spread leg to be approved and the other rejected. Documented directly in
+  `calendar_spread.py`'s module docstring, not hidden.
+- **Adjustment rules are a genuinely new capability** (`AdjustmentRule`, opt-in, off by default):
+  when enabled, rolls the first short leg whose `|delta|` breaches a configured threshold
+  further OTM (closes the breached leg, opens a new one at a tighter target delta) as a single
+  `ADJUST` signal — `domain/enums.py::SignalAction.ADJUST` already existed but was unused before
+  M14. Demonstrated on the new multi-leg engine (available to Iron Fly/Short Straddle/Vertical
+  Spread and its presets); not retrofitted onto the 3 pre-existing strategies.
+- **Dashboard + LLM catalog integration, one shared source of truth.** `strategies/registry.py`
+  gained `strategy_class(type)` and `catalog_entries()` (plain dicts: strategy_type, class_name,
+  description, `params_model.model_json_schema()`). Both `llm/tools.py::_get_strategy_catalog`
+  (dropping a hardcoded `_STRATEGY_CLASSES` dict that duplicated the registry) and the new
+  `GET /dashboard/api/strategies` channel (`dashboard/models.py::StrategyEntry`/`StrategyView`,
+  `backend.py::StrategySource`, `api/runtime.py::_StrategySourceAdapter` — the one dashboard
+  adapter needing no `Container` engine at all) build their own DTOs from these same dicts, so
+  a 10th strategy needs zero `llm/`/`dashboard/` changes to appear in either surface.
+
+Run: same single app (`.venv/bin/uvicorn alphaquant.api.main:app --reload`); `curl
+127.0.0.1:8000/dashboard/api/strategies` lists all 9 with full JSON-schema params. No new
+settings, no new container providers — the strategy registry is pure, stateless Python state
+populated at import time.
+
+---
+
+## 12. Outstanding issues / known gaps
 
 1. **Logs source is a stub** — `LogSource` returns injected `LogRow`s; there is no structlog→ring-
    buffer bridge yet. Logs page renders whatever a log source provides (empty by default).
@@ -434,11 +557,12 @@ still mount and stream a clean error frame). Watchlist example: `curl -X POST
 5. `create_dashboard_app` still exists (test helper only). Production uses the single app.
 6. **`core/container.py`'s data-layer providers (`_db`, `instrument_repository`,
    `chain_service`, `kite_provider`, etc.) stay below the ~95% per-package coverage convention**
-   in isolation — pre-existing, requires Postgres/Kite creds to exercise, unrelated to M13/M12
-   (every M13- and M12-added provider is fully covered; see `test_kite_broker_is_never_touched_
-   without_credentials` / `test_kite_broker_constructs_when_credentials_are_present` and the
-   equivalent `test_llm_client_is_never_touched_without_credentials`-style tests in
-   `tests/unit/core/test_container.py`).
+   in isolation — pre-existing, requires Postgres/Kite creds to exercise, unrelated to
+   M13/M12/M14 (every M13- and M12-added provider is fully covered; see `test_kite_broker_is_
+   never_touched_without_credentials` / `test_kite_broker_constructs_when_credentials_are_
+   present` and the equivalent `test_llm_client_is_never_touched_without_credentials`-style
+   tests in `tests/unit/core/test_container.py`; M14 added no new container providers at all —
+   the strategy registry is stateless, populated at import time, no credentials involved).
 7. **M13's audit trail is in-memory only** (`LiveTradingGate`'s bounded `deque`) — resets on
    restart along with the armed state itself (by design). A `JSONJournalStore`-backed version,
    matching the existing "protocol + JSON store + in-memory" pattern, is a natural follow-up if
@@ -461,10 +585,32 @@ still mount and stream a clean error frame). Watchlist example: `curl -X POST
     "news summaries, earnings explainers" under LLM use is aspirational for a future data-source
     milestone; M12 does not summarize news or earnings because there is nothing to summarize
     (explicit scope exclusion, confirmed during the M12 design review, not an oversight).
+13. **Calendar Spread only trades in backtest/research** (M14, explicit scope decision — see
+    §11) — paper/live never populate `StrategyContext.other_expiries` today, since the
+    live/paper data pipeline (`ChainService.nearest_expiry` → `ChainSnapshotJob`) only ever
+    snapshots one expiry per underlying. The strategy degrades safely (never enters) rather than
+    acting on an incomplete chain; wiring true near+far snapshot support into the M2 data layer
+    and M8/M9 paper/live engines is separate, larger follow-up work.
+14. **A shared test helper hardcodes its tradingsymbol format regardless of expiry**
+    (`tests/unit/domain/conftest.py::make_contract` — `tradingsymbol=f"{underlying}25JUL
+    {strike}{suffix}"`, ignoring the `expiry` argument). Harmless for every single-expiry test
+    (M3–M13), but two same-strike different-expiry contracts built via this helper collide on
+    the same tradingsymbol — since position/order tracking is keyed by tradingsymbol, this
+    would silently net two calendar-spread legs against each other. Discovered and worked
+    around locally (not fixed in the shared helper, given its wide blast radius across
+    oms/live/data/risk/strategies tests) in `tests/unit/backtest/test_multi_expiry.py::
+    _with_distinct_tradingsymbols`. A real Kite tradingsymbol always encodes the actual
+    expiry, so this is purely a test-fixture gap, not a production one — worth fixing in the
+    shared helper if more multi-expiry test scenarios show up.
+15. **Adjustment rules (M14) are demonstrated, not battle-tested** — `AdjustmentRule`'s roll
+    logic (`rules.evaluate_adjustment`) is unit- and strategy-level tested (breach detection,
+    roll-target resolution, opt-in/disabled paths) but has never been exercised through a
+    multi-tick backtest showing a roll actually happening mid-trade over time; the current tests
+    construct the breach condition directly rather than letting the underlying move into it.
 
 ---
 
-## 12. Next tasks
+## 13. Next tasks
 
 - Optional, smaller follow-ups (none blocking anything currently planned): structlog→LogSource
   bridge; persistent (`JSONJournalStore`-backed) audit trail for `LiveTradingGate`; a dashboard
@@ -472,18 +618,20 @@ still mount and stream a clean error frame). Watchlist example: `curl -X POST
   experiment store / conversation store; wire the chain-snapshot scheduler for proprietary
   intraday history; verify `KiteBroker` and `ClaudeClient` against real Kite/Anthropic
   credentials once available; a news/earnings ingestion pipeline (would unlock the
-  currently-out-of-scope LLM capabilities CLAUDE.md mentions).
+  currently-out-of-scope LLM capabilities CLAUDE.md mentions); paper/live Calendar Spread
+  support (needs the M2/M8/M9 multi-expiry data-pipeline work from §12 item 13); fix
+  `make_contract`'s tradingsymbol format to encode expiry (§12 item 14).
 - **Live trading go-live checklist (before ever setting `ALPHAQUANT_TRADING_MODE=live` for
   real):** paper burn-in per the roadmap's own note, real Kite credentials configured, a real
   `execution.arming_secret` configured (not the empty default), and a deliberate, out-of-band
   decision to call `POST /execution/arm` — never automate that call.
-- No milestone is currently in progress. Every milestone through M13, plus M12 (landed after
-  M13 in this session), is ✅ (see §2); the roadmap has no further numbered milestone defined
-  yet — next steps are user-directed.
+- No milestone is currently in progress. Every milestone through M13, plus M12 and M14 (both
+  landed after M13 in this session), is ✅ (see §2); the roadmap has no further numbered
+  milestone defined yet — next steps are user-directed.
 
 ---
 
-## 13. Commands
+## 14. Commands
 
 ```bash
 # Tests (unit)                     integration needs: docker compose up -d postgres redis
@@ -506,37 +654,49 @@ ALPHAQUANT_EXECUTION__ARMING_SECRET=... .venv/bin/uvicorn alphaquant.api.main:ap
 
 ---
 
-## 14. Workflow conventions (how this project has been built)
+## 15. Workflow conventions (how this project has been built)
 
 - **Milestone-gated**: one module per milestone (M0…). After each: tests + all gates green →
   commit → **STOP and wait for user approval** before the next.
 - **Plan first for big work**: review the repo, present a design/plan (plan mode), get approval,
   then implement. Do not write code before architecture is approved on milestone-sized tasks.
-  M12 followed this exactly: repo review → design review (with two `AskUserQuestion`
-  clarifications: watchlist persistence, LLM API auth) → plan-mode approval → implementation.
+  M12 and M14 both followed this exactly: repo review → design review (M12: two
+  `AskUserQuestion` clarifications on watchlist persistence/LLM auth; M14: four, on Calendar
+  Spread's paper/live scope, the generic Vertical Spread shape, whether to touch the 3
+  pre-existing strategies, and dashboard integration depth — all four "recommended" options
+  accepted) → plan-mode approval → implementation.
 - **Do not modify completed modules** unless the task explicitly requires it. Exceptions so far:
   `api/app.py` (dashboard integration, then M13's `/execution` mount, then M12's `/llm` mount),
   M13's dashboard-port additions (`dashboard/backend.py`/`models.py`/`views.py`/`api.py` — a new
   `ExecutionSource` port + `ExecutionView` + `/api/execution` channel — explicitly requested as
   part of "reuse the Dashboard"), `config/settings.py` (new `ExecutionSettings`), `pyproject.toml`
-  (new import-linter contracts), and M12's single additive edit to `dashboard/permissions.py`
+  (new import-linter contracts), M12's single additive edit to `dashboard/permissions.py`
   (`Permission.USE_LLM`, granted to both existing roles — explicitly requested as part of
-  "reuse the dashboard's bearer-token settings" for LLM auth). When gaps surface in already-
-  completed modules that block a new milestone safely (e.g. `HeartbeatMonitor` had no public
-  state reader), prefer a composition-root-only subclass adding a pure accessor (see
-  `core/instrumentation.py`) over editing the completed module directly.
+  "reuse the dashboard's bearer-token settings" for LLM auth), and M14's purely-additive touches
+  to `strategies/base.py` (`other_expiries`, empty-default), `strategies/common.py` (+2 new
+  functions, the old `premium_exit_reason` untouched), `strategies/registry.py` (+2 new
+  accessors), `backtest/engine.py` (+`latest_chains` dict alongside the untouched
+  `latest_chain`), and the same M13-established `dashboard.backend`/`models`/`api` +
+  `api/runtime.py` port-addition pattern reused for a new `StrategySource` — every M14 diff to
+  a completed module is additive (new field/function/dict with a safe default), never a
+  behavior change to existing code paths, confirmed by the pre-existing test suites for those
+  modules passing unmodified. When gaps surface in already-completed modules that block a new
+  milestone safely (e.g. `HeartbeatMonitor` had no public state reader), prefer a
+  composition-root-only subclass adding a pure accessor (see `core/instrumentation.py`) over
+  editing the completed module directly.
 - **Commits**: milestone commits `M# Name`; otherwise Conventional Commits (`feat(ui): …`).
   End messages with `Co-Authored-By: Claude <model> <noreply@anthropic.com>` naming whichever
   model authored the commit (varies by session — check recent git log rather than assuming one).
   Branch off `main` only if asked; this project commits milestones directly to `main`.
 - `CLAUDE.md` and `AGENTS.md` are the same conventions in two files (tooling reads both).
 
-## 15. Git history (recent)
+## 16. Git history (recent)
 
-`M12 LLM Assistant` is this commit, immediately following `7f63e25` (`M13 Broker Integration`)
-below — milestones landed out of numeric order in this session (M13 first, M12 second).
+`M14 Options Strategy Library` is this commit, immediately following `f67a2ac` (`M12 LLM
+Assistant`) below — milestones landed out of numeric order this session (M13 → M12 → M14).
 
 ```
+f67a2ac M12 LLM Assistant
 7f63e25 M13 Broker Integration
 0528a27 feat(api): wire live/OMS/paper/risk/feature/research engines into the composition root
 b5db7be feat(ui): professional trading dashboard      07a3da8 M11 Dashboard & Observability

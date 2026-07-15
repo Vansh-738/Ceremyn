@@ -28,6 +28,7 @@ class Channel(StrEnum):
     METRICS = "metrics"
     ALERTS = "alerts"
     EXECUTION = "execution"
+    STRATEGIES = "strategies"
 
 
 class AlertSeverity(StrEnum):
@@ -332,6 +333,24 @@ class ExecutionView(BaseModel):
     armed: bool = False
     live_trading_permitted: bool = False
     active_broker: str = "simulated"
+
+
+class StrategyEntry(BaseModel):
+    """One registered strategy type: the same catalog the LLM assistant reads, surfaced for
+    the dashboard (M14)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    strategy_type: str
+    class_name: str
+    description: str = ""
+    params_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class StrategyView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    strategies: tuple[StrategyEntry, ...] = ()
 
 
 class OverviewView(BaseModel):

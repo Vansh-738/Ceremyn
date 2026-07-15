@@ -14,16 +14,7 @@ from alphaquant.llm.exceptions import LLMToolError
 from alphaquant.llm.providers import DashboardReader, ExperimentDetailReader, RecapReader
 from alphaquant.llm.snapshots import StrategyCatalogEntry
 from alphaquant.llm.watchlist import WatchlistStore
-from alphaquant.strategies import available_types
-from alphaquant.strategies.expiry_day_theta import ExpiryDayTheta
-from alphaquant.strategies.iron_condor import IronCondor
-from alphaquant.strategies.short_strangle import ShortStrangle
-
-_STRATEGY_CLASSES: dict[str, type[Any]] = {
-    "short_strangle": ShortStrangle,
-    "iron_condor": IronCondor,
-    "expiry_day_theta": ExpiryDayTheta,
-}
+from alphaquant.strategies import catalog_entries
 
 
 @dataclass(frozen=True)
@@ -114,18 +105,10 @@ def _get_alerts(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
 
 
 def _get_strategy_catalog(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
-    entries = [
-        StrategyCatalogEntry(
-            strategy_type=strategy_type,
-            class_name=cls.__name__,
-            description=(cls.__doc__ or "").strip(),
-        )
-        for strategy_type, cls in _STRATEGY_CLASSES.items()
-        if strategy_type in available_types()
-    ]
+    entries = [StrategyCatalogEntry(**entry) for entry in catalog_entries()]
     return ToolResult(
         data={"strategies": [entry.model_dump(mode="json") for entry in entries]},
-        source="strategies.available_types() + class docstrings",
+        source="strategies.catalog_entries()",
     )
 
 

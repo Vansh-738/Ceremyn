@@ -20,6 +20,7 @@ VIEW_PATHS = [
     "/api/health",
     "/api/metrics",
     "/api/alerts",
+    "/api/strategies",
 ]
 
 

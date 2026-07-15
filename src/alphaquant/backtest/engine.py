@@ -1,7 +1,7 @@
 """Event-driven backtest engine."""
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -54,6 +54,11 @@ class BacktestEngine:
         self.portfolio = portfolio or BacktestPortfolio(self.config.portfolio)
         self.simulator = simulator or ExecutionSimulator(config=self.config.simulation)
         self.latest_chain: OptionChainSnapshot | None = None
+        # Every chain event ever seen, keyed by expiry — lets a strategy that needs a second
+        # expiry's chain at the same instant (e.g. a calendar spread) see it via
+        # StrategyContext.other_expiries. `latest_chain` above still tracks the single
+        # most-recently-arrived one, unchanged, for the existing single-expiry code paths.
+        self.latest_chains: dict[date, OptionChainSnapshot] = {}
         self.quotes: dict[str, Quote] = {}
         self.candles: dict[str, Candle] = {}
         self.pending_orders: dict[str, list[PendingOrderState]] = defaultdict(list)
@@ -66,6 +71,7 @@ class BacktestEngine:
             self.candles[event.candle.tradingsymbol] = event.candle
         elif isinstance(event, OptionChainEvent):
             self.latest_chain = event.chain
+            self.latest_chains[event.chain.expiry] = event.chain
             for entry in event.chain.entries:
                 if entry.quote is not None:
                     self.quotes[entry.contract.tradingsymbol] = entry.quote
@@ -86,10 +92,14 @@ class BacktestEngine:
         return self.portfolio.snapshot()
 
     def _run_strategy(self, *, chain: OptionChainSnapshot) -> None:
+        other_expiries = {
+            expiry: c for expiry, c in self.latest_chains.items() if expiry != chain.expiry
+        }
         strategy_context = StrategyContext(
             chain=chain,
             portfolio=self.portfolio.snapshot(),
             now=chain.timestamp,
+            other_expiries=other_expiries,
         )
         for signal in self.strategy.on_chain(strategy_context):
             decision = self.risk_engine.evaluate(

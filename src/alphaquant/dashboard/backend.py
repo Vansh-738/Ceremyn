@@ -37,6 +37,8 @@ from alphaquant.dashboard.models import (
     ReconciliationStatus,
     ResearchView,
     RiskView,
+    StrategyEntry,
+    StrategyView,
 )
 from alphaquant.domain import PortfolioSnapshot
 from alphaquant.features.models import FeatureSet
@@ -115,6 +117,12 @@ class ExecutionSource(Protocol):
     def active_broker_name(self) -> str: ...
 
 
+class StrategySource(Protocol):
+    """A read-only catalog of registered strategy types — never an engine, never a broker."""
+
+    def catalog(self) -> tuple[StrategyEntry, ...]: ...
+
+
 @dataclass(frozen=True)
 class DashboardSources:
     """The set of read ports wired at the composition edge. Any may be absent."""
@@ -128,6 +136,7 @@ class DashboardSources:
     research: ResearchSource | None = None
     logs: LogSource | None = None
     execution: ExecutionSource | None = None
+    strategies: StrategySource | None = None
 
 
 class DashboardService:
@@ -224,6 +233,11 @@ class DashboardService:
             active_broker=source.active_broker_name(),
         )
 
+    def strategies(self) -> StrategyView:
+        source = self.sources.strategies
+        entries = source.catalog() if source is not None else ()
+        return StrategyView(strategies=entries)
+
     def metrics(self) -> MetricsView:
         oms_metrics = self.sources.oms.oms_metrics() if self.sources.oms else None
         live_metrics = self.sources.live.live_metrics() if self.sources.live else None
@@ -316,5 +330,6 @@ class DashboardService:
             Channel.METRICS: self.metrics,
             Channel.ALERTS: self.alerts,
             Channel.EXECUTION: self.execution,
+            Channel.STRATEGIES: self.strategies,
         }
         return dispatch[channel]()

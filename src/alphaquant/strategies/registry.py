@@ -37,3 +37,32 @@ def create(definition: StrategyDefinition) -> Strategy[Any]:
 
 def available_types() -> tuple[str, ...]:
     return tuple(sorted(_REGISTRY))
+
+
+def strategy_class(strategy_type: str) -> type[Strategy[Any]]:
+    """The registered class for `strategy_type` (not an instance — no params to validate)."""
+    try:
+        return _REGISTRY[strategy_type]
+    except KeyError as exc:
+        raise ConfigurationError(
+            f"unknown strategy type {strategy_type!r}; available: {sorted(_REGISTRY)}"
+        ) from exc
+
+
+def catalog_entries() -> tuple[dict[str, Any], ...]:
+    """Every registered strategy as a plain dict (`strategy_type`, `class_name`, `description`,
+    `params_schema`) — the shared basis for the dashboard's and LLM assistant's independently
+    owned strategy-catalog DTOs (each package builds its own frozen model from these fields;
+    neither imports the other)."""
+    entries = []
+    for strategy_type in available_types():
+        cls = strategy_class(strategy_type)
+        entries.append(
+            {
+                "strategy_type": strategy_type,
+                "class_name": cls.__name__,
+                "description": (cls.__doc__ or "").strip(),
+                "params_schema": cls.params_model.model_json_schema(),
+            }
+        )
+    return tuple(entries)

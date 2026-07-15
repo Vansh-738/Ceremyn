@@ -63,3 +63,4 @@ class StrategyCatalogEntry(BaseModel):
     strategy_type: str = Field(min_length=1)
     class_name: str = Field(min_length=1)
     description: str = ""
+    params_schema: dict[str, Any] = Field(default_factory=dict)

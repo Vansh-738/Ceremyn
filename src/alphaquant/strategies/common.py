@@ -93,3 +93,30 @@ def premium_exit_reason(
     if -profit_pct >= stop_loss_pct:
         return f"stop loss: {-profit_pct:.1f}% >= {stop_loss_pct:.0f}%"
     return None
+
+
+def net_pnl_pct(entry_cashflow: Decimal, close_cashflow: Decimal) -> float:
+    """P&L as a percentage of capital at risk, correct for both net-credit and net-debit
+    entries (unlike `premium_exit_reason`'s formula, which only holds for entry_cashflow > 0).
+
+    `entry_cashflow` is `net_entry_credit(...)` (positive = credit received at entry, negative
+    = debit paid). `close_cashflow` is `-net_close_cost(...)` (positive = would receive money
+    closing now, negative = would pay). P&L = entry_cashflow + close_cashflow; capital at risk
+    is `abs(entry_cashflow)`.
+    """
+    if entry_cashflow == 0:
+        return 0.0
+    return float((entry_cashflow + close_cashflow) / abs(entry_cashflow) * 100)
+
+
+def exit_reason_from_pnl_pct(
+    pnl_pct: float,
+    profit_target_pct: float,
+    stop_loss_pct: float,
+) -> str | None:
+    """Exit rationale from a signed P&L percentage (see `net_pnl_pct`), or None to stay in."""
+    if pnl_pct >= profit_target_pct:
+        return f"profit target: {pnl_pct:.1f}% >= {profit_target_pct:.0f}%"
+    if -pnl_pct >= stop_loss_pct:
+        return f"stop loss: {-pnl_pct:.1f}% >= {stop_loss_pct:.0f}%"
+    return None

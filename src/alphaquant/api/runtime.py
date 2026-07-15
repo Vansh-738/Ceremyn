@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from alphaquant.core.container import Container
 from alphaquant.core.timeutils import now_utc
 from alphaquant.dashboard.backend import DashboardSources, KillSwitchStatus
-from alphaquant.dashboard.models import ReconciliationStatus
+from alphaquant.dashboard.models import ReconciliationStatus, StrategyEntry
 from alphaquant.domain import PortfolioSnapshot
 from alphaquant.features.models import FeatureSet
 from alphaquant.live.heartbeat import HeartbeatState
@@ -24,6 +24,7 @@ from alphaquant.oms.orders import OMSOrder
 from alphaquant.paper.monitor import MonitorSnapshot
 from alphaquant.research.experiment import Experiment
 from alphaquant.risk import RiskDecision
+from alphaquant.strategies import catalog_entries
 
 # OMS reconciliation replays broker/ledger state and appends a journal entry on every
 # call — cheap once, but the WebSocket broadcaster polls every channel every ~1s
@@ -150,6 +151,15 @@ class _ExecutionSourceAdapter:
         return "kite" if self.live_trading_permitted() else "simulated"
 
 
+class _StrategySourceAdapter:
+    """A pure registry read (M14) — unlike every other adapter here, it needs no `Container`
+    engine at all; it's wired through `build_dashboard_sources` only for consistency with the
+    rest of this module's "every source may be absent unless wired here" shape."""
+
+    def catalog(self) -> tuple[StrategyEntry, ...]:
+        return tuple(StrategyEntry(**entry) for entry in catalog_entries())
+
+
 def build_dashboard_sources(container: Container) -> DashboardSources:
     """The composition edge: wraps `container`'s engines in read-only port adapters."""
     return DashboardSources(
@@ -160,4 +170,5 @@ def build_dashboard_sources(container: Container) -> DashboardSources:
         paper=_PaperSourceAdapter(container),
         research=_ResearchSourceAdapter(container),
         execution=_ExecutionSourceAdapter(container),
+        strategies=_StrategySourceAdapter(),
     )

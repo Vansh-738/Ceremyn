@@ -5,8 +5,30 @@ orders. They have no broker handle and cannot import the execution layer.
 Importing this package registers the built-in strategies.
 """
 
-from alphaquant.strategies import expiry_day_theta, iron_condor, short_strangle  # noqa: F401
+from alphaquant.strategies import (  # noqa: F401
+    bear_call_spread,
+    bull_put_spread,
+    calendar_spread,
+    expiry_day_theta,
+    iron_condor,
+    iron_fly,
+    short_straddle,
+    short_strangle,
+    vertical_spread,
+)
 from alphaquant.strategies.base import Strategy, StrategyContext
-from alphaquant.strategies.registry import available_types, create
+from alphaquant.strategies.registry import (
+    available_types,
+    catalog_entries,
+    create,
+    strategy_class,
+)
 
-__all__ = ["Strategy", "StrategyContext", "available_types", "create"]
+__all__ = [
+    "Strategy",
+    "StrategyContext",
+    "available_types",
+    "catalog_entries",
+    "create",
+    "strategy_class",
+]

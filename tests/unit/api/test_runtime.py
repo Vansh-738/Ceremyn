@@ -13,6 +13,7 @@ _PORT_METHODS = {
     "paper": ("monitor", "portfolio_snapshot"),
     "research": ("experiments",),
     "execution": ("is_armed", "live_trading_permitted", "active_broker_name"),
+    "strategies": ("catalog",),
 }
 
 
@@ -139,6 +140,26 @@ def test_execution_source_never_touches_kite_credentials() -> None:
     sources.execution.live_trading_permitted()
     sources.execution.active_broker_name()
     assert "kite_broker" not in container.__dict__
+
+
+def test_strategy_source_catalog() -> None:
+    sources = build_dashboard_sources(make_container())
+    assert sources.strategies is not None
+    entries = sources.strategies.catalog()
+    assert len(entries) >= 9  # 3 from M3 + 6 from M14
+    by_type = {entry.strategy_type: entry for entry in entries}
+    assert "calendar_spread" in by_type
+    assert by_type["calendar_spread"].class_name == "CalendarSpread"
+    assert "properties" in by_type["calendar_spread"].params_schema
+
+
+def test_strategy_source_needs_no_container_engine() -> None:
+    container = make_container()
+    sources = build_dashboard_sources(container)
+    assert sources.strategies is not None
+    sources.strategies.catalog()
+    for attr in ("oms_engine", "paper_engine", "live_engine", "risk_engine"):
+        assert attr not in container.__dict__, attr
 
 
 def test_sources_do_not_build_engines_eagerly() -> None:

@@ -5,11 +5,12 @@ The same on_chain interface is driven by the backtester, the paper trader, and
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime, time
+from collections.abc import Mapping
+from datetime import date, datetime, time
 from typing import Any, ClassVar, Generic, TypeVar, cast
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from alphaquant.core.timeutils import to_ist
 from alphaquant.domain import (
@@ -39,6 +40,9 @@ class StrategyContext(BaseModel):
     portfolio: PortfolioSnapshot | None = None
     iv_rank: float | None = None  # vs this underlying's IV history, 0..100
     now: datetime
+    # Other expiries of the same underlying known to the runner at this instant (e.g. for
+    # calendar spreads). Empty by default — zero behavior change for single-expiry strategies.
+    other_expiries: Mapping[date, OptionChainSnapshot] = Field(default_factory=dict)
 
     @field_validator("now")
     @classmethod
