@@ -2,13 +2,22 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import OptionContract, Position, Side
+from alphaquant.domain import EquityInstrument, Exchange, OptionContract, Position, Side
 from tests.unit.domain.conftest import make_contract
 
 
 @pytest.fixture
 def flat(nifty_call: OptionContract) -> Position:
     return Position(contract=nifty_call)
+
+
+def test_position_holds_a_non_option_instrument() -> None:
+    equity = EquityInstrument(
+        tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+    )
+    pos = Position(contract=equity).apply_fill(Side.BUY, 10, Decimal("2500"))
+    assert pos.quantity == 10
+    assert pos.unrealized_pnl(Decimal("2550")) == Decimal(500)
 
 
 class TestLongLifecycle:

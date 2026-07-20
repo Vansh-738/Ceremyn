@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from alphaquant.domain import (
     OptionChainSnapshot,
+    OptionContract,
     OptionType,
     Position,
     Side,
@@ -78,6 +79,8 @@ def _net_close_cost_across(
     for position in positions:
         if position.is_flat:
             continue
+        if not isinstance(position.contract, OptionContract):
+            return None
         chain = chains_by_expiry.get(position.contract.expiry)
         if chain is None:
             return None
@@ -202,8 +205,9 @@ class CalendarSpread(Strategy[CalendarSpreadParams]):
     def _exit_signals(self, ctx: StrategyContext, reason: str) -> list[Signal]:
         by_expiry: dict[date, list[Position]] = {}
         for position in ctx.positions:
-            if not position.is_flat:
-                by_expiry.setdefault(position.contract.expiry, []).append(position)
+            if position.is_flat or not isinstance(position.contract, OptionContract):
+                continue
+            by_expiry.setdefault(position.contract.expiry, []).append(position)
         correlation_id = uuid4()
         return [
             self._signal(

@@ -9,8 +9,20 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from alphaquant.config import RiskSettings, Settings
 from alphaquant.core.timeutils import to_ist
-from alphaquant.domain import PortfolioExposure, PortfolioGreeks, PortfolioSnapshot, Signal
+from alphaquant.domain import (
+    OptionContract,
+    PortfolioExposure,
+    PortfolioGreeks,
+    PortfolioSnapshot,
+    Signal,
+)
 from alphaquant.domain.enums import KillSwitchState, Side
+
+# Instruments with no expiry (e.g. equities) have no expiry-proximity risk to
+# measure; this sentinel makes `ExpiryRestrictionsRule`'s threshold checks a no-op
+# for them without threading `int | None` through every consumer. Asset-class-aware
+# time-based risk rules are a later milestone's scope, not this domain widening.
+_NO_EXPIRY_DAYS = 10**6
 
 
 def _as_decimal(value: object, default: Decimal = Decimal("0")) -> Decimal:
@@ -74,6 +86,8 @@ class RiskContext(BaseModel):
     def signal_notional(self) -> Decimal:
         total = Decimal("0")
         for leg in self.signal.legs:
+            if not isinstance(leg.contract, OptionContract):
+                continue
             quantity = leg.quantity
             total += leg.contract.strike * quantity
         return total
@@ -89,6 +103,8 @@ class RiskContext(BaseModel):
     @property
     def days_to_expiry(self) -> int:
         expiry = self.signal.expiry or self.signal.legs[0].contract.expiry
+        if expiry is None:
+            return _NO_EXPIRY_DAYS
         return (expiry - self.market_time.date()).days
 
     @property
@@ -152,9 +168,14 @@ class RiskContext(BaseModel):
 
         for leg in self.signal.legs:
             signed_quantity = leg.quantity if leg.side is Side.BUY else -leg.quantity
-            signed_notional = leg.contract.strike * signed_quantity
+            # Non-option notional contribution is 0 until asset-aware exposure
+            # dispatch lands; unreachable today (every leg is an option).
+            reference_price = (
+                leg.contract.strike if isinstance(leg.contract, OptionContract) else Decimal("0")
+            )
+            signed_notional = reference_price * signed_quantity
             signal_net_notional += signed_notional
-            signal_gross_notional += leg.contract.strike * leg.quantity
+            signal_gross_notional += reference_price * leg.quantity
             signal_net_units += signed_quantity
             if leg.side is Side.SELL:
                 signal_short_units += leg.quantity

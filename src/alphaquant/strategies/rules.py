@@ -6,7 +6,7 @@ strategy only needs to override what it actually wants to configure.
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from alphaquant.domain import Position, Side, SignalLeg
+from alphaquant.domain import OptionContract, Position, Side, SignalLeg
 from alphaquant.strategies.base import StrategyContext
 from alphaquant.strategies.common import (
     exit_reason_from_pnl_pct,
@@ -84,6 +84,20 @@ def evaluate_adjustment(
         return None
     for position in positions:
         if not position.is_short:
+            continue
+        if not isinstance(position.contract, OptionContract):
+            # Adjustment rolls are an options-chain concept; nothing to roll for a
+            # non-option position (no strategy produces one yet).
+            continue
+        if position.contract.expiry != ctx.chain.expiry:
+            # `chain.get()` matches by strike + option_type only, not expiry -- a
+            # position held across an expiry-listing change (e.g. the exchange
+            # shifts which weekly date a series trades on) would otherwise silently
+            # resolve to a *different* expiry's contract at the same strike, and
+            # rolling it would build a signal mixing two expiries (rejected by
+            # `Signal`'s own validation). Nothing else can currently re-evaluate
+            # this leg either, so it's left alone rather than adjusted against data
+            # that doesn't actually describe it.
             continue
         entry = ctx.chain.get(position.contract.strike, position.contract.option_type)
         if entry is None or entry.greeks is None:

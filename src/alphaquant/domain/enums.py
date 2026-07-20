@@ -15,6 +15,17 @@ class OptionType(StrEnum):
     PUT = "PE"
 
 
+class AssetClass(StrEnum):
+    """What kind of instrument a tradable `Instrument` represents."""
+
+    EQUITY = "EQUITY"
+    FUTURES = "FUTURES"
+    ETF = "ETF"
+    OPTION = "OPTION"
+    COMMODITY = "COMMODITY"
+    CURRENCY_FUTURES = "CURRENCY_FUTURES"
+
+
 class Side(StrEnum):
     BUY = "BUY"
     SELL = "SELL"

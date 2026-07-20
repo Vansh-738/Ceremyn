@@ -19,7 +19,7 @@ from alphaquant.domain.enums import (
     Side,
 )
 from alphaquant.domain.errors import OrderTransitionError
-from alphaquant.domain.instruments import OptionContract
+from alphaquant.domain.instruments import Instrument
 from alphaquant.domain.market_data import _require_aware
 
 VALID_TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
@@ -56,7 +56,7 @@ class Order(BaseModel):
 
     id: UUID = Field(default_factory=uuid4)
     signal_id: UUID | None = None
-    contract: OptionContract
+    contract: Instrument
     side: Side
     quantity: int = Field(gt=0)  # units, must be a whole number of lots
     order_type: OrderType

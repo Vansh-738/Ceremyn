@@ -1,10 +1,20 @@
 # AlphaQuant — Project Context
 
 > Single source of truth for resuming work with minimal context loss. Last updated after
-> M14 (Institutional Options Strategy Library), which followed M12 (LLM Assistant), M13
-> (Broker Integration), and the runtime-wiring commit (`0528a27`) that preceded them —
-> milestones have landed out of numeric order all session (M13 → M12 → M14). Pair this with
-> `CLAUDE.md` (enforced conventions) and `README.md` (setup + roadmap).
+> M16 (Domain & Instrument Generalization — the first milestone of the multi-asset platform
+> migration, see §17), which followed M15 (Trading Runtime & Production Readiness), M14
+> (Institutional Options Strategy Library), M12 (LLM Assistant), M13 (Broker Integration), and
+> the runtime-wiring commit (`0528a27`) that preceded them — milestones have landed out of
+> numeric order all session (M13 → M12 → M14 → M15 → M16). Pair this with `CLAUDE.md` (enforced
+> conventions) and `README.md` (setup + roadmap).
+>
+> **Note:** this file's own milestone table/status sections were stale through M15 (that
+> commit's own author never updated them — confirmed by diffing `PROJECT_CONTEXT.md` at HEAD,
+> which still read "last updated after M14" despite M15 being committed). M16 fixes that gap
+> for M15 and itself. Separately, the working tree also carries a large body of **pre-existing,
+> unrelated uncommitted work** (new strategies, a REST poller, service-management scripts —
+> see §12) that predates and is untouched by M16; it was deliberately left alone and not part
+> of this commit.
 
 ---
 
@@ -45,12 +55,16 @@ extensive backtesting, paper-before-live, production-quality code.
 | M13 | Broker integration: real `KiteBroker`, `SimulatedBroker` fallback, triple-gate arming (`LiveTradingGate` + `GatedBrokerAdapter`), `/execution` admin API | ✅ |
 | M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, 12 capabilities, SSE streaming, `/llm` API, incapable of execution by construction | ✅ |
 | M14 | Institutional Options Strategy Library: shared declarative multi-leg engine + 6 new strategies (Iron Fly, Short Straddle, Vertical Spread + Bull Put/Bear Call presets, Calendar Spread) on top of the 3 existing (Iron Condor, Short Strangle, Expiry-Day Theta) — 9 total, adjustment rules, multi-expiry backtest support, dashboard + LLM catalog integration | ✅ |
+| M15 | Trading Runtime & Production Readiness: new `runtime/` package (`Orchestrator` — live data → strategies → risk → OMS → broker → portfolio, fills/heartbeat/reconciliation polling loop; ships inert with zero strategies by default); `KiteTicker` callbacks drive the real heartbeat/reconnect state machine; OMS orders journaled and restored from `JSONJournalStore` at startup; `KiteBroker` order lookup round-trips Kite's own `tag` field; a shared compensation mechanism unwinds sibling legs of a multi-leg/correlated signal group when one leg is rejected. 936 tests passing at the time. | ✅ |
+| M16 | **Multi-asset migration begins** — Domain & Instrument Generalization: `AssetClass` enum + `EquityInstrument`/`FutureContract`/`ETFInstrument` alongside the existing `OptionContract`; `Position`/`Order`/`SignalLeg`/`Trade`/`ClosedTrade` widened from `OptionContract` to the generic `Instrument` base. Zero behavior change for any of the 9 option strategies. See §17. | ✅ |
 
-**Quality (all green):** 912 passed, 0 failed (unit suite; DB-gated integration tests skip
-locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict` (197 files), `lint-imports`
-(17 contracts, all KEPT — no new contracts needed for M14) all clean. Overall coverage ~96%
-(CI gate is 85%); every M14 file is at 100% individually — see §12 for the (pre-existing,
-unrelated) exceptions.
+**Quality (all green, M16):** 947 passed, 0 failed, 4 skipped. `ruff`, `ruff format --check`,
+`mypy --strict` (201 files), `lint-imports` (17 contracts, all KEPT — no new contracts needed
+for M16) all clean. **Verified in true isolation** — `git stash`-ed every pre-existing
+uncommitted file (see the note above and §12) before running the gate, so this reflects HEAD +
+M16's own 16 changed files only, not the combined tree. (936 tests passed at M15; the combined
+working tree including the pre-existing uncommitted WIP currently passes 1045 — a stale/inflated
+number if read as "M16's own scope," since most of the delta belongs to that other WIP.)
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.
@@ -185,11 +199,19 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   `BrokerError`), `container.py` (the composition root — see §4), `instrumentation.py`
   (`ReadableHeartbeatMonitor`, `ObservableRiskEngine` — composition-root-only subclasses that add
   pure read accessors over `live`/`risk` without touching those completed packages).
-- **`domain/`** (705) — pure models: `Instrument`/`OptionContract`, `Quote`/`Candle`,
-  `Greeks`, `OptionChainSnapshot` (+`pcr`, OI totals, `atm_strike`), `Signal`/`SignalLeg`,
-  `Order` (+ status state machine `transition_to`; `CREATED→SUBMITTED` is impossible — must pass
-  risk), `Fill`, `Position` (weighted-avg-cost accounting), `Trade`, `PortfolioSnapshot`
-  (+greeks/exposure/kill-switch), `StrategyDefinition`, enums.
+- **`domain/`** (705) — pure models: `Instrument` (generic base — `tradingsymbol`, `exchange`,
+  `tick_size`, `broker_token`, `underlying`, `expiry: date | None`, `lot_size`) with four
+  asset-class subclasses (M16): `OptionContract` (unchanged fields, `asset_class=OPTION`),
+  `EquityInstrument`/`ETFInstrument` (`lot_size` defaults to 1), `FutureContract` (`expiry`/
+  `lot_size` required, like options) — each sets `asset_class: ClassVar[AssetClass]`, mirroring
+  `Strategy.strategy_type`. `Quote`/`Candle`, `Greeks`, `OptionChainSnapshot` (+`pcr`, OI totals,
+  `atm_strike` — still `OptionContract`-only via `ChainEntry`, untouched by M16),
+  `Signal`/`SignalLeg` (M16: `SignalLeg.contract` widened to `Instrument`; `_derive_scope`'s
+  underlying/expiry equality checks needed no logic change since both fields now live on the
+  base class), `Order` (+ status state machine `transition_to`; `CREATED→SUBMITTED` is
+  impossible — must pass risk; M16: `contract` widened to `Instrument`), `Fill`, `Position`
+  (weighted-avg-cost accounting; M16: `contract` widened to `Instrument`), `Trade` (M16: same),
+  `PortfolioSnapshot` (+greeks/exposure/kill-switch), `StrategyDefinition`, enums (+`AssetClass`).
 - **`data/`** (1164) — `providers/bhavcopy.py` (NSE UDiFF download+parse), `providers/kite.py`
   (market data only), `repositories/` (SQLAlchemy async: instruments/candles/chains) + Alembic,
   `services/pricing.py` (Black-Scholes price/greeks, Brent IV), `services/chain_analytics.py`
@@ -607,6 +629,22 @@ populated at import time.
     roll-target resolution, opt-in/disabled paths) but has never been exercised through a
     multi-tick backtest showing a roll actually happening mid-trade over time; the current tests
     construct the breach condition directly rather than letting the underlying move into it.
+16. **The working tree carries a large body of pre-existing, uncommitted work that predates
+    M16 and is untouched by it** (discovered during M16's own commit prep — `git status` showed
+    ~90 modified/untracked files before M16 made any edit). New untracked strategies
+    (`long_strangle.py`, `long_contrarian.py`, `long_skew.py`, `max_pain_reversion.py`,
+    `jade_lizard.py`, `broken_wing_butterfly.py`), a new `runtime/rest_poller.py` +
+    `runtime/fills.py`, service-management scripts (`scripts/kite_login.py`,
+    `scripts/install_service.sh`/`start_dashboard.sh`/`stop_dashboard.sh`/
+    `uninstall_service.sh`, `scripts/backtest_all_strategies.py`/`tune_long_strangle.py`/etc.),
+    an Alembic migration (`0002_option_chain_eod_lot_size.py`), and modifications across
+    `api/`, `config/`, `core/`, `dashboard/`, `data/`, `execution/`, `oms/`, `runtime/`,
+    `strategies/` beyond what M16 touched. This matches prior-session memory (long_contrarian
+    live, jade_lizard/broken_wing_butterfly parameter-sweep findings) — it looks like real,
+    intentional in-progress work, not clutter. **M16 deliberately did not stage or commit any of
+    it** — only the specific files listed in §17's "what changed" were added to M16's commit.
+    Whoever resumes next should run `git status` before assuming a clean tree and decide
+    separately whether/how to commit this work.
 
 ---
 
@@ -692,10 +730,13 @@ ALPHAQUANT_EXECUTION__ARMING_SECRET=... .venv/bin/uvicorn alphaquant.api.main:ap
 
 ## 16. Git history (recent)
 
-`M14 Options Strategy Library` is this commit, immediately following `f67a2ac` (`M12 LLM
-Assistant`) below — milestones landed out of numeric order this session (M13 → M12 → M14).
+`M16 Domain & Instrument Generalization` is this commit, immediately following `ef46d78`
+(`M15 Trading Runtime & Production Readiness`) below — milestones landed out of numeric order
+this session (M13 → M12 → M14 → M15 → M16).
 
 ```
+ef46d78 M15 Trading Runtime & Production Readiness
+947a655 M14 Options Strategy Library
 f67a2ac M12 LLM Assistant
 7f63e25 M13 Broker Integration
 0528a27 feat(api): wire live/OMS/paper/risk/feature/research engines into the composition root
@@ -706,3 +747,81 @@ d698d3d M8 Paper Trading                               b7d51cd M7 Feature Store
 cca3751 M4 Risk Engine                                 caa6c75 M3.5 Architecture Hardening
 7fd4796 M2 Data layer   e2b0b92 M1 Domain+core   6255d9c M0 Scaffolding
 ```
+
+---
+
+## 17. Multi-Asset Platform Migration (M16+) — how it works and what's next
+
+The user requested a migration from an options-only platform to a multi-asset one (equities,
+futures, ETFs, options now; commodities/currency futures scaffolded for later), plus three
+trading modes (Research / Assisted / Automated). This is far bigger than any single milestone,
+so it's tracked as its own roadmap, M16 onward, each milestone design-reviewed and approved the
+same way M12–M15 were.
+
+**Roadmap:**
+
+| # | Milestone | Depends on | Scope |
+|---|---|---|---|
+| M16 | Domain & Instrument Generalization | — | ✅ this commit |
+| M17 | Data Layer Generalization | M16 | `MarketDataProvider` protocol; generic OHLCV ingest for equities/futures reusing `CandleRepository`; instrument repository widened; asset-class-aware universe config |
+| M18 | Strategy Engine: bar-driven path | M16, M17 | Parallel `on_bar`/`BarEvent` hook for equity/futures strategies alongside the untouched `on_chain` path |
+| M19 | Risk & Backtest asset-awareness | M16 | Asset-class-dispatched margin/exposure math (currently a documented placeholder — see below) |
+| M20 | Trading Modes: Assisted & Automated | M16, M19 | New orthogonal automation axis (not a 4th `TradingMode`); OMS approval-queue; per-strategy permissions/limits + audit log |
+| M21 | Dashboard multi-asset UI | M16–M19 | Make the ~6 option-specific dashboard fields conditional; generic instrument terminology |
+| M22 | AI Assistant: cross-asset trade recommendations | M16–M20 | Non-executing `propose_trade_idea` tool, reusing the existing `Assistant` tool-loop |
+
+**M16 (this commit) — what changed:**
+- `domain/enums.py`: additive `AssetClass` enum (`EQUITY`/`FUTURES`/`ETF`/`OPTION`/`COMMODITY`/
+  `CURRENCY_FUTURES` — the last two scaffolded now, zero provider/strategy work behind them yet).
+- `domain/instruments.py`: `underlying`/`expiry`/`lot_size` promoted from `OptionContract` to
+  the base `Instrument` (`expiry: date | None = None`, `lot_size` defaults to 1); each subclass
+  sets `asset_class: ClassVar[AssetClass]`. Three new instrument types:
+  `EquityInstrument`/`ETFInstrument` (thin, `lot_size=1` default), `FutureContract` (`expiry`/
+  `lot_size` required, same shape as `OptionContract` minus `strike`/`option_type`).
+- `Position.contract`, `Order.contract`, `SignalLeg.contract`, `Trade.contract`,
+  `ClosedTrade.contract` (`backtest/ledger.py`), `_OpenLot.contract` (`backtest/portfolio.py`):
+  all widened from `OptionContract` to the generic `Instrument`. `OMSPortfolio`/
+  `ExecutionSimulator`/OMS as a whole needed **zero changes** — confirmed during design review
+  they only ever touch `.contract.tradingsymbol`/`.lot_size`, both on the base class now.
+- **A real, necessary correction discovered mid-implementation** (not in the original design
+  doc, which under-scoped this): several places read option-only fields (`.strike`,
+  `.option_type`) directly off a `Position`/`SignalLeg`'s now-generic `.contract` —
+  `strategies/common.py::net_close_cost`, `strategies/rules.py::evaluate_adjustment`,
+  `strategies/calendar_spread.py` (two spots), and `risk/context.py` (`signal_notional`,
+  `signal_margin_required`, `projected_exposure`). Each got a minimal
+  `isinstance(x.contract, OptionContract)` guard, behaviorally inert today (every position/leg
+  produced by any of the 9 registered strategies is still an `OptionContract`) but required for
+  `mypy --strict` to pass now that the field type is `Instrument`. Documented inline at each site
+  as a placeholder for M19's real asset-aware dispatch, not a design decision.
+- **Margin/notional math is explicitly a placeholder for non-options**, not yet real: strike-based
+  formulas (`backtest/portfolio.py::mark_to_market`/`_margin_used`,
+  `risk/context.py::signal_notional`/`signal_margin_required`/`projected_exposure`) fall back to
+  the position's last-known price (backtest) or contribute zero (risk context, which has no price
+  feed available) for a non-option instrument. Unreachable in M16 (no equity/futures strategy
+  exists yet), correct for every option path (byte-identical formulas), but **not a real equity/
+  futures margin model** — that's M19's job.
+- `risk/context.py::days_to_expiry`: a large sentinel (`_NO_EXPIRY_DAYS = 10**6`) is returned for
+  an instrument with no expiry, so `ExpiryRestrictionsRule`'s threshold checks become a
+  correctness-preserving no-op for non-expiring instruments without threading `int | None`
+  through `risk/rules/time.py`.
+- Test suite: 947 passed, 0 failed, 4 skipped (DB-gated integration, unchanged) — verified with
+  the pre-existing uncommitted WIP stashed out, i.e. HEAD + M16 only, not the combined tree. New
+  tests in `tests/unit/domain/test_instruments.py` (new instrument types + `asset_class` per
+  type), `test_positions.py`/`test_orders.py`/`test_signals.py` (a `Position`/`Order` holding a
+  non-option `Instrument`; an all-equity `Signal` with `expiry=None` on every leg passing
+  `_derive_scope` unmodified).
+- **A second, real correction discovered during commit prep**: `risk/context.py` and
+  `backtest/portfolio.py` already carried unrelated, pre-existing *uncommitted* changes (a
+  margin-ratio-settings feature — `signal_margin_required`, `RiskMarginSettings.
+  short_option_margin_ratio`/`long_option_margin_ratio` — and a daily-P&L-baseline-reset feature,
+  respectively) that predate M16 and were never part of it. M16's edits had been layered on top
+  of that WIP rather than on HEAD, so the initial staged diff would have smuggled unrelated,
+  half-finished, cross-file-dependent work into this commit. Both files were reconstructed from
+  `git show HEAD:<file>` with *only* M16's own edits re-applied, verified via `diff` against
+  HEAD to confirm the diff contains nothing else, then the full quality gate was re-run with
+  every other pre-existing uncommitted file `git stash`-ed out — see the isolation note above.
+
+**Explicitly out of scope for M16** (each is a later milestone): no new data provider or
+repository change (still options-only — M17), no bar-driven strategy path (M18), no real
+asset-aware margin model (M19), no new trading mode (M20), no dashboard/UI change (M21), no LLM
+capability change (M22).

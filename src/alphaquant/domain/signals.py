@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from alphaquant.domain.enums import Side, SignalAction
-from alphaquant.domain.instruments import OptionContract
+from alphaquant.domain.instruments import Instrument
 
 
 def _require_aware(value: datetime) -> datetime:
@@ -24,7 +24,7 @@ def _require_aware(value: datetime) -> datetime:
 class SignalLeg(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    contract: OptionContract
+    contract: Instrument
     side: Side
     lots: int = Field(gt=0)
 

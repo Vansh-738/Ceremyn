@@ -4,7 +4,15 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import OptionType, Side, Signal, SignalAction, SignalLeg
+from alphaquant.domain import (
+    EquityInstrument,
+    Exchange,
+    OptionType,
+    Side,
+    Signal,
+    SignalAction,
+    SignalLeg,
+)
 from tests.unit.domain.conftest import make_contract
 
 
@@ -74,3 +82,20 @@ def test_signal_requires_at_least_one_leg() -> None:
 def test_leg_lots_must_be_positive() -> None:
     with pytest.raises(ValidationError):
         SignalLeg(contract=make_contract(), side=Side.BUY, lots=0)
+
+
+def test_all_equity_signal_has_no_expiry() -> None:
+    # A plain equity signal: underlying defaults to the leg's own tradingsymbol,
+    # expiry is None on every leg -- `_derive_scope`'s equality checks still hold
+    # (None == None) with no special-casing for non-derivative instruments.
+    equity = EquityInstrument(
+        tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+    )
+    signal = Signal(
+        strategy_id="equity_momentum_v1",
+        action=SignalAction.ENTER,
+        market_timestamp=datetime(2025, 7, 14, 10, 0, tzinfo=UTC),
+        legs=(SignalLeg(contract=equity, side=Side.BUY, lots=1),),
+    )
+    assert signal.underlying == "RELIANCE"
+    assert signal.expiry is None

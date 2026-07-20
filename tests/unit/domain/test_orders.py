@@ -4,6 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from alphaquant.domain import (
+    EquityInstrument,
+    Exchange,
     OptionContract,
     Order,
     OrderStatus,
@@ -46,6 +48,18 @@ class TestOrderInvariants:
     def test_market_order_needs_no_prices(self, nifty_call: OptionContract) -> None:
         order = make_order(nifty_call, order_type=OrderType.MARKET, limit_price=None)
         assert order.limit_price is None
+
+    def test_order_holds_a_non_option_instrument(self) -> None:
+        equity = EquityInstrument(
+            tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+        )
+        order = Order(
+            contract=equity,
+            side=Side.BUY,
+            quantity=10,
+            order_type=OrderType.MARKET,
+        )
+        assert order.lots == 10  # lot_size defaults to 1 for a cash equity
 
 
 class TestOrderStateMachine:

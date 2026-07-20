@@ -5,6 +5,7 @@ from decimal import Decimal
 from alphaquant.domain import (
     ChainEntry,
     OptionChainSnapshot,
+    OptionContract,
     OptionType,
     Position,
     Side,
@@ -51,6 +52,16 @@ def net_close_cost(positions: tuple[Position, ...], chain: OptionChainSnapshot) 
     for position in positions:
         if position.is_flat:
             continue
+        if not isinstance(position.contract, OptionContract):
+            # Every registered strategy today only ever holds option positions;
+            # a non-option instrument here has no chain entry to price against.
+            return None
+        if position.contract.expiry != chain.expiry:
+            # `chain.get()` matches by strike + option_type only -- a position held
+            # across an expiry-listing change would otherwise silently price against
+            # a *different* expiry's contract at the same strike. Treat it the same
+            # as any other missing mark rather than return a wrong number.
+            return None
         entry = chain.get(position.contract.strike, position.contract.option_type)
         mark = mark_price(entry)
         if mark is None:

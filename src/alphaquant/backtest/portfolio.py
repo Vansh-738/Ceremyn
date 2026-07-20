@@ -12,6 +12,7 @@ from alphaquant.backtest.ledger import CashLedgerEntry, ClosedTrade, TradeLedger
 from alphaquant.backtest.statistics import EquityPoint
 from alphaquant.domain import (
     Fill,
+    Instrument,
     KillSwitchState,
     OptionContract,
     Order,
@@ -25,7 +26,7 @@ from alphaquant.domain.enums import Side
 
 @dataclass(slots=True)
 class _OpenLot:
-    contract: OptionContract
+    contract: Instrument
     quantity: int
     price: Decimal
     opened_at: datetime
@@ -116,9 +117,15 @@ class BacktestPortfolio:
                 continue
             price = self._last_prices.get(position.contract.tradingsymbol, position.avg_price)
             unrealized += position.unrealized_pnl(price)
-            notional = position.contract.strike * abs(position.quantity)
-            gross_notional += notional
-            signed_notional = position.contract.strike * position.quantity
+            # Notional reference price: strike for options (unchanged formula), else
+            # the position's own mark -- asset-class-aware margin/exposure dispatch
+            # is out of scope here (M16 only widens the domain vocabulary; no
+            # non-option position can be produced by any registered strategy yet).
+            reference_price = (
+                position.contract.strike if isinstance(position.contract, OptionContract) else price
+            )
+            gross_notional += reference_price * abs(position.quantity)
+            signed_notional = reference_price * position.quantity
             net_notional += signed_notional
             by_underlying[position.contract.underlying] += signed_notional
             net_option_units += position.quantity
@@ -184,7 +191,12 @@ class BacktestPortfolio:
                 if position.quantity < 0
                 else self.config.long_option_margin_ratio
             )
-            total += position.contract.strike * abs(position.quantity) * ratio
+            reference_price = (
+                position.contract.strike
+                if isinstance(position.contract, OptionContract)
+                else self._last_prices.get(position.contract.tradingsymbol, position.avg_price)
+            )
+            total += reference_price * abs(position.quantity) * ratio
         return total
 
     def _record_lots(

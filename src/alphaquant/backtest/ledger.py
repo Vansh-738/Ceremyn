@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from alphaquant.domain import OptionContract
+from alphaquant.domain import Instrument
 from alphaquant.domain.enums import Side
 from alphaquant.domain.market_data import _require_aware
 
@@ -24,7 +24,7 @@ class CashLedgerEntry(BaseModel):
 class ClosedTrade(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    contract: OptionContract
+    contract: Instrument
     strategy_id: str = Field(min_length=1)
     signal_id: UUID | None = None
     quantity: int = Field(gt=0)

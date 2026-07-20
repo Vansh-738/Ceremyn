@@ -11,14 +11,14 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from alphaquant.domain.enums import Side
-from alphaquant.domain.instruments import OptionContract
+from alphaquant.domain.instruments import Instrument
 from alphaquant.domain.market_data import _require_aware
 
 
 class Position(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    contract: OptionContract
+    contract: Instrument
     quantity: int = 0  # signed units
     avg_price: Decimal = Decimal("0")  # of the open quantity; 0 when flat
     realized_pnl: Decimal = Decimal("0")  # gross, before transaction costs
@@ -81,7 +81,7 @@ class Trade(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    contract: OptionContract
+    contract: Instrument
     strategy_id: str = Field(min_length=1)
     quantity: int = Field(gt=0)  # units traded (absolute)
     direction: Side  # side of the opening leg
