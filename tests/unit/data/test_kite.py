@@ -7,7 +7,7 @@ import pytest
 from alphaquant.core.exceptions import BrokerError
 from alphaquant.core.timeutils import IST
 from alphaquant.data.providers.kite import KiteProvider
-from alphaquant.domain import OptionType, TimeFrame
+from alphaquant.domain import AssetClass, OptionType, TimeFrame
 
 NFO_DUMP = [
     {
@@ -34,7 +34,7 @@ NFO_DUMP = [
         "segment": "NFO-OPT",
         "exchange": "NFO",
     },
-    {  # excluded: future, not an option
+    {  # excluded from options: future, not an option (included by fetch_future_contracts)
         "instrument_token": 113,
         "tradingsymbol": "NIFTY25JULFUT",
         "name": "NIFTY",
@@ -60,6 +60,42 @@ NFO_DUMP = [
     },
 ]
 
+NSE_DUMP = [
+    {
+        "instrument_token": 738561,
+        "tradingsymbol": "RELIANCE",
+        "name": "RELIANCE INDUSTRIES",
+        "isin": "INE002A01018",
+        "tick_size": 0.05,
+        "lot_size": 1,
+        "instrument_type": "EQ",
+        "segment": "NSE",
+        "exchange": "NSE",
+    },
+    {
+        "instrument_token": 999999,
+        "tradingsymbol": "NIFTYBEES",
+        "name": "NIPPON INDIA ETF NIFTY BEES",
+        "isin": "INF204KB17I5",
+        "tick_size": 0.01,
+        "lot_size": 1,
+        "instrument_type": "EQ",
+        "segment": "NSE",
+        "exchange": "NSE",
+    },
+    {  # excluded: unwanted tradingsymbol
+        "instrument_token": 111111,
+        "tradingsymbol": "INFY",
+        "name": "INFOSYS",
+        "isin": "INE009A01021",
+        "tick_size": 0.05,
+        "lot_size": 1,
+        "instrument_type": "EQ",
+        "segment": "NSE",
+        "exchange": "NSE",
+    },
+]
+
 QUOTE_PAYLOAD = {
     "last_price": 180.5,
     "volume": 8956234,
@@ -78,8 +114,11 @@ class FakeKite:
         self.access_token: str | None = None
 
     def instruments(self, exchange: str) -> list[dict[str, Any]]:
-        assert exchange == "NFO"
-        return NFO_DUMP
+        if exchange == "NFO":
+            return NFO_DUMP
+        if exchange == "NSE":
+            return NSE_DUMP
+        raise AssertionError(f"unexpected exchange {exchange!r}")
 
     def quote(self, symbols: list[str]) -> dict[str, Any]:
         self.quote_calls.append(symbols)
@@ -139,6 +178,42 @@ class TestInstruments:
         assert contract.lot_size == 30
         assert contract.broker_token == 112
         assert contract.expiry == date(2025, 7, 29)  # datetime normalized to date
+
+
+class TestFutureContracts:
+    async def test_filters_futures_for_wanted_underlyings(self, provider: KiteProvider) -> None:
+        contracts = await provider.fetch_future_contracts(("NIFTY", "BANKNIFTY"))
+        assert [c.tradingsymbol for c in contracts] == ["NIFTY25JULFUT"]
+
+    async def test_contract_mapping(self, provider: KiteProvider) -> None:
+        (contract,) = await provider.fetch_future_contracts(("NIFTY",))
+        assert contract.asset_class is AssetClass.FUTURES
+        assert contract.underlying == "NIFTY"
+        assert contract.expiry == date(2025, 7, 31)
+        assert contract.lot_size == 75
+        assert contract.broker_token == 113
+
+
+class TestCashInstruments:
+    async def test_fetches_equity_instruments(self, provider: KiteProvider) -> None:
+        (equity,) = await provider.fetch_equity_instruments(("RELIANCE",))
+        assert equity.asset_class is AssetClass.EQUITY
+        assert equity.tradingsymbol == "RELIANCE"
+        assert equity.underlying == "RELIANCE"
+        assert equity.isin == "INE002A01018"
+        assert equity.broker_token == 738561
+        assert equity.lot_size == 1
+
+    async def test_fetches_etf_instruments(self, provider: KiteProvider) -> None:
+        (etf,) = await provider.fetch_etf_instruments(("NIFTYBEES",))
+        assert etf.asset_class is AssetClass.ETF
+        assert etf.tradingsymbol == "NIFTYBEES"
+        assert etf.isin == "INF204KB17I5"
+        assert etf.broker_token == 999999
+
+    async def test_unwanted_tradingsymbol_excluded(self, provider: KiteProvider) -> None:
+        assert await provider.fetch_equity_instruments(("RELIANCE",)) != []
+        assert await provider.fetch_equity_instruments(("DOES_NOT_EXIST",)) == []
 
 
 class TestQuotes:

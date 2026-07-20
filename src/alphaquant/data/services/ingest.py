@@ -1,29 +1,44 @@
-"""Bhavcopy backfill: download EOD chains for a date range and persist them."""
+"""Bhavcopy backfill: download EOD F&O records for a date range and persist them.
 
+Generic over the record type so the same day-iteration/calendar logic drives
+both options (the default) and futures -- `parse` and `repository` must agree
+on the record type; see `core.container.Container.future_bhavcopy_ingest` for
+the futures wiring.
+"""
+
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
+from typing import Generic, Protocol, TypeVar
 
 import structlog
 
 from alphaquant.core.calendar import MarketCalendar
 from alphaquant.core.exceptions import CalendarError, DataError
 from alphaquant.data.providers.bhavcopy import BhavcopyClient, parse_bhavcopy
-from alphaquant.data.repositories.chains import OptionChainEodRepository
 
 logger = structlog.get_logger(__name__)
 
+T = TypeVar("T")
 
-class BhavcopyIngestService:
+
+class _EodRepository(Protocol[T]):
+    async def upsert_many(self, records: list[T]) -> int: ...
+
+
+class BhavcopyIngestService(Generic[T]):
     def __init__(
         self,
         client: BhavcopyClient,
-        repository: OptionChainEodRepository,
+        repository: _EodRepository[T],
         calendar: MarketCalendar,
         underlyings: tuple[str, ...],
+        parse: Callable[[bytes, Iterable[str], date], list[T]] = parse_bhavcopy,  # type: ignore[assignment]
     ) -> None:
         self._client = client
         self._repository = repository
         self._calendar = calendar
         self._underlyings = underlyings
+        self._parse = parse
 
     async def ingest_range(self, start: date, end: date) -> dict[date, int]:
         """Ingest every trading day in [start, end]; returns rows stored per day."""
@@ -46,7 +61,7 @@ class BhavcopyIngestService:
         except DataError as exc:
             logger.warning("bhavcopy_missing", trade_date=str(day), reason=str(exc))
             return None
-        records = parse_bhavcopy(payload, self._underlyings, day)
+        records = self._parse(payload, self._underlyings, day)
         stored = await self._repository.upsert_many(records)
         logger.info("bhavcopy_ingested", trade_date=str(day), rows=stored)
         return stored

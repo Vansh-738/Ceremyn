@@ -25,3 +25,22 @@ class EodOptionRecord(BaseModel):
     open_interest: int = Field(default=0, ge=0)
     oi_change: int = 0
     underlying_close: Decimal | None = None
+
+
+class EodFutureRecord(BaseModel):
+    """One future contract's end-of-day row (bhavcopy granularity)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    trade_date: date
+    underlying: str = Field(min_length=1)
+    expiry: date
+    open: Decimal | None = None
+    high: Decimal | None = None
+    low: Decimal | None = None
+    close: Decimal | None = None
+    settle: Decimal | None = None
+    volume: int = Field(default=0, ge=0)
+    open_interest: int = Field(default=0, ge=0)
+    oi_change: int = 0
+    underlying_close: Decimal | None = None

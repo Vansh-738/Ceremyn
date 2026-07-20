@@ -16,7 +16,7 @@ from alphaquant.data.providers.kite import KiteProvider
 from alphaquant.data.repositories.chains import ChainSnapshotRepository
 from alphaquant.data.repositories.instruments import InstrumentRepository
 from alphaquant.data.services.chain_analytics import ChainAnalyticsService
-from alphaquant.domain import ChainEntry, OptionChainSnapshot
+from alphaquant.domain import ChainEntry, OptionChainSnapshot, OptionContract
 
 logger = structlog.get_logger(__name__)
 
@@ -35,7 +35,15 @@ class ChainService:
         self._analytics = analytics
 
     async def build(self, underlying: str, expiry: date) -> OptionChainSnapshot:
-        contracts = await self._instruments.list_contracts(underlying, expiry)
+        # `list_contracts` is asset-class-generic (any Instrument sharing this
+        # underlying+expiry); an option chain is options only, so narrow here
+        # rather than widen `ChainEntry.contract`, which is deliberately
+        # options-only.
+        contracts = [
+            contract
+            for contract in await self._instruments.list_contracts(underlying, expiry)
+            if isinstance(contract, OptionContract)
+        ]
         if not contracts:
             raise ValueError(
                 f"no stored contracts for {underlying} {expiry}; run seed_instruments first"

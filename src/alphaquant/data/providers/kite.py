@@ -19,7 +19,17 @@ import structlog
 from alphaquant.config import Settings
 from alphaquant.core.exceptions import BrokerError
 from alphaquant.core.timeutils import IST, now_utc
-from alphaquant.domain import Candle, Exchange, OptionContract, OptionType, Quote, TimeFrame
+from alphaquant.domain import (
+    Candle,
+    EquityInstrument,
+    ETFInstrument,
+    Exchange,
+    FutureContract,
+    OptionContract,
+    OptionType,
+    Quote,
+    TimeFrame,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -65,12 +75,16 @@ class KiteProvider:
 
     # -- instruments --------------------------------------------------------
 
-    async def fetch_option_contracts(self, underlyings: Sequence[str]) -> list[OptionContract]:
-        """All NFO option contracts for the given index underlyings."""
+    async def _fetch_instrument_dump(self, exchange: str) -> list[dict[str, Any]]:
         try:
-            dump: list[dict[str, Any]] = await asyncio.to_thread(self._kite.instruments, "NFO")
+            dump: list[dict[str, Any]] = await asyncio.to_thread(self._kite.instruments, exchange)
         except Exception as exc:
             raise BrokerError(f"Kite instrument dump failed: {exc}") from exc
+        return dump
+
+    async def fetch_option_contracts(self, underlyings: Sequence[str]) -> list[OptionContract]:
+        """All NFO option contracts for the given index underlyings."""
+        dump = await self._fetch_instrument_dump("NFO")
         wanted = set(underlyings)
         contracts = [
             _instrument_to_contract(entry)
@@ -79,6 +93,49 @@ class KiteProvider:
         ]
         logger.info("kite_contracts_fetched", count=len(contracts))
         return contracts
+
+    async def fetch_future_contracts(self, underlyings: Sequence[str]) -> list[FutureContract]:
+        """All NFO future contracts for the given index/stock underlyings."""
+        dump = await self._fetch_instrument_dump("NFO")
+        wanted = set(underlyings)
+        contracts = [
+            _instrument_to_future(entry)
+            for entry in dump
+            if entry.get("name") in wanted and entry.get("instrument_type") == "FUT"
+        ]
+        logger.info("kite_future_contracts_fetched", count=len(contracts))
+        return contracts
+
+    async def _fetch_cash_instrument_dump(
+        self, tradingsymbols: Sequence[str]
+    ) -> list[dict[str, Any]]:
+        """Raw NSE cash-segment entries for the given tradingsymbols. Equities and
+        ETFs share the same `instrument_type` ("EQ") in Kite's dump -- there is no
+        structural field to tell them apart; callers must already know which
+        tradingsymbols they want classified as which."""
+        dump = await self._fetch_instrument_dump("NSE")
+        wanted = set(tradingsymbols)
+        return [
+            entry
+            for entry in dump
+            if entry.get("tradingsymbol") in wanted and entry.get("instrument_type") == "EQ"
+        ]
+
+    async def fetch_equity_instruments(
+        self, tradingsymbols: Sequence[str]
+    ) -> list[EquityInstrument]:
+        """Equity instruments for the given NSE tradingsymbols."""
+        entries = await self._fetch_cash_instrument_dump(tradingsymbols)
+        instruments = [_instrument_to_equity(entry) for entry in entries]
+        logger.info("kite_equity_instruments_fetched", count=len(instruments))
+        return instruments
+
+    async def fetch_etf_instruments(self, tradingsymbols: Sequence[str]) -> list[ETFInstrument]:
+        """ETF instruments for the given NSE tradingsymbols."""
+        entries = await self._fetch_cash_instrument_dump(tradingsymbols)
+        instruments = [_instrument_to_etf(entry) for entry in entries]
+        logger.info("kite_etf_instruments_fetched", count=len(instruments))
+        return instruments
 
     # -- quotes ---------------------------------------------------------------
 
@@ -155,6 +212,39 @@ def _instrument_to_contract(entry: dict[str, Any]) -> OptionContract:
         option_type=OptionType(entry["instrument_type"]),
         lot_size=int(entry["lot_size"]),
     )
+
+
+def _instrument_to_future(entry: dict[str, Any]) -> FutureContract:
+    return FutureContract(
+        tradingsymbol=str(entry["tradingsymbol"]),
+        exchange=Exchange.NFO,
+        tick_size=Decimal(str(entry.get("tick_size", "0.05"))),
+        broker_token=int(entry["instrument_token"]),
+        underlying=str(entry["name"]),
+        expiry=_ensure_date(entry["expiry"]),
+        lot_size=int(entry["lot_size"]),
+    )
+
+
+def _cash_instrument_kwargs(entry: dict[str, Any]) -> dict[str, Any]:
+    """Fields shared by every NSE cash-segment instrument (equity or ETF)."""
+    tradingsymbol = str(entry["tradingsymbol"])
+    return {
+        "tradingsymbol": tradingsymbol,
+        "exchange": Exchange.NSE,
+        "tick_size": Decimal(str(entry.get("tick_size", "0.05"))),
+        "broker_token": int(entry["instrument_token"]),
+        "underlying": tradingsymbol,
+        "isin": str(entry["isin"]) if entry.get("isin") else None,
+    }
+
+
+def _instrument_to_equity(entry: dict[str, Any]) -> EquityInstrument:
+    return EquityInstrument(**_cash_instrument_kwargs(entry))
+
+
+def _instrument_to_etf(entry: dict[str, Any]) -> ETFInstrument:
+    return ETFInstrument(**_cash_instrument_kwargs(entry))
 
 
 def _payload_to_quote(key: str, payload: dict[str, Any]) -> Quote:

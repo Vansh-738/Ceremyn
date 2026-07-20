@@ -2,8 +2,10 @@
 
 NSE publishes a daily UDiFF bhavcopy zip on its archives host:
     https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_<YYYYMMDD>_F_0000.csv.zip
-One row per contract; we keep index options (FinInstrmTp == "IDO") for the
-configured underlyings. This is the primary historical dataset for backtests.
+One row per contract, covering both options and futures. `parse_bhavcopy` keeps
+index options (FinInstrmTp == "IDO") for the configured underlyings -- the
+primary historical dataset for options backtests. `parse_bhavcopy_futures`
+reads the same file for index/stock futures (FinInstrmTp in "IDF"/"STF").
 """
 
 import io
@@ -17,7 +19,7 @@ import polars as pl
 import structlog
 
 from alphaquant.core.exceptions import DataError
-from alphaquant.data.records import EodOptionRecord
+from alphaquant.data.records import EodFutureRecord, EodOptionRecord
 
 logger = structlog.get_logger(__name__)
 
@@ -36,6 +38,7 @@ _HEADERS = {
 }
 
 _INDEX_OPTION_TYPE = "IDO"
+_FUTURE_TYPES = ("IDF", "STF")  # index futures, stock futures
 
 
 class BhavcopyClient:
@@ -94,6 +97,49 @@ def parse_bhavcopy(
         )
     logger.info(
         "bhavcopy_parsed",
+        trade_date=str(trade_date),
+        total_rows=frame.height,
+        kept_rows=len(records),
+    )
+    return records
+
+
+def parse_bhavcopy_futures(
+    zip_bytes: bytes, underlyings: Iterable[str], trade_date: date
+) -> list[EodFutureRecord]:
+    """Extract index/stock-future rows for `underlyings` from the same bhavcopy zip
+    `parse_bhavcopy` reads options from."""
+    frame = _read_csv_from_zip(zip_bytes)
+    wanted = set(underlyings)
+    filtered = frame.filter(
+        pl.col("FinInstrmTp").is_in(_FUTURE_TYPES) & pl.col("TckrSymb").is_in(wanted)
+    )
+
+    records: list[EodFutureRecord] = []
+    for row in filtered.iter_rows(named=True):
+        row_date = _as_date(row["TradDt"])
+        if row_date != trade_date:
+            raise DataError(
+                f"bhavcopy trade date mismatch: expected {trade_date}, file has {row_date}"
+            )
+        records.append(
+            EodFutureRecord(
+                trade_date=row_date,
+                underlying=str(row["TckrSymb"]),
+                expiry=_as_date(row["XpryDt"]),
+                open=_as_decimal(row["OpnPric"]),
+                high=_as_decimal(row["HghPric"]),
+                low=_as_decimal(row["LwPric"]),
+                close=_as_decimal(row["ClsPric"]),
+                settle=_as_decimal(row["SttlmPric"]),
+                volume=_as_int(row["TtlTradgVol"]),
+                open_interest=_as_int(row["OpnIntrst"]),
+                oi_change=_as_int(row["ChngInOpnIntrst"]),
+                underlying_close=_as_decimal(row["UndrlygPric"]),
+            )
+        )
+    logger.info(
+        "bhavcopy_futures_parsed",
         trade_date=str(trade_date),
         total_rows=frame.height,
         kept_rows=len(records),

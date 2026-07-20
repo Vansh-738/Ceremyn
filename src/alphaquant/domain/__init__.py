@@ -5,6 +5,7 @@ This package must not import from any other alphaquant package
 """
 
 from alphaquant.domain.chain import ChainEntry, OptionChainSnapshot
+from alphaquant.domain.corporate_actions import CorporateAction, CorporateActionType
 from alphaquant.domain.enums import (
     TERMINAL_ORDER_STATUSES,
     AssetClass,
@@ -40,6 +41,8 @@ __all__ = [
     "AssetClass",
     "Candle",
     "ChainEntry",
+    "CorporateAction",
+    "CorporateActionType",
     "DomainError",
     "ETFInstrument",
     "EquityInstrument",

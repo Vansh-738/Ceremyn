@@ -21,12 +21,16 @@ if TYPE_CHECKING:
     from alphaquant.broker.simulated import SimulatedBroker
     from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
     from alphaquant.data.providers.kite import KiteProvider
+    from alphaquant.data.records import EodFutureRecord, EodOptionRecord
     from alphaquant.data.repositories.candles import CandleRepository
     from alphaquant.data.repositories.chains import (
         ChainSnapshotRepository,
         OptionChainEodRepository,
     )
+    from alphaquant.data.repositories.corporate_actions import CorporateActionRepository
+    from alphaquant.data.repositories.futures import FutureChainEodRepository
     from alphaquant.data.repositories.instruments import InstrumentRepository
+    from alphaquant.data.services.candle_ingest import CandleIngestService
     from alphaquant.data.services.chain_analytics import ChainAnalyticsService
     from alphaquant.data.services.ingest import BhavcopyIngestService
     from alphaquant.data.services.snapshots import ChainService, ChainSnapshotJob
@@ -99,6 +103,18 @@ class Container:
 
         return ChainSnapshotRepository(self.session_factory)
 
+    @cached_property
+    def future_chain_eod_repository(self) -> "FutureChainEodRepository":
+        from alphaquant.data.repositories.futures import FutureChainEodRepository
+
+        return FutureChainEodRepository(self.session_factory)
+
+    @cached_property
+    def corporate_action_repository(self) -> "CorporateActionRepository":
+        from alphaquant.data.repositories.corporate_actions import CorporateActionRepository
+
+        return CorporateActionRepository(self.session_factory)
+
     # -- providers & services -----------------------------------------------
 
     @cached_property
@@ -131,7 +147,7 @@ class Container:
         )
 
     @cached_property
-    def bhavcopy_ingest(self) -> "BhavcopyIngestService":
+    def bhavcopy_ingest(self) -> "BhavcopyIngestService[EodOptionRecord]":
         from alphaquant.data.providers.bhavcopy import BhavcopyClient
         from alphaquant.data.services.ingest import BhavcopyIngestService
 
@@ -141,6 +157,27 @@ class Container:
             self.calendar,
             self.settings.data.underlyings,
         )
+
+    @cached_property
+    def future_bhavcopy_ingest(self) -> "BhavcopyIngestService[EodFutureRecord]":
+        from alphaquant.data.providers.bhavcopy import BhavcopyClient, parse_bhavcopy_futures
+        from alphaquant.data.services.ingest import BhavcopyIngestService
+
+        # Same underlyings as options: NIFTY/BANKNIFTY futures trade against the
+        # same index names, and both segments live in the same bhavcopy file.
+        return BhavcopyIngestService(
+            BhavcopyClient(),
+            self.future_chain_eod_repository,
+            self.calendar,
+            self.settings.data.underlyings,
+            parse=parse_bhavcopy_futures,
+        )
+
+    @cached_property
+    def candle_ingest(self) -> "CandleIngestService":
+        from alphaquant.data.services.candle_ingest import CandleIngestService
+
+        return CandleIngestService(self.kite_provider, self.candle_repository)
 
     # -- runtime engines (live, OMS, paper, risk, features, research) -------
     #

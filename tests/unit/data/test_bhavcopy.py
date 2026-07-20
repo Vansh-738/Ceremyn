@@ -8,8 +8,8 @@ import pytest
 
 from alphaquant.core.calendar import MarketCalendar
 from alphaquant.core.exceptions import DataError
-from alphaquant.data.providers.bhavcopy import parse_bhavcopy
-from alphaquant.data.records import EodOptionRecord
+from alphaquant.data.providers.bhavcopy import parse_bhavcopy, parse_bhavcopy_futures
+from alphaquant.data.records import EodFutureRecord, EodOptionRecord
 from alphaquant.data.services.ingest import BhavcopyIngestService
 
 FIXTURE = Path(__file__).parents[2] / "fixtures" / "bhavcopy_sample.csv"
@@ -55,6 +55,33 @@ class TestParser:
     def test_invalid_zip_raises(self) -> None:
         with pytest.raises(DataError, match="zip"):
             parse_bhavcopy(b"not a zip", UNDERLYINGS, TRADE_DATE)
+
+
+class TestFutureParser:
+    def test_keeps_only_futures_for_wanted_underlyings(self) -> None:
+        records = parse_bhavcopy_futures(fixture_zip(), UNDERLYINGS, TRADE_DATE)
+        # Fixture: 1 NIFTY IDF; options and the stock future (RELIANCE, unwanted) excluded.
+        assert len(records) == 1
+        assert records[0].underlying == "NIFTY"
+
+    def test_field_mapping(self) -> None:
+        (record,) = parse_bhavcopy_futures(fixture_zip(), UNDERLYINGS, TRADE_DATE)
+        assert record.trade_date == TRADE_DATE
+        assert record.expiry == date(2025, 7, 31)
+        assert record.close == Decimal("24580.25")
+        assert record.settle == Decimal("24580.25")
+        assert record.open_interest == 12_456_300
+        assert record.oi_change == 235_600
+        assert record.volume == 15_478_236
+        assert record.underlying_close == Decimal("24502.15")
+
+    def test_trade_date_mismatch_raises(self) -> None:
+        with pytest.raises(DataError, match="mismatch"):
+            parse_bhavcopy_futures(fixture_zip(), UNDERLYINGS, date(2025, 7, 10))
+
+    def test_invalid_zip_raises(self) -> None:
+        with pytest.raises(DataError, match="zip"):
+            parse_bhavcopy_futures(b"not a zip", UNDERLYINGS, TRADE_DATE)
 
 
 class FakeClient:
@@ -105,3 +132,30 @@ class TestIngestService:
         service = make_service(FakeClient({}), FakeRepo())
         with pytest.raises(ValueError, match="end date"):
             await service.ingest_range(date(2025, 7, 14), date(2025, 7, 11))
+
+
+class FakeFutureRepo:
+    def __init__(self) -> None:
+        self.stored: list[EodFutureRecord] = []
+
+    async def upsert_many(self, records: list[EodFutureRecord]) -> int:
+        self.stored.extend(records)
+        return len(records)
+
+
+class TestFutureIngestService:
+    """Same `BhavcopyIngestService`, driven with `parse_bhavcopy_futures` instead of
+    the (default) options parser -- no duplicated day-iteration/calendar logic."""
+
+    async def test_ingests_futures_via_the_same_service(self) -> None:
+        client = FakeClient({TRADE_DATE: fixture_zip()})
+        repo = FakeFutureRepo()
+        service = BhavcopyIngestService(
+            client, repo, MarketCalendar(), UNDERLYINGS, parse=parse_bhavcopy_futures
+        )  # type: ignore[arg-type]
+
+        results = await service.ingest_range(TRADE_DATE, TRADE_DATE)
+
+        assert results == {TRADE_DATE: 1}
+        assert len(repo.stored) == 1
+        assert repo.stored[0].underlying == "NIFTY"
