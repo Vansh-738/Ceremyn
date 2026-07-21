@@ -76,6 +76,22 @@ class TestEvaluateExit:
         ctx = _ctx(chain=chain)
         assert evaluate_exit(ctx, (position,), ExitRule()) is None
 
+    def test_none_when_position_expiry_differs_from_chain_expiry(self) -> None:
+        """Same rationale as the adjustment-path regression: `chain.get()` matches
+        by strike + option_type only, so a stale-expiry position must be treated
+        as unpriceable (None), not silently marked against a different expiry's
+        contract at the same strike."""
+        position = Position(
+            contract=make_contract(
+                strike=24000, option_type=OptionType.CALL, expiry=date(2025, 8, 5)
+            ),
+            quantity=-75,
+            avg_price=Decimal("100"),
+        )
+        chain = marked_chain({(24000, OptionType.CALL): "40"})  # marked_chain's default EXPIRY
+        ctx = _ctx(chain=chain)
+        assert evaluate_exit(ctx, (position,), ExitRule()) is None
+
     def test_credit_position_profit_target(self) -> None:
         position = Position(
             contract=make_contract(strike=24000, option_type=OptionType.CALL, expiry=EXPIRY),
@@ -192,6 +208,25 @@ class TestEvaluateAdjustment:
         assert atm_entry is not None
         position = Position(contract=atm_entry.contract, quantity=0, avg_price=Decimal("0"))
         rule = AdjustmentRule(enabled=True, breach_delta=0.35, roll_to_delta=0.20)
+        assert evaluate_adjustment(ctx, (position,), rule) is None
+
+    def test_skips_position_from_a_different_expiry(self) -> None:
+        """A position held across an expiry-listing change (the exchange starts
+        quoting a new date for the same weekly series) must never get rolled
+        against a chain that doesn't actually describe it -- `chain.get()` only
+        matches by strike + option_type, so without this guard the "replacement"
+        leg would come from a different expiry than the leg being closed, and
+        `Signal`'s own validation rejects legs that don't share an expiry."""
+        chain = enriched_chain()
+        ctx = _ctx(chain=chain)
+        atm_entry = chain.get(chain.atm_strike, OptionType.CALL)
+        assert atm_entry is not None
+        stale_contract = atm_entry.contract.model_copy(
+            update={"expiry": date(2025, 8, 5)}  # a week later than `chain.expiry`
+        )
+        position = Position(contract=stale_contract, quantity=-75, avg_price=Decimal("100"))
+        rule = AdjustmentRule(enabled=True, breach_delta=0.35, roll_to_delta=0.20)
+
         assert evaluate_adjustment(ctx, (position,), rule) is None
 
     def test_skips_short_leg_not_found_in_chain(self) -> None:
