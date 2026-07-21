@@ -1,5 +1,14 @@
 # Architecture Decisions — Deferred Questions
 
+Ceremyn's long-term direction is an AI-powered Market Intelligence Platform — market
+analysis, opportunity discovery, and explanation as the product, with execution as one
+consumer of that intelligence rather than the point of the platform. The questions below
+are about today's v1 architecture (options research/paper/live trading for Indian
+markets), not that end-state; several of them (the runtime driver split, the
+single-strategy live path) are exactly the kind of thing a broader evolution would need
+to revisit. See `PROJECT_CONTEXT.md` §1 for the mission statement and `ROADMAP_V2.md` for
+the phased architectural roadmap toward that longer-term direction.
+
 Findings from the architectural cleanup audit (see git history around
 `refactor(cleanup): remove verified dead code`) that require a product
 decision rather than a mechanical fix. Left unchanged pending that decision.

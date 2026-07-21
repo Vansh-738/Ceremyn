@@ -1,11 +1,17 @@
 # Ceremyn
 
-An institutional-grade, AI-assisted **options trading research platform** for Indian
-markets (NIFTY & BANKNIFTY options in v1).
+**Ceremyn is an AI-powered Market Intelligence Platform.** It continuously analyzes
+markets, surfaces trading opportunities, explains the reasoning behind them, and ranks
+them by expected edge — with execution as one consumer of that intelligence, not the
+platform's sole purpose.
 
-Ceremyn is not a gambling bot and not a market-prediction AI. It is a quantitative
-research platform for discovering, validating, and operating statistically profitable
-options strategies — with risk management and reliability as first-class concerns.
+Ceremyn is not a gambling bot and not a black-box prediction engine. Every opportunity
+it surfaces is backed by an explainable, backtested, risk-managed process. **v1 scope**
+is institutional-grade options trading research for Indian markets (NIFTY & BANKNIFTY
+options): discovering, validating, and operating statistically profitable strategies —
+with risk management and reliability as first-class concerns. Broader market coverage
+is the platform's long-term direction (see `ARCHITECTURE_DECISIONS.md`), built out
+incrementally on top of this same risk-first foundation.
 
 ## Safety model
 

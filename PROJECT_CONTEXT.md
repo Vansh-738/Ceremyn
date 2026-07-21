@@ -20,10 +20,15 @@
 
 ## 1. Mission & scope
 
-Institutional-grade, AI-assisted **options trading research platform** for Indian markets
-(NIFTY / BANKNIFTY index options in v1). It is a **quantitative research platform**, not a
-prediction bot. Priorities, in order: reliability, risk management, modular architecture,
-extensive backtesting, paper-before-live, production-quality code.
+Ceremyn is an **AI-powered Market Intelligence Platform**: it continuously analyzes
+markets, surfaces and explains trading opportunities, and ranks them by expected edge.
+Execution is one consumer of that intelligence, not the platform's sole purpose. It is
+not a black-box prediction engine — every opportunity surfaced is explainable, backtested,
+and risk-managed. **v1 scope** is an institutional-grade options trading research platform
+for Indian markets (NIFTY / BANKNIFTY index options). Priorities, in order: reliability,
+risk management, modular architecture, extensive backtesting, paper-before-live,
+production-quality code. See `ARCHITECTURE_DECISIONS.md` for the platform's longer-term
+architectural direction beyond v1.
 
 **Confirmed product decisions** (do not re-litigate):
 - Backtest data: NSE EOD derivatives **bhavcopy** (free, full chains + OI) behind a pluggable

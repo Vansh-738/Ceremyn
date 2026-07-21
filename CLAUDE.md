@@ -1,7 +1,11 @@
 # Ceremyn — project conventions
 
-Options trading **research platform** for Indian markets (NIFTY/BANKNIFTY options v1).
-Not a prediction bot. Reliability and risk management outrank features.
+Ceremyn is an AI-powered **market intelligence platform**: it analyzes markets, surfaces
+and explains trading opportunities, and ranks them by expected edge. Execution is one
+consumer of that intelligence, not the point of the platform. v1 scope is options
+trading research for Indian markets (NIFTY/BANKNIFTY options v1). Not a prediction bot —
+every opportunity surfaced is explainable and backtested, not a black-box guess.
+Reliability and risk management outrank features.
 
 ## Safety invariants (never violate, never "temporarily" bypass)
 
