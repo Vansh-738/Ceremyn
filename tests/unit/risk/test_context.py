@@ -1,15 +1,15 @@
 from decimal import Decimal
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     KillSwitchState,
     PortfolioExposure,
     PortfolioGreeks,
     PortfolioSnapshot,
     Position,
 )
-from alphaquant.domain.enums import Side
-from alphaquant.domain.signals import SignalLeg
-from alphaquant.risk.context import RiskContext
+from ceremyn.domain.enums import Side
+from ceremyn.domain.signals import SignalLeg
+from ceremyn.risk.context import RiskContext
 from tests.unit.risk.conftest import make_contract, make_signal
 
 

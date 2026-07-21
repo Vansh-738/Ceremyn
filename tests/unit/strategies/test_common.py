@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from alphaquant.strategies.common import exit_reason_from_pnl_pct, net_pnl_pct
+from ceremyn.strategies.common import exit_reason_from_pnl_pct, net_pnl_pct
 
 
 class TestNetPnlPct:

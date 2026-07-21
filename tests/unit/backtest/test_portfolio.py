@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from alphaquant.backtest.portfolio import BacktestPortfolio, PortfolioConfig
-from alphaquant.domain import Fill, Order
-from alphaquant.domain.enums import KillSwitchState, OrderType, Side
+from ceremyn.backtest.portfolio import BacktestPortfolio, PortfolioConfig
+from ceremyn.domain import Fill, Order
+from ceremyn.domain.enums import KillSwitchState, OrderType, Side
 from tests.unit.backtest.helpers import make_chain, make_contract
 
 

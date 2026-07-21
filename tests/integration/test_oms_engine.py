@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.oms import BrokerExecutionReport, BrokerOrderStatus, OrderManagementEngine
-from alphaquant.risk import RiskEngine
+from ceremyn.oms import BrokerExecutionReport, BrokerOrderStatus, OrderManagementEngine
+from ceremyn.risk import RiskEngine
 from tests.unit.oms.conftest import T0, FakeBroker, make_signal, permissive_settings
 
 

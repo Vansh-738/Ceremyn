@@ -5,14 +5,14 @@ from typing import Any
 
 import pytest
 
-from alphaquant.data.services.chain_analytics import ChainAnalyticsService
-from alphaquant.domain import Side, Signal, SignalAction, SignalLeg
-from alphaquant.live.cache import LiveDataCache
-from alphaquant.oms.broker import BrokerExecutionReport, BrokerOrderStatus
-from alphaquant.oms.engine import OrderManagementEngine
-from alphaquant.risk import RiskEngine
-from alphaquant.runtime.rest_poller import RestPricePoller, _orphaned_symbols, _strategy_positions
-from alphaquant.strategies.base import Strategy, StrategyContext
+from ceremyn.data.services.chain_analytics import ChainAnalyticsService
+from ceremyn.domain import Side, Signal, SignalAction, SignalLeg
+from ceremyn.live.cache import LiveDataCache
+from ceremyn.oms.broker import BrokerExecutionReport, BrokerOrderStatus
+from ceremyn.oms.engine import OrderManagementEngine
+from ceremyn.risk import RiskEngine
+from ceremyn.runtime.rest_poller import RestPricePoller, _orphaned_symbols, _strategy_positions
+from ceremyn.strategies.base import Strategy, StrategyContext
 from tests.unit.backtest.helpers import make_contract
 from tests.unit.oms.conftest import EXPIRY, T0, FakeBroker, permissive_settings
 
@@ -37,7 +37,7 @@ class _NoopStrategy(Strategy[Any]):
 
 
 def _make_poller() -> RestPricePoller:
-    from alphaquant.domain import StrategyDefinition
+    from ceremyn.domain import StrategyDefinition
 
     definition = StrategyDefinition(
         id="noop", strategy_type="test_noop", name="noop", underlyings=("NIFTY",)

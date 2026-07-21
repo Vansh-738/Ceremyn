@@ -1,8 +1,8 @@
 import pytest
 
-from alphaquant.config import Settings
-from alphaquant.llm.client import ClaudeClient
-from alphaquant.llm.exceptions import LLMProviderError
+from ceremyn.config import Settings
+from ceremyn.llm.client import ClaudeClient
+from ceremyn.llm.exceptions import LLMProviderError
 from tests.unit.llm.conftest import FakeAnthropic, FakeContentBlock, FakeMessage, FakeSDKStream
 
 

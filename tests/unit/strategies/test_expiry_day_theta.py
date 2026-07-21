@@ -4,9 +4,9 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import OptionType, Position, Side, SignalAction
-from alphaquant.strategies import Strategy, create
-from alphaquant.strategies.base import StrategyContext
+from ceremyn.domain import OptionType, Position, Side, SignalAction
+from ceremyn.strategies import Strategy, create
+from ceremyn.strategies.base import StrategyContext
 from tests.unit.domain.conftest import make_contract
 from tests.unit.strategies.conftest import (
     EXPIRY,

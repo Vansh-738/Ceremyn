@@ -4,13 +4,13 @@ from uuid import uuid4
 
 import pytest
 
-from alphaquant.backtest.portfolio import PortfolioConfig
-from alphaquant.broker import SimulatedBroker
-from alphaquant.domain import Order, Side
-from alphaquant.domain.enums import OrderType
-from alphaquant.live.cache import LiveDataCache
-from alphaquant.oms.broker import BrokerAdapter, BrokerOrderStatus
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.backtest.portfolio import PortfolioConfig
+from ceremyn.broker import SimulatedBroker
+from ceremyn.domain import Order, Side
+from ceremyn.domain.enums import OrderType
+from ceremyn.live.cache import LiveDataCache
+from ceremyn.oms.broker import BrokerAdapter, BrokerOrderStatus
+from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
 from tests.unit.backtest.helpers import make_chain, make_contract
 
 T0 = datetime(2026, 7, 15, 4, 20, tzinfo=UTC)

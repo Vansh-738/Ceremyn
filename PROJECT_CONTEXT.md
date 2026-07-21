@@ -1,4 +1,4 @@
-# AlphaQuant — Project Context
+# Ceremyn — Project Context
 
 > Single source of truth for resuming work with minimal context loss. Last updated after
 > M16 (Domain & Instrument Generalization — the first milestone of the multi-asset platform
@@ -110,20 +110,20 @@ and `/llm` alongside `/dashboard`, each a structurally separate router.
 ones:
 - `domain` is independent and cannot import infrastructure.
 - **`strategies` cannot import `execution`/`broker`** — held throughout M14: all 6 new strategy
-  files import only `alphaquant.domain` and their own package, same discipline as the 3
+  files import only `ceremyn.domain` and their own package, same discipline as the 3
   pre-existing ones, confirmed by `lint-imports` staying at 17/17 with zero new contracts.
-  `dashboard → alphaquant.strategies` (added for the M14 strategy-catalog channel, §11) was
+  `dashboard → ceremyn.strategies` (added for the M14 strategy-catalog channel, §11) was
   already permitted — `strategies` was never in the "Dashboard cannot place orders" forbidden
   list, since it has no execution-adjacent imports of its own to leak.
 - **`llm` cannot import `execution`/`risk`** — and because import-linter's `ForbiddenContract`
   checks transitively, this already forbids every package that itself reaches `risk`:
   `oms`, `paper`, `live`, `research`, `backtest`, `dashboard.backend` (confirmed by direct grep
   of each package's imports during the M12 design review, not assumed). `llm/`'s only
-  `alphaquant.*` imports are `domain`, `core`, `config`, `features`, `strategies`, and
+  `ceremyn.*` imports are `domain`, `core`, `config`, `features`, `strategies`, and
   `dashboard.models` (pure DTOs) — verified two ways: the transitive contract above, and a
   direct static-import test (`tests/unit/architecture/test_boundaries.py::
   test_llm_package_never_imports_execution_adjacent_packages`) that AST-parses every file under
-  `src/alphaquant/llm/` and fails with a precise file/line on any forbidden import, rather than
+  `src/ceremyn/llm/` and fails with a precise file/line on any forbidden import, rather than
   relying solely on `lint-imports` catching it after the fact.
 - `risk` cannot import `broker`/`execution`/`strategies`/`llm`.
 - **`oms` cannot import `broker`/`execution`** — OMS only ever codes against the `BrokerAdapter`
@@ -148,7 +148,7 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
 
 1. **Live trading disabled by default.** Three independent gates must all pass, all enforced
    inside `execution.gate.LiveTradingGate.permits_live_trading()`: (1) env
-   `ALPHAQUANT_TRADING_MODE=live`, (2) `ALPHAQUANT_LIVE_TRADING_ENABLED=true` — both via
+   `CEREMYN_TRADING_MODE=live`, (2) `CEREMYN_LIVE_TRADING_ENABLED=true` — both via
    `Settings.effective_mode` (LIVE degrades to PAPER without the flag) — and (3) a runtime
    arming token, submitted via `POST /execution/arm {token, reason}` *after* gates 1–2 are
    already open (`arm()` raises the pre-existing `LiveTradingLockedError` otherwise — arming is
@@ -167,7 +167,7 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
    `OrderManagementEngine`, `BrokerAdapter`, or `GatedBrokerAdapter` at import time; (b) **no
    write capability in the tool surface** — every one of the assistant's 16 tools
    (`llm/tools.py::TOOL_DEFINITIONS`) is a hand-written function that only reads and returns a
-   frozen DTO; there is no "run arbitrary code" or "call arbitrary AlphaQuant method" tool, so
+   frozen DTO; there is no "run arbitrary code" or "call arbitrary Ceremyn method" tool, so
    Claude's tool-use can only ever invoke this fixed, read-only set. (The one piece of writable
    state — watchlist symbols — is exactly as consequential as conversation history: session-
    scoped, in-memory, never touching a broker, order, or position.); (c) **`/llm` and
@@ -185,10 +185,10 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
 
 ## 6. File structure (package-by-package)
 
-`src/alphaquant/` (LOC approximate, source only):
+`src/ceremyn/` (LOC approximate, source only):
 
 - **`config/`** (209) — `settings.py` (`Settings`, nested `DB/Redis/Kite/Anthropic/Data/Risk`
-  settings, `env_prefix="ALPHAQUANT_"`, `__` nesting), `modes.py` (`TradingMode`). `get_settings()`
+  settings, `env_prefix="CEREMYN_"`, `__` nesting), `modes.py` (`TradingMode`). `get_settings()`
   is the **only** sanctioned env access point.
 - **`core/`** — `logging.py` (structlog: console in dev, JSON in prod), `events.py`
   (`EventBus`, async publish, sync/async handlers, `ExceptionGroup` on handler failure),
@@ -304,7 +304,7 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   (`LiveTradingGate`, `GateEvent`), `gated_broker.py` (`GatedBrokerAdapter`). See §5.
 - **`llm/`** (M12) — `client.py` (`ClaudeClient`, thin Anthropic SDK wrapper, `from_settings()`),
   `providers.py` (structural Protocols: `DashboardReader` — duck-typed by the real
-  `DashboardService`, `llm` never imports `alphaquant.dashboard`; `ExperimentDetailReader`,
+  `DashboardService`, `llm` never imports `ceremyn.dashboard`; `ExperimentDetailReader`,
   `RecapReader`), `snapshots.py` (`ExperimentDetailBrief`, `RecapBrief`, `StrategyCatalogEntry` —
   frozen DTOs; M14 added a `params_schema: dict[str, Any]` field, populated from each
   strategy's `params_model.model_json_schema()`, so strategy-explanation answers can describe
@@ -335,7 +335,7 @@ registered `test_backtest_strategy`).
 - **Money/prices = `Decimal`** in domain/ledgers; floats only inside numerical kernels
   (greeks/IV/indicators) at the NumPy boundary.
 - Logging via `structlog.get_logger(__name__)`; never `print`.
-- Config only via `alphaquant.config.get_settings()`; never read `os.environ` elsewhere.
+- Config only via `ceremyn.config.get_settings()`; never read `os.environ` elsewhere.
 - Files ≤ 500 lines; split before exceeding.
 - Every module ships with tests; new packages target **>95% unit coverage**.
 - **Reuse, don't duplicate.** Established pattern across M6–M11: new layers compose existing
@@ -381,7 +381,7 @@ registered `test_backtest_strategy`).
   conversation, event_bus=)`; `.chat(session_id, message) → AsyncIterator[StreamEvent]`,
   `.daily_recap/.session_recap/.generate_report(topic=)/.compare_experiments(experiment_ids=)`
   (same call). `ClaudeClient.from_settings(settings)` mirrors `KiteBroker.from_settings` exactly
-  — raises `LLMProviderError` without `ALPHAQUANT_ANTHROPIC__API_KEY`, never touched until a
+  — raises `LLMProviderError` without `CEREMYN_ANTHROPIC__API_KEY`, never touched until a
   turn actually needs it (`client_factory`, resolved+cached lazily inside `Assistant`).
 
 ---
@@ -421,8 +421,8 @@ than showing zeros because nothing was ever connected.
   the M13 gate status is available via the JSON channel/WebSocket but has no dedicated UI panel
   (explicit scope decision; a small follow-up if wanted).
 
-Run: `.venv/bin/uvicorn alphaquant.api.main:app --reload` → open `http://127.0.0.1:8000/dashboard/`.
-Arm/disarm (needs `ALPHAQUANT_EXECUTION__ARMING_SECRET` set): `curl -X POST
+Run: `.venv/bin/uvicorn ceremyn.api.main:app --reload` → open `http://127.0.0.1:8000/dashboard/`.
+Arm/disarm (needs `CEREMYN_EXECUTION__ARMING_SECRET` set): `curl -X POST
 127.0.0.1:8000/execution/arm -d '{"token":"...","reason":"..."}'`.
 
 ---
@@ -438,7 +438,7 @@ tools read through the exact same `DashboardService` instance the dashboard rend
 
 - **Provider-based, not import-based.** `llm/providers.py` defines three structural Protocols
   (`DashboardReader`, `ExperimentDetailReader`, `RecapReader`); `llm` never imports
-  `alphaquant.dashboard` or `alphaquant.oms`/`alphaquant.paper`/etc. to satisfy them. At the
+  `ceremyn.dashboard` or `ceremyn.oms`/`ceremyn.paper`/etc. to satisfy them. At the
   composition root (`api/app.py::create_app()`), the real `DashboardService` is handed to the
   assistant directly (duck-typed — it already has the right method surface); the two new
   Protocols are satisfied by small adapters in `api/llm_runtime.py` (`_ExperimentDetailAdapter`
@@ -476,18 +476,18 @@ tools read through the exact same `DashboardService` instance the dashboard rend
 - **Lazy credentials, verified live.** `container.llm_client` (`ClaudeClient.from_settings`) is
   never touched at app-mount or `build_assistant()` time — only the first time a chat turn
   actually calls it (`Assistant._resolve_client()`, cached after first resolution). Manually
-  verified against a running `uvicorn` process with no `ALPHAQUANT_ANTHROPIC__API_KEY`
+  verified against a running `uvicorn` process with no `CEREMYN_ANTHROPIC__API_KEY`
   configured: `/llm/watchlist/*` works end-to-end; `/llm/chat` and `/llm/reports/daily-recap`
   stream real, live tool-call frames (pre-fetched from the real `Container` engines) and then a
-  clean `{"type": "error", "message": "ALPHAQUANT_ANTHROPIC__API_KEY is not configured"}` SSE
+  clean `{"type": "error", "message": "CEREMYN_ANTHROPIC__API_KEY is not configured"}` SSE
   frame — never a crash, and `/dashboard`/`/execution`/`/health` stay unaffected throughout.
 - **EventBus**: after any report/recap, the assistant publishes `AssistantReportGenerated`
   (`llm/events.py`, pure pydantic) onto `container.event_bus` — makes LLM activity observable
   (e.g. a future "recent AI reports" dashboard panel) without inventing new auto-triggering
   behavior.
 
-Run: same single app as the dashboard (`.venv/bin/uvicorn alphaquant.api.main:app --reload`);
-set `ALPHAQUANT_ANTHROPIC__API_KEY=...` for `/llm/chat` etc. to actually complete (unset, they
+Run: same single app as the dashboard (`.venv/bin/uvicorn ceremyn.api.main:app --reload`);
+set `CEREMYN_ANTHROPIC__API_KEY=...` for `/llm/chat` etc. to actually complete (unset, they
 still mount and stream a clean error frame). Watchlist example: `curl -X POST
 127.0.0.1:8000/llm/watchlist/s1 -d '{"action":"add","symbol":"NIFTY"}'`.
 
@@ -556,7 +556,7 @@ fully generic over `strategy_type` strings.
   adapter needing no `Container` engine at all) build their own DTOs from these same dicts, so
   a 10th strategy needs zero `llm/`/`dashboard/` changes to appear in either surface.
 
-Run: same single app (`.venv/bin/uvicorn alphaquant.api.main:app --reload`); `curl
+Run: same single app (`.venv/bin/uvicorn ceremyn.api.main:app --reload`); `curl
 127.0.0.1:8000/dashboard/api/strategies` lists all 9 with full JSON-schema params. No new
 settings, no new container providers — the strategy registry is pure, stateless Python state
 populated at import time.
@@ -573,7 +573,7 @@ populated at import time.
    run in CI (`TEST_DATABASE_URL`).
 4. **No secrets configured** — Kite/Anthropic keys and `execution.arming_secret` are all empty in
    dev; live data, LLM, and arming all need real values to do anything beyond their safe defaults
-   (empty `arming_secret` means `/execution/arm` always 403s, and no `ALPHAQUANT_ANTHROPIC__
+   (empty `arming_secret` means `/execution/arm` always 403s, and no `CEREMYN_ANTHROPIC__
    API_KEY` means `/llm/chat` etc. always stream a clean SSE error frame — both refused, not
    silently permitted/faked, when unconfigured; manually verified for `/llm` — see §10).
 5. `create_dashboard_app` still exists (test helper only). Production uses the single app.
@@ -659,7 +659,7 @@ populated at import time.
   currently-out-of-scope LLM capabilities CLAUDE.md mentions); paper/live Calendar Spread
   support (needs the M2/M8/M9 multi-expiry data-pipeline work from §12 item 13); fix
   `make_contract`'s tradingsymbol format to encode expiry (§12 item 14).
-- **Live trading go-live checklist (before ever setting `ALPHAQUANT_TRADING_MODE=live` for
+- **Live trading go-live checklist (before ever setting `CEREMYN_TRADING_MODE=live` for
   real):** paper burn-in per the roadmap's own note, real Kite credentials configured, a real
   `execution.arming_secret` configured (not the empty default), and a deliberate, out-of-band
   decision to call `POST /execution/arm` — never automate that call.
@@ -679,7 +679,7 @@ populated at import time.
 # Tests (unit)                     integration needs: docker compose up -d postgres redis
 .venv/bin/pytest tests/unit -q
 .venv/bin/pytest -q                                   # full (integration auto-skips w/o DB)
-.venv/bin/pytest tests/unit/<pkg> --cov=alphaquant.<pkg> --cov-fail-under=95
+.venv/bin/pytest tests/unit/<pkg> --cov=ceremyn.<pkg> --cov-fail-under=95
 
 # Quality gates (all must pass before commit)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
@@ -687,11 +687,11 @@ populated at import time.
 .venv/bin/lint-imports
 
 # Run the single app (dashboard at /dashboard/, Swagger at /docs)
-.venv/bin/uvicorn alphaquant.api.main:app --reload
+.venv/bin/uvicorn ceremyn.api.main:app --reload
 
 # Run with arming enabled (still needs TRADING_MODE=live + LIVE_TRADING_ENABLED=true + the
 # right token via POST /execution/arm before any order would actually go live)
-ALPHAQUANT_EXECUTION__ARMING_SECRET=... .venv/bin/uvicorn alphaquant.api.main:app --reload
+CEREMYN_EXECUTION__ARMING_SECRET=... .venv/bin/uvicorn ceremyn.api.main:app --reload
 ```
 
 ---

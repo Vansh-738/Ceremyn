@@ -1,9 +1,9 @@
 from typing import Any
 
-from alphaquant.dashboard.backend import DashboardService
-from alphaquant.dashboard.events import SnapshotDiffer
-from alphaquant.dashboard.models import Channel, WSFrame
-from alphaquant.dashboard.websocket import ConnectionManager, broadcast_changes
+from ceremyn.dashboard.backend import DashboardService
+from ceremyn.dashboard.events import SnapshotDiffer
+from ceremyn.dashboard.models import Channel, WSFrame
+from ceremyn.dashboard.websocket import ConnectionManager, broadcast_changes
 
 
 class FakeSocket:

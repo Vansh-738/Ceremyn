@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from alphaquant.core.timeutils import IST
-from alphaquant.paper.scheduler import PaperScheduler
+from ceremyn.core.timeutils import IST
+from ceremyn.paper.scheduler import PaperScheduler
 from tests.unit.paper.conftest import make_tick
 
 

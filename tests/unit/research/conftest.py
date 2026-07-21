@@ -4,15 +4,15 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.backtest.events import OptionChainEvent
-from alphaquant.config import Settings
-from alphaquant.domain import StrategyDefinition
-from alphaquant.research.dataset import Dataset, dataset_from_events
-from alphaquant.research.experiment import Experiment
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.research.experiment_store import InMemoryExperimentStore
-from alphaquant.research.statistics import ExperimentMetrics
-from alphaquant.risk import RiskEngine
+from ceremyn.backtest.events import OptionChainEvent
+from ceremyn.config import Settings
+from ceremyn.domain import StrategyDefinition
+from ceremyn.research.dataset import Dataset, dataset_from_events
+from ceremyn.research.experiment import Experiment
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.research.experiment_store import InMemoryExperimentStore
+from ceremyn.research.statistics import ExperimentMetrics
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import make_chain, make_strategy_definition
 
 START = datetime(2026, 7, 1, 4, 0, tzinfo=UTC)

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from alphaquant.core.calendar import MarketCalendar
-from alphaquant.core.exceptions import DataError
-from alphaquant.data.providers.bhavcopy import parse_bhavcopy, parse_bhavcopy_futures
-from alphaquant.data.records import EodFutureRecord, EodOptionRecord
-from alphaquant.data.services.ingest import BhavcopyIngestService
+from ceremyn.core.calendar import MarketCalendar
+from ceremyn.core.exceptions import DataError
+from ceremyn.data.providers.bhavcopy import parse_bhavcopy, parse_bhavcopy_futures
+from ceremyn.data.records import EodFutureRecord, EodOptionRecord
+from ceremyn.data.services.ingest import BhavcopyIngestService
 
 FIXTURE = Path(__file__).parents[2] / "fixtures" / "bhavcopy_sample.csv"
 TRADE_DATE = date(2025, 7, 11)

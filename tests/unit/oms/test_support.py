@@ -1,4 +1,4 @@
-from alphaquant.oms import OMSOrder, OrderPlanner
+from ceremyn.oms import OMSOrder, OrderPlanner
 from tests.unit.oms.conftest import T0, make_signal
 
 

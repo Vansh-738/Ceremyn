@@ -1,4 +1,4 @@
-# AlphaQuant — project conventions
+# Ceremyn — project conventions
 
 Options trading **research platform** for Indian markets (NIFTY/BANKNIFTY options v1).
 Not a prediction bot. Reliability and risk management outrank features.
@@ -6,16 +6,16 @@ Not a prediction bot. Reliability and risk management outrank features.
 ## Safety invariants (never violate, never "temporarily" bypass)
 
 1. **Live trading is disabled by default.** Three independent gates must all pass
-   before a live order is possible: `ALPHAQUANT_TRADING_MODE=live` env var,
-   `ALPHAQUANT_LIVE_TRADING_ENABLED=true`, and a runtime arming token submitted
+   before a live order is possible: `CEREMYN_TRADING_MODE=live` env var,
+   `CEREMYN_LIVE_TRADING_ENABLED=true`, and a runtime arming token submitted
    after startup. Missing any gate → orders route to the paper broker.
    Gate logic lives in `Settings.effective_mode` (config/settings.py) and the
    execution layer.
 2. **Every order passes through `RiskEngine.validate()`.** Strategies emit
    `Signal` objects only; the OMS alone constructs orders. Never give a strategy
    a broker handle.
-3. **The LLM never decides BUY or SELL.** `alphaquant.llm` must not import
-   `alphaquant.execution` or `alphaquant.risk` (import-linter enforces this).
+3. **The LLM never decides BUY or SELL.** `ceremyn.llm` must not import
+   `ceremyn.execution` or `ceremyn.risk` (import-linter enforces this).
    LLM use is limited to: news summaries, earnings explainers, report
    generation, trade explanations, strategy reviews.
 4. **Identical strategy/risk code across backtest, paper, and live** — the three
@@ -23,7 +23,7 @@ Not a prediction bot. Reliability and risk management outrank features.
 
 ## Architecture
 
-Clean architecture, src layout (`src/alphaquant/`):
+Clean architecture, src layout (`src/ceremyn/`):
 - `domain/` — pure entities/value objects; imports nothing else in the project.
 - `data/`, `strategies/`, `risk/`, `backtest/`, `execution/`, `journal/`, `llm/`
   — service layer coded against protocols, not concrete infra.
@@ -41,7 +41,7 @@ Clean architecture, src layout (`src/alphaquant/`):
 - Money/prices: `Decimal` in domain models and ledgers; floats only inside
   numerical kernels (greeks/IV) at the NumPy boundary.
 - Logging via `structlog.get_logger(__name__)`; never `print`.
-- Config only via `alphaquant.config.get_settings()`; never read `os.environ`
+- Config only via `ceremyn.config.get_settings()`; never read `os.environ`
   elsewhere.
 - Files ≤ 500 lines; split before you exceed it.
 - Every module lands with tests. Unit tests in `tests/unit` (mirror src);
@@ -53,7 +53,7 @@ Clean architecture, src layout (`src/alphaquant/`):
 - Lint: `.venv/bin/ruff check . && .venv/bin/ruff format --check .`
 - Types: `.venv/bin/mypy`
 - Contracts: `.venv/bin/lint-imports`
-- Run API: `.venv/bin/uvicorn alphaquant.api.main:app --reload`
+- Run API: `.venv/bin/uvicorn ceremyn.api.main:app --reload`
 
 ## Workflow
 

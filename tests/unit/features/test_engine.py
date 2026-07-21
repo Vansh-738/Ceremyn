@@ -1,13 +1,13 @@
 import pytest
 
-from alphaquant.core.exceptions import ConfigurationError
-from alphaquant.features.base import Feature
-from alphaquant.features.cache import InMemoryFeatureCache
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.engine import FeatureEngine, default_validator
-from alphaquant.features.models import FeatureScalar
-from alphaquant.features.registry import FeatureRegistry
-from alphaquant.features.validation import Bounds, FeatureValidationError
+from ceremyn.core.exceptions import ConfigurationError
+from ceremyn.features.base import Feature
+from ceremyn.features.cache import InMemoryFeatureCache
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.engine import FeatureEngine, default_validator
+from ceremyn.features.models import FeatureScalar
+from ceremyn.features.registry import FeatureRegistry
+from ceremyn.features.validation import Bounds, FeatureValidationError
 from tests.unit.features.conftest import make_chain, make_context
 
 

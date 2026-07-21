@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from alphaquant.config import Settings
-from alphaquant.domain import (
+from ceremyn.config import Settings
+from ceremyn.domain import (
     Exchange,
     KillSwitchState,
     OptionContract,

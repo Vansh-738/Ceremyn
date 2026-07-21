@@ -1,4 +1,4 @@
-from alphaquant.llm.conversation import ConversationMessage, InMemoryConversationStore
+from ceremyn.llm.conversation import ConversationMessage, InMemoryConversationStore
 
 
 def make_store(**kwargs: int) -> InMemoryConversationStore:

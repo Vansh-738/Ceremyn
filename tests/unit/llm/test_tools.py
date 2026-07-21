@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.llm.exceptions import LLMToolError
-from alphaquant.llm.snapshots import ExperimentDetailBrief, RecapBrief
-from alphaquant.llm.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolContext, run_tool
-from alphaquant.llm.watchlist import InMemoryWatchlistStore
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.llm.exceptions import LLMToolError
+from ceremyn.llm.snapshots import ExperimentDetailBrief, RecapBrief
+from ceremyn.llm.tools import TOOL_DEFINITIONS, TOOL_DISPATCH, ToolContext, run_tool
+from ceremyn.llm.watchlist import InMemoryWatchlistStore
 
 NOW = datetime(2026, 7, 15, 10, 0, tzinfo=UTC)
 

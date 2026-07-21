@@ -4,7 +4,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     EquityInstrument,
     Exchange,
     OptionType,

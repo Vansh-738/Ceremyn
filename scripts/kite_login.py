@@ -21,12 +21,12 @@ Usage:
 import re
 from pathlib import Path
 
-from alphaquant.config import get_settings
-from alphaquant.core.exceptions import BrokerError
-from alphaquant.data.providers.kite import KiteProvider
+from ceremyn.config import get_settings
+from ceremyn.core.exceptions import BrokerError
+from ceremyn.data.providers.kite import KiteProvider
 
 ENV_PATH = Path(".env")
-ENV_KEY = "ALPHAQUANT_KITE__ACCESS_TOKEN"
+ENV_KEY = "CEREMYN_KITE__ACCESS_TOKEN"
 
 
 def _write_access_token(token: str) -> None:
@@ -52,10 +52,10 @@ def main() -> None:
 
     settings = get_settings()
     if not settings.kite.api_key:
-        raise SystemExit("ALPHAQUANT_KITE__API_KEY is not set in .env — set that first.")
+        raise SystemExit("CEREMYN_KITE__API_KEY is not set in .env — set that first.")
     api_secret = settings.kite.api_secret.get_secret_value()
     if not api_secret:
-        raise SystemExit("ALPHAQUANT_KITE__API_SECRET is not set in .env — set that first.")
+        raise SystemExit("CEREMYN_KITE__API_SECRET is not set in .env — set that first.")
 
     provider = KiteProvider.from_settings(settings)
     print("1. Open this URL in your browser and log in to Kite:\n")

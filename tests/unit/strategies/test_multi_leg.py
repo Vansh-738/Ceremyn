@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from alphaquant.domain import OptionType, Position, Side, SignalAction
-from alphaquant.strategies import create
-from alphaquant.strategies.base import StrategyContext
-from alphaquant.strategies.common import mark_price
-from alphaquant.strategies.legs import LegSpec
-from alphaquant.strategies.multi_leg import drive
-from alphaquant.strategies.rules import AdjustmentRule, EntryFilter, ExitRule
+from ceremyn.domain import OptionType, Position, Side, SignalAction
+from ceremyn.strategies import create
+from ceremyn.strategies.base import StrategyContext
+from ceremyn.strategies.common import mark_price
+from ceremyn.strategies.legs import LegSpec
+from ceremyn.strategies.multi_leg import drive
+from ceremyn.strategies.rules import AdjustmentRule, EntryFilter, ExitRule
 from tests.unit.domain.conftest import make_contract
 from tests.unit.strategies.conftest import (
     EXPIRY,

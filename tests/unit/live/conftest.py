@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from alphaquant.data.services.chain_analytics import ChainAnalyticsService
-from alphaquant.domain import OptionContract, OptionType
-from alphaquant.live.feed import UnderlyingDefinition
+from ceremyn.data.services.chain_analytics import ChainAnalyticsService
+from ceremyn.domain import OptionContract, OptionType
+from ceremyn.live.feed import UnderlyingDefinition
 from tests.unit.domain.conftest import make_contract
 
 INDEX_TOKEN = 256265

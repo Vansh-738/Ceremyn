@@ -1,14 +1,14 @@
 from datetime import UTC, datetime
 
-from alphaquant.core.events import EventBus
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.llm.assistant import Assistant
-from alphaquant.llm.client import ClaudeClient
-from alphaquant.llm.conversation import InMemoryConversationStore
-from alphaquant.llm.events import AssistantReportGenerated
-from alphaquant.llm.exceptions import LLMProviderError
-from alphaquant.llm.snapshots import ExperimentDetailBrief, RecapBrief
-from alphaquant.llm.watchlist import InMemoryWatchlistStore
+from ceremyn.core.events import EventBus
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.llm.assistant import Assistant
+from ceremyn.llm.client import ClaudeClient
+from ceremyn.llm.conversation import InMemoryConversationStore
+from ceremyn.llm.events import AssistantReportGenerated
+from ceremyn.llm.exceptions import LLMProviderError
+from ceremyn.llm.snapshots import ExperimentDetailBrief, RecapBrief
+from ceremyn.llm.watchlist import InMemoryWatchlistStore
 from tests.unit.llm.conftest import FakeAnthropic, FakeContentBlock, FakeMessage, FakeSDKStream
 
 NOW = datetime(2026, 7, 15, 10, 0, tzinfo=UTC)
@@ -182,7 +182,7 @@ async def test_chat_emits_error_event_on_provider_failure() -> None:
 
 async def test_chat_emits_error_event_when_client_factory_fails() -> None:
     def factory() -> ClaudeClient:
-        raise LLMProviderError("ALPHAQUANT_ANTHROPIC__API_KEY is not configured")
+        raise LLMProviderError("CEREMYN_ANTHROPIC__API_KEY is not configured")
 
     assistant = Assistant(
         client_factory=factory,

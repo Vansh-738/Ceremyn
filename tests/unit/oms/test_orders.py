@@ -1,4 +1,4 @@
-from alphaquant.oms import ExecutionStyle, OrderPlanner, PlanOrderRole
+from ceremyn.oms import ExecutionStyle, OrderPlanner, PlanOrderRole
 from tests.unit.oms.conftest import T0, make_signal
 
 

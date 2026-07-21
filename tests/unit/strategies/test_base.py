@@ -4,8 +4,8 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import PortfolioSnapshot, Position
-from alphaquant.strategies.base import StrategyContext
+from ceremyn.domain import PortfolioSnapshot, Position
+from ceremyn.strategies.base import StrategyContext
 from tests.unit.domain.conftest import make_contract
 from tests.unit.strategies.conftest import NOW, enriched_chain
 

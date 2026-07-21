@@ -3,16 +3,16 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import KillSwitchState, SignalAction
-from alphaquant.risk import (
+from ceremyn.domain import KillSwitchState, SignalAction
+from ceremyn.risk import (
     RiskConfigurationError,
     RiskEngine,
     RiskEvaluationError,
     build_default_rules,
 )
-from alphaquant.risk.context import RiskContext
-from alphaquant.risk.models import RiskCategory, RuleResult
-from alphaquant.risk.rules import RiskRule
+from ceremyn.risk.context import RiskContext
+from ceremyn.risk.models import RiskCategory, RuleResult
+from ceremyn.risk.rules import RiskRule
 
 
 def test_default_registry_contains_all_rules() -> None:

@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from alphaquant.features.models import FeatureValue
-from alphaquant.features.validation import (
+from ceremyn.features.models import FeatureValue
+from ceremyn.features.validation import (
     Bounds,
     Categorical,
     FeatureValidationError,

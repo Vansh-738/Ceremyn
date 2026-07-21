@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from alphaquant.live.kite import KiteStreamingClient
-from alphaquant.live.stream import AsyncTickStream
+from ceremyn.live.kite import KiteStreamingClient
+from ceremyn.live.stream import AsyncTickStream
 
 
 class FakeTicker:

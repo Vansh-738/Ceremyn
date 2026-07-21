@@ -1,8 +1,8 @@
-from alphaquant.domain import StrategyDefinition
-from alphaquant.research.dataset import Dataset
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.research.experiment_store import InMemoryExperimentStore
-from alphaquant.risk import RiskEngine
+from ceremyn.domain import StrategyDefinition
+from ceremyn.research.dataset import Dataset
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.research.experiment_store import InMemoryExperimentStore
+from ceremyn.risk import RiskEngine
 
 
 class TestBuildSpec:

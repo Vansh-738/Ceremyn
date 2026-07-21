@@ -4,8 +4,8 @@ needed for any of this, so it lives in `tests/unit`, not the Docker-gated `tests
 
 from fastapi.testclient import TestClient
 
-from alphaquant.api.app import create_app
-from alphaquant.config import Settings, TradingMode
+from ceremyn.api.app import create_app
+from ceremyn.config import Settings, TradingMode
 
 SECRET = "super-secret-token"
 

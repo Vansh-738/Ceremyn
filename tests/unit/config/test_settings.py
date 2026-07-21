@@ -6,7 +6,7 @@ These are the most important tests in M0: they pin down the safety defaults.
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.config import Settings, TradingMode, get_settings
+from ceremyn.config import Settings, TradingMode, get_settings
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -46,12 +46,12 @@ class TestEffectiveModeGating:
 
 class TestEnvironmentLoading:
     def test_mode_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("ALPHAQUANT_TRADING_MODE", "paper")
+        monkeypatch.setenv("CEREMYN_TRADING_MODE", "paper")
         assert make_settings().trading_mode is TradingMode.PAPER
 
     def test_nested_env_delimiter(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("ALPHAQUANT_DB__HOST", "db.internal")
-        monkeypatch.setenv("ALPHAQUANT_DB__PORT", "6543")
+        monkeypatch.setenv("CEREMYN_DB__HOST", "db.internal")
+        monkeypatch.setenv("CEREMYN_DB__PORT", "6543")
         settings = make_settings()
         assert settings.db.host == "db.internal"
         assert settings.db.port == 6543
@@ -60,9 +60,7 @@ class TestEnvironmentLoading:
 class TestConnectionUrls:
     def test_database_url(self) -> None:
         settings = make_settings()
-        assert settings.db.url == (
-            "postgresql+asyncpg://alphaquant:change-me@localhost:5432/alphaquant"
-        )
+        assert settings.db.url == ("postgresql+asyncpg://ceremyn:change-me@localhost:5432/ceremyn")
 
     def test_redis_url(self) -> None:
         assert make_settings().redis.url == "redis://localhost:6379/0"
@@ -83,8 +81,8 @@ class TestRiskSettings:
         assert settings.risk.time.trading_start.isoformat() == "09:15:00"
 
     def test_risk_thresholds_load_from_nested_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("ALPHAQUANT_RISK__MARGIN__MAX_MARGIN_USAGE_RATIO", "0.65")
-        monkeypatch.setenv("ALPHAQUANT_RISK__TIME__ALLOW_EXPIRY_DAY", "true")
+        monkeypatch.setenv("CEREMYN_RISK__MARGIN__MAX_MARGIN_USAGE_RATIO", "0.65")
+        monkeypatch.setenv("CEREMYN_RISK__TIME__ALLOW_EXPIRY_DAY", "true")
         settings = make_settings()
         assert settings.risk.margin.max_margin_usage_ratio == pytest.approx(0.65)
         assert settings.risk.time.allow_expiry_day is True

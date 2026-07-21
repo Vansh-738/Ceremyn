@@ -9,14 +9,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
-from alphaquant.backtest.engine import BacktestConfig, BacktestEngine
-from alphaquant.backtest.events import OptionChainEvent
-from alphaquant.backtest.runner import BacktestRunner
-from alphaquant.config import Settings
-from alphaquant.domain import OptionChainSnapshot, Signal, StrategyDefinition
-from alphaquant.risk import RiskEngine
-from alphaquant.strategies import Strategy, StrategyContext, create
-from alphaquant.strategies.registry import register
+from ceremyn.backtest.engine import BacktestConfig, BacktestEngine
+from ceremyn.backtest.events import OptionChainEvent
+from ceremyn.backtest.runner import BacktestRunner
+from ceremyn.config import Settings
+from ceremyn.domain import OptionChainSnapshot, Signal, StrategyDefinition
+from ceremyn.risk import RiskEngine
+from ceremyn.strategies import Strategy, StrategyContext, create
+from ceremyn.strategies.registry import register
 from tests.unit.strategies.conftest import EXPIRY, NOW, enriched_chain, make_definition
 
 FAR_EXPIRY = date(2025, 8, 26)

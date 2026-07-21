@@ -1,9 +1,9 @@
-from alphaquant.domain import StrategyDefinition
-from alphaquant.research.dataset import Dataset
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.research.optimizer import Optimizer
-from alphaquant.research.parameter_grid import ParameterGrid
-from alphaquant.risk import RiskEngine
+from ceremyn.domain import StrategyDefinition
+from ceremyn.research.dataset import Dataset
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.research.optimizer import Optimizer
+from ceremyn.research.parameter_grid import ParameterGrid
+from ceremyn.risk import RiskEngine
 
 
 class TestGridSearch:
@@ -86,7 +86,7 @@ class TestSweep:
 
 
 def test_empty_run_has_no_best() -> None:
-    from alphaquant.research.optimizer import OptimizationRun
+    from ceremyn.research.optimizer import OptimizationRun
 
     empty = OptimizationRun(score_metric="sharpe")
     assert empty.best is None

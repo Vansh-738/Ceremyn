@@ -1,7 +1,7 @@
 import pytest
 
-from alphaquant.dashboard.config import DashboardSettings
-from alphaquant.dashboard.permissions import (
+from ceremyn.dashboard.config import DashboardSettings
+from ceremyn.dashboard.permissions import (
     AuthError,
     ForbiddenError,
     Permission,

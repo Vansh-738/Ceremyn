@@ -1,10 +1,10 @@
 import pytest
 
-from alphaquant.core.exceptions import ConfigurationError
-from alphaquant.features.base import Feature
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.models import FeatureScalar
-from alphaquant.features.registry import FeatureRegistry, default_registry
+from ceremyn.core.exceptions import ConfigurationError
+from ceremyn.features.base import Feature
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.models import FeatureScalar
+from ceremyn.features.registry import FeatureRegistry, default_registry
 
 EXPECTED_FEATURES = {
     "pcr",

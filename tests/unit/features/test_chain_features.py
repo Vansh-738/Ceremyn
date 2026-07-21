@@ -1,7 +1,7 @@
-from alphaquant.data.services.chain_analytics import iv_percentile, iv_rank, max_pain
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.models import FeatureScalar
-from alphaquant.features.registry import default_registry
+from ceremyn.data.services.chain_analytics import iv_percentile, iv_rank, max_pain
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.models import FeatureScalar
+from ceremyn.features.registry import default_registry
 from tests.unit.features.conftest import make_chain, make_context
 
 

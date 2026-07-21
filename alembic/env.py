@@ -8,9 +8,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-from alphaquant.config import get_settings
-from alphaquant.data.repositories import models  # noqa: F401  — register tables
-from alphaquant.data.repositories.db import Base
+from ceremyn.config import get_settings
+from ceremyn.data.repositories import models  # noqa: F401  — register tables
+from ceremyn.data.repositories.db import Base
 
 config = context.config
 

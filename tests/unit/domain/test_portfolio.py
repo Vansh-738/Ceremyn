@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     KillSwitchState,
     OptionType,
     Order,

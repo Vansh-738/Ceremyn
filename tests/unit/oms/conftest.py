@@ -6,9 +6,9 @@ from uuid import UUID
 
 import pytest
 
-from alphaquant.config import Settings
-from alphaquant.domain import Side, Signal, SignalAction, SignalLeg
-from alphaquant.oms import (
+from ceremyn.config import Settings
+from ceremyn.domain import Side, Signal, SignalAction, SignalLeg
+from ceremyn.oms import (
     BrokerCapabilities,
     BrokerCashSnapshot,
     BrokerExecutionReport,
@@ -18,9 +18,9 @@ from alphaquant.oms import (
     BrokerSubmissionResult,
     OMSRetryableError,
 )
-from alphaquant.oms.broker import BrokerCancelResult, BrokerReplaceResult
-from alphaquant.oms.exceptions import OMSNonRetryableBrokerError
-from alphaquant.risk import RiskEngine
+from ceremyn.oms.broker import BrokerCancelResult, BrokerReplaceResult
+from ceremyn.oms.exceptions import OMSNonRetryableBrokerError
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import make_contract
 
 T0 = datetime(2026, 7, 15, 4, 20, tzinfo=UTC)

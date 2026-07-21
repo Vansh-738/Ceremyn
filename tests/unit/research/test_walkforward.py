@@ -1,11 +1,11 @@
 import pytest
 
-from alphaquant.domain import StrategyDefinition
-from alphaquant.research.dataset import Dataset
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.research.parameter_grid import ParameterGrid
-from alphaquant.research.walkforward import WalkForwardLab, WalkForwardReport
-from alphaquant.risk import RiskEngine
+from ceremyn.domain import StrategyDefinition
+from ceremyn.research.dataset import Dataset
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.research.parameter_grid import ParameterGrid
+from ceremyn.research.walkforward import WalkForwardLab, WalkForwardReport
+from ceremyn.risk import RiskEngine
 
 
 def run_wf(

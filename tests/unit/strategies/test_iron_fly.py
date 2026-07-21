@@ -2,10 +2,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from alphaquant.domain import OptionType, Position, Side, SignalAction
-from alphaquant.strategies import Strategy, create
-from alphaquant.strategies.base import StrategyContext
-from alphaquant.strategies.common import mark_price
+from ceremyn.domain import OptionType, Position, Side, SignalAction
+from ceremyn.strategies import Strategy, create
+from ceremyn.strategies.base import StrategyContext
+from ceremyn.strategies.common import mark_price
 from tests.unit.domain.conftest import make_contract
 from tests.unit.strategies.conftest import (
     EXPIRY,

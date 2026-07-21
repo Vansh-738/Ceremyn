@@ -2,18 +2,18 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from alphaquant.backtest.commission import CostBreakdown
-from alphaquant.domain import Fill, Order, PortfolioSnapshot, Side, Signal, SignalLeg
-from alphaquant.domain.enums import OrderStatus, OrderType, SignalAction
-from alphaquant.paper.events import OrderFilled, OrderRejected, RiskEvaluated
-from alphaquant.paper.journal import (
+from ceremyn.backtest.commission import CostBreakdown
+from ceremyn.domain import Fill, Order, PortfolioSnapshot, Side, Signal, SignalLeg
+from ceremyn.domain.enums import OrderStatus, OrderType, SignalAction
+from ceremyn.paper.events import OrderFilled, OrderRejected, RiskEvaluated
+from ceremyn.paper.journal import (
     InMemoryJournalStore,
     JournalEntryKind,
     JournalStore,
     JSONJournalStore,
     PaperJournal,
 )
-from alphaquant.risk import RiskEngine
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import make_contract
 from tests.unit.paper.conftest import TICK_ZERO, permissive_settings
 

@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from alphaquant.backtest.statistics import EquityPoint
-from alphaquant.dashboard import views
-from alphaquant.dashboard.models import ReconciliationStatus
-from alphaquant.oms.orders import OMSExecutionState
+from ceremyn.backtest.statistics import EquityPoint
+from ceremyn.dashboard import views
+from ceremyn.dashboard.models import ReconciliationStatus
+from ceremyn.oms.orders import OMSExecutionState
 from tests.unit.dashboard.conftest import (
     make_feature_set,
     make_market_snapshot,

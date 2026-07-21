@@ -1,10 +1,10 @@
 import json
 
-from alphaquant.research.comparison import compare
-from alphaquant.research.cross_validation import CrossValidationReport, FoldResult
-from alphaquant.research.leaderboard import Leaderboard, RankMetric
-from alphaquant.research.report import ResearchReporter
-from alphaquant.research.walkforward import (
+from ceremyn.research.comparison import compare
+from ceremyn.research.cross_validation import CrossValidationReport, FoldResult
+from ceremyn.research.leaderboard import Leaderboard, RankMetric
+from ceremyn.research.report import ResearchReporter
+from ceremyn.research.walkforward import (
     WalkForwardReport,
     WalkForwardWindowReport,
 )

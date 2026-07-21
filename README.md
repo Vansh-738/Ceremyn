@@ -1,9 +1,9 @@
-# AlphaQuant
+# Ceremyn
 
 An institutional-grade, AI-assisted **options trading research platform** for Indian
 markets (NIFTY & BANKNIFTY options in v1).
 
-AlphaQuant is not a gambling bot and not a market-prediction AI. It is a quantitative
+Ceremyn is not a gambling bot and not a market-prediction AI. It is a quantitative
 research platform for discovering, validating, and operating statistically profitable
 options strategies — with risk management and reliability as first-class concerns.
 
@@ -14,8 +14,8 @@ three independent gates all pass:
 
 | Gate | What | Where |
 |------|------|-------|
-| 1 | `ALPHAQUANT_TRADING_MODE=live` | environment / `.env` |
-| 2 | `ALPHAQUANT_LIVE_TRADING_ENABLED=true` | environment / `.env` |
+| 1 | `CEREMYN_TRADING_MODE=live` | environment / `.env` |
+| 2 | `CEREMYN_LIVE_TRADING_ENABLED=true` | environment / `.env` |
 | 3 | Runtime arming token submitted via the API after startup | never stored in config |
 
 If any gate is missing, the platform degrades to **paper** mode. Additional invariants:
@@ -33,7 +33,7 @@ If any gate is missing, the platform degrades to **paper** mode. Additional inva
 - **paper** — live market data, simulated fills, full risk engine, trade journal.
 - **live** — real orders via Zerodha Kite Connect, behind the three gates above.
 
-Set via `ALPHAQUANT_TRADING_MODE` (default: `research`).
+Set via `CEREMYN_TRADING_MODE` (default: `research`).
 
 ## Quickstart
 
@@ -50,7 +50,7 @@ python3.12 -m venv .venv
 .venv/bin/pip install --no-deps -e .
 
 # 4. Run the API
-.venv/bin/uvicorn alphaquant.api.main:app --reload
+.venv/bin/uvicorn ceremyn.api.main:app --reload
 # http://127.0.0.1:8000/health          -> {"status": "ok"}
 # http://127.0.0.1:8000/system/status   -> mode & gate status
 ```
@@ -82,7 +82,7 @@ Clean architecture with a src layout — see [CLAUDE.md](CLAUDE.md) for the full
 conventions and dependency rules.
 
 ```
-src/alphaquant/
+src/ceremyn/
 ├── config/      settings (pydantic-settings), trading-mode model
 ├── core/        logging, exceptions, event bus, NSE market calendar, DI container
 ├── domain/      pure entities: Instrument, OptionChain, Greeks, Signal, Order, ...

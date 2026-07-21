@@ -33,12 +33,12 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: alphaquant
+          POSTGRES_USER: ceremyn
           POSTGRES_PASSWORD: change-me
-          POSTGRES_DB: alphaquant
+          POSTGRES_DB: ceremyn
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U alphaquant"
+          --health-cmd "pg_isready -U ceremyn"
           --health-interval 5s --health-timeout 3s --health-retries 10
       redis:
         image: redis:7-alpine
@@ -56,5 +56,5 @@ jobs:
         run: pip install -r requirements-dev.txt && pip install --no-deps -e .
       - name: Integration tests
         env:
-          TEST_DATABASE_URL: postgresql+asyncpg://alphaquant:change-me@localhost:5432/alphaquant
+          TEST_DATABASE_URL: postgresql+asyncpg://ceremyn:change-me@localhost:5432/ceremyn
         run: pytest tests/integration -q -m integration

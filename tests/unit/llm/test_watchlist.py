@@ -1,4 +1,4 @@
-from alphaquant.llm.watchlist import InMemoryWatchlistStore
+from ceremyn.llm.watchlist import InMemoryWatchlistStore
 
 
 def test_empty_watchlist_for_unknown_session() -> None:

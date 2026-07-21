@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import ChainEntry, OptionChainSnapshot, OptionType
+from ceremyn.domain import ChainEntry, OptionChainSnapshot, OptionType
 from tests.unit.domain.conftest import make_contract, make_quote
 
 

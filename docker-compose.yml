@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${ALPHAQUANT_DB__USER:-alphaquant}
-      POSTGRES_PASSWORD: ${ALPHAQUANT_DB__PASSWORD:-change-me}
-      POSTGRES_DB: ${ALPHAQUANT_DB__NAME:-alphaquant}
+      POSTGRES_USER: ${CEREMYN_DB__USER:-ceremyn}
+      POSTGRES_PASSWORD: ${CEREMYN_DB__PASSWORD:-change-me}
+      POSTGRES_DB: ${CEREMYN_DB__NAME:-ceremyn}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${ALPHAQUANT_DB__USER:-alphaquant}"]
+      test: ["CMD-SHELL", "pg_isready -U ${CEREMYN_DB__USER:-ceremyn}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -34,8 +34,8 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      ALPHAQUANT_DB__HOST: postgres
-      ALPHAQUANT_REDIS__HOST: redis
+      CEREMYN_DB__HOST: postgres
+      CEREMYN_REDIS__HOST: redis
     ports:
       - "8000:8000"
     depends_on:

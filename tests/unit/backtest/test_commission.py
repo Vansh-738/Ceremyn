@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from alphaquant.backtest.commission import IndianCostConfig, IndianCostModel
-from alphaquant.domain.enums import Side
+from ceremyn.backtest.commission import IndianCostConfig, IndianCostModel
+from ceremyn.domain.enums import Side
 
 
 def test_indian_cost_model_calculates_all_components() -> None:

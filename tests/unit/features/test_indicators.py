@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from alphaquant.features import indicators
+from ceremyn.features import indicators
 
 
 class TestEMA:

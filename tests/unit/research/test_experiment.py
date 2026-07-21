@@ -3,8 +3,8 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.research.experiment import Experiment, ExperimentSpec, git_commit
-from alphaquant.research.statistics import ExperimentMetrics
+from ceremyn.research.experiment import Experiment, ExperimentSpec, git_commit
+from ceremyn.research.statistics import ExperimentMetrics
 
 
 def make_spec(**overrides: object) -> ExperimentSpec:
@@ -52,7 +52,7 @@ class TestGitCommit:
         def boom(*_args: object, **_kwargs: object) -> None:
             raise OSError("git missing")
 
-        monkeypatch.setattr("alphaquant.research.experiment.subprocess.run", boom)
+        monkeypatch.setattr("ceremyn.research.experiment.subprocess.run", boom)
         assert git_commit() == "unknown"
 
     def test_returns_unknown_on_nonzero_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,7 +61,7 @@ class TestGitCommit:
         def failed(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
             return subprocess.CompletedProcess(args=[], returncode=128, stdout="", stderr="err")
 
-        monkeypatch.setattr("alphaquant.research.experiment.subprocess.run", failed)
+        monkeypatch.setattr("ceremyn.research.experiment.subprocess.run", failed)
         assert git_commit() == "unknown"
 
 

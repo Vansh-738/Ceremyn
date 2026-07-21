@@ -4,10 +4,10 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.backtest.commission import CostBreakdown
-from alphaquant.domain import Fill, Order, Side
-from alphaquant.domain.enums import OrderStatus, OrderType
-from alphaquant.paper.events import MarketTick, OrderFilled
+from ceremyn.backtest.commission import CostBreakdown
+from ceremyn.domain import Fill, Order, Side
+from ceremyn.domain.enums import OrderStatus, OrderType
+from ceremyn.paper.events import MarketTick, OrderFilled
 from tests.unit.backtest.helpers import make_chain, make_contract
 from tests.unit.paper.conftest import TICK_ZERO
 

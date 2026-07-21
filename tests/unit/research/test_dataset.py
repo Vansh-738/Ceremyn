@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.research.dataset import Dataset, dataset_from_events
+from ceremyn.research.dataset import Dataset, dataset_from_events
 from tests.unit.research.conftest import price_path_events
 
 

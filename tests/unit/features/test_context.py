@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.features.context import FeatureContext
+from ceremyn.features.context import FeatureContext
 from tests.unit.features.conftest import make_chain, make_context, trending_closes
 
 

@@ -3,10 +3,10 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.core.exceptions import DataError
-from alphaquant.core.timeutils import IST
-from alphaquant.data.services.candle_ingest import CandleIngestService
-from alphaquant.domain import Candle, EquityInstrument, Exchange, TimeFrame
+from ceremyn.core.exceptions import DataError
+from ceremyn.core.timeutils import IST
+from ceremyn.data.services.candle_ingest import CandleIngestService
+from ceremyn.domain import Candle, EquityInstrument, Exchange, TimeFrame
 
 
 class FakeProvider:

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from alphaquant.llm.snapshots import ExperimentDetailBrief, RecapBrief, StrategyCatalogEntry
+from ceremyn.llm.snapshots import ExperimentDetailBrief, RecapBrief, StrategyCatalogEntry
 
 NOW = datetime(2026, 7, 15, 10, 0, tzinfo=UTC)
 NAIVE = datetime(2026, 7, 15, 10, 0)

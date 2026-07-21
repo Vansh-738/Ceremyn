@@ -4,7 +4,7 @@ Skipped entirely when TEST_DATABASE_URL is unset, so `pytest` stays green
 without infrastructure. Locally:
 
     docker compose up -d postgres
-    TEST_DATABASE_URL=postgresql+asyncpg://alphaquant:change-me@localhost:5432/alphaquant \
+    TEST_DATABASE_URL=postgresql+asyncpg://ceremyn:change-me@localhost:5432/ceremyn \
         .venv/bin/pytest tests/integration -m integration
 """
 
@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from alphaquant.data.repositories.db import Base, create_engine_and_sessionmaker
+from ceremyn.data.repositories.db import Base, create_engine_and_sessionmaker
 
 TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "")
 

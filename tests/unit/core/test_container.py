@@ -1,20 +1,20 @@
-from alphaquant.broker.simulated import SimulatedBroker
-from alphaquant.config import Settings
-from alphaquant.core.calendar import MarketCalendar
-from alphaquant.core.container import Container
-from alphaquant.core.events import EventBus
-from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
-from alphaquant.execution import GatedBrokerAdapter, KiteBroker, LiveTradingGate
-from alphaquant.features.engine import FeatureEngine
-from alphaquant.live.engine import LiveMarketDataEngine
-from alphaquant.live.reconnect import ReconnectManager
-from alphaquant.llm.client import ClaudeClient
-from alphaquant.llm.conversation import InMemoryConversationStore
-from alphaquant.llm.watchlist import InMemoryWatchlistStore
-from alphaquant.oms.engine import OrderManagementEngine
-from alphaquant.paper.engine import PaperTradingEngine
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.runtime.orchestrator import RuntimeOrchestrator
+from ceremyn.broker.simulated import SimulatedBroker
+from ceremyn.config import Settings
+from ceremyn.core.calendar import MarketCalendar
+from ceremyn.core.container import Container
+from ceremyn.core.events import EventBus
+from ceremyn.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
+from ceremyn.execution import GatedBrokerAdapter, KiteBroker, LiveTradingGate
+from ceremyn.features.engine import FeatureEngine
+from ceremyn.live.engine import LiveMarketDataEngine
+from ceremyn.live.reconnect import ReconnectManager
+from ceremyn.llm.client import ClaudeClient
+from ceremyn.llm.conversation import InMemoryConversationStore
+from ceremyn.llm.watchlist import InMemoryWatchlistStore
+from ceremyn.oms.engine import OrderManagementEngine
+from ceremyn.paper.engine import PaperTradingEngine
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.runtime.orchestrator import RuntimeOrchestrator
 
 
 def make_container() -> Container:
@@ -119,7 +119,7 @@ def test_kite_broker_is_never_touched_without_credentials() -> None:
     container = make_container()
     for attr in RUNTIME_ENGINE_ATTRS:
         getattr(container, attr)
-    # No ALPHAQUANT_KITE__API_KEY in this dev environment: `kite_broker` would raise
+    # No CEREMYN_KITE__API_KEY in this dev environment: `kite_broker` would raise
     # BrokerError if constructed, so it must stay untouched until live routing is
     # actually permitted (see `execution.gated_broker.GatedBrokerAdapter`).
     assert "kite_broker" not in container.__dict__
@@ -136,7 +136,7 @@ def test_llm_client_is_never_touched_without_credentials() -> None:
     container = make_container()
     for attr in RUNTIME_ENGINE_ATTRS:
         getattr(container, attr)
-    # No ALPHAQUANT_ANTHROPIC__API_KEY in this dev environment: `llm_client` would raise
+    # No CEREMYN_ANTHROPIC__API_KEY in this dev environment: `llm_client` would raise
     # LLMProviderError if constructed, so nothing in ordinary runtime wiring may touch it.
     assert "llm_client" not in container.__dict__
 
@@ -154,7 +154,7 @@ def test_oms_engine_journal_is_persisted_and_stable_across_containers(
     """`oms_engine` must use a durable, stably-named journal (not the default
     in-memory one, not a random-uuid session id) so a restart re-opens the *same*
     file rather than starting fresh empty every time."""
-    from alphaquant.oms.journal import JSONJournalStore
+    from ceremyn.oms.journal import JSONJournalStore
 
     monkeypatch.chdir(tmp_path)  # `JSONJournalStore`'s default root is a relative path
 

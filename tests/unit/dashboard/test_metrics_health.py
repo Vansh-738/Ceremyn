@@ -1,9 +1,9 @@
-from alphaquant.backtest.statistics import BacktestStatistics
-from alphaquant.dashboard.health import build_health
-from alphaquant.dashboard.metrics import build_metrics
-from alphaquant.dashboard.models import DataFeedStatus
-from alphaquant.live.heartbeat import HeartbeatState
-from alphaquant.live.reconnect import ReconnectState
+from ceremyn.backtest.statistics import BacktestStatistics
+from ceremyn.dashboard.health import build_health
+from ceremyn.dashboard.metrics import build_metrics
+from ceremyn.dashboard.models import DataFeedStatus
+from ceremyn.live.heartbeat import HeartbeatState
+from ceremyn.live.reconnect import ReconnectState
 from tests.unit.dashboard.conftest import NOW, make_oms_metrics, make_portfolio_snapshot
 
 

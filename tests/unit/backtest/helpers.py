@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     ChainEntry,
     Exchange,
     OptionChainSnapshot,
@@ -15,9 +15,9 @@ from alphaquant.domain import (
     SignalLeg,
     StrategyDefinition,
 )
-from alphaquant.domain.enums import SignalAction
-from alphaquant.strategies import Strategy, StrategyContext
-from alphaquant.strategies.registry import register
+from ceremyn.domain.enums import SignalAction
+from ceremyn.strategies import Strategy, StrategyContext
+from ceremyn.strategies.registry import register
 
 
 class TestStrategyParams(BaseModel):

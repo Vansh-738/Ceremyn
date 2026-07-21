@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from alphaquant.core.events import EventBus
+from ceremyn.core.events import EventBus
 
 
 @dataclass

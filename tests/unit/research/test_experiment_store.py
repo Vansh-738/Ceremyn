@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from alphaquant.research.experiment import Experiment
-from alphaquant.research.experiment_store import (
+from ceremyn.research.experiment import Experiment
+from ceremyn.research.experiment_store import (
     ExperimentStore,
     InMemoryExperimentStore,
     JSONExperimentStore,
 )
-from alphaquant.research.statistics import ExperimentMetrics
+from ceremyn.research.statistics import ExperimentMetrics
 
 
 def make_experiment(experiment_id: str, spec_hash: str, sharpe: float = 1.0) -> Experiment:

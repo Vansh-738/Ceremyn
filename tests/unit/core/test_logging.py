@@ -1,7 +1,7 @@
 import pytest
 
-from alphaquant.core import logging as logging_module
-from alphaquant.core.logging import _capture_to_ring_buffer, recent_log_entries
+from ceremyn.core import logging as logging_module
+from ceremyn.core.logging import _capture_to_ring_buffer, recent_log_entries
 
 
 @pytest.fixture(autouse=True)

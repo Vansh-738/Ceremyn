@@ -3,15 +3,15 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import KillSwitchState, PortfolioSnapshot
-from alphaquant.domain.enums import Side
-from alphaquant.domain.signals import SignalLeg
-from alphaquant.risk.context import RiskContext
-from alphaquant.risk.models import RiskDecision
-from alphaquant.risk.rules import utilization
-from alphaquant.risk.rules.margin import MaximumMarginUsageRule
-from alphaquant.risk.rules.time import ExpiryRestrictionsRule
-from alphaquant.risk.rules.volatility import HighVolatilityFilterRule
+from ceremyn.domain import KillSwitchState, PortfolioSnapshot
+from ceremyn.domain.enums import Side
+from ceremyn.domain.signals import SignalLeg
+from ceremyn.risk.context import RiskContext
+from ceremyn.risk.models import RiskDecision
+from ceremyn.risk.rules import utilization
+from ceremyn.risk.rules.margin import MaximumMarginUsageRule
+from ceremyn.risk.rules.time import ExpiryRestrictionsRule
+from ceremyn.risk.rules.volatility import HighVolatilityFilterRule
 from tests.unit.risk.conftest import make_contract, make_signal
 
 

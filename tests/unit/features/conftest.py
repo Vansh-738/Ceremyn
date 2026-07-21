@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     Candle,
     ChainEntry,
     Exchange,
@@ -14,7 +14,7 @@ from alphaquant.domain import (
     Quote,
     TimeFrame,
 )
-from alphaquant.features.context import FeatureContext
+from ceremyn.features.context import FeatureContext
 
 AS_OF = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
 EXPIRY = date(2026, 7, 30)

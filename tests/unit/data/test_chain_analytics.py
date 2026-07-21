@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.core.timeutils import IST
-from alphaquant.data.services.chain_analytics import (
+from ceremyn.core.timeutils import IST
+from ceremyn.data.services.chain_analytics import (
     EXPIRY_CUTOFF,
     ChainAnalyticsService,
     expiry_moment,
@@ -12,8 +12,8 @@ from alphaquant.data.services.chain_analytics import (
     iv_rank,
     max_pain,
 )
-from alphaquant.data.services.pricing import bs_price, time_to_expiry_years
-from alphaquant.domain import ChainEntry, OptionChainSnapshot, OptionType, Quote
+from ceremyn.data.services.pricing import bs_price, time_to_expiry_years
+from ceremyn.domain import ChainEntry, OptionChainSnapshot, OptionType, Quote
 from tests.unit.domain.conftest import make_contract
 
 R = 0.065

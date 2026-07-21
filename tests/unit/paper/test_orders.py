@@ -1,9 +1,9 @@
 from datetime import timedelta
 
-from alphaquant.domain import Side, Signal, SignalLeg
-from alphaquant.domain.enums import OrderStatus, SignalAction
-from alphaquant.paper.broker import PaperBroker
-from alphaquant.paper.orders import PaperOMS
+from ceremyn.domain import Side, Signal, SignalLeg
+from ceremyn.domain.enums import OrderStatus, SignalAction
+from ceremyn.paper.broker import PaperBroker
+from ceremyn.paper.orders import PaperOMS
 from tests.unit.backtest.helpers import make_contract
 from tests.unit.paper.conftest import TICK_ZERO
 

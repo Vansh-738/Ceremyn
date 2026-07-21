@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from alphaquant.config import Settings
-from alphaquant.features.engine import FeatureEngine
-from alphaquant.paper.journal import JournalEntryKind
-from alphaquant.risk import RiskEngine
-from alphaquant.strategies import Strategy
+from ceremyn.config import Settings
+from ceremyn.features.engine import FeatureEngine
+from ceremyn.paper.journal import JournalEntryKind
+from ceremyn.risk import RiskEngine
+from ceremyn.strategies import Strategy
 from tests.unit.paper.conftest import (
     ListFeed,
     make_engine,

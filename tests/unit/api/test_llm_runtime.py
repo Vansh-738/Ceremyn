@@ -1,19 +1,19 @@
 from datetime import UTC, datetime, timedelta
 
-from alphaquant.api.llm_runtime import _ExperimentDetailAdapter, _RecapAdapter, build_assistant
-from alphaquant.api.runtime import build_dashboard_sources
-from alphaquant.config import Settings
-from alphaquant.core.container import Container
-from alphaquant.core.timeutils import now_ist
-from alphaquant.dashboard.backend import DashboardService
-from alphaquant.llm.assistant import Assistant
-from alphaquant.oms.journal import JournalEntry as OMSJournalEntry
-from alphaquant.oms.journal import JournalEntryKind as OMSJournalEntryKind
-from alphaquant.paper.journal import JournalEntry as PaperJournalEntry
-from alphaquant.paper.journal import JournalEntryKind as PaperJournalEntryKind
-from alphaquant.research.experiment import Experiment
-from alphaquant.research.experiment_store import InMemoryExperimentStore
-from alphaquant.research.statistics import ExperimentMetrics
+from ceremyn.api.llm_runtime import _ExperimentDetailAdapter, _RecapAdapter, build_assistant
+from ceremyn.api.runtime import build_dashboard_sources
+from ceremyn.config import Settings
+from ceremyn.core.container import Container
+from ceremyn.core.timeutils import now_ist
+from ceremyn.dashboard.backend import DashboardService
+from ceremyn.llm.assistant import Assistant
+from ceremyn.oms.journal import JournalEntry as OMSJournalEntry
+from ceremyn.oms.journal import JournalEntryKind as OMSJournalEntryKind
+from ceremyn.paper.journal import JournalEntry as PaperJournalEntry
+from ceremyn.paper.journal import JournalEntryKind as PaperJournalEntryKind
+from ceremyn.research.experiment import Experiment
+from ceremyn.research.experiment_store import InMemoryExperimentStore
+from ceremyn.research.statistics import ExperimentMetrics
 
 NOW = datetime(2026, 7, 15, 10, 0, tzinfo=UTC)
 

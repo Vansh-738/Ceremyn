@@ -1,10 +1,10 @@
 import pytest
 
-from alphaquant.domain import StrategyDefinition
-from alphaquant.research.cross_validation import CrossValidator
-from alphaquant.research.dataset import Dataset
-from alphaquant.research.experiment_manager import ExperimentManager
-from alphaquant.risk import RiskEngine
+from ceremyn.domain import StrategyDefinition
+from ceremyn.research.cross_validation import CrossValidator
+from ceremyn.research.dataset import Dataset
+from ceremyn.research.experiment_manager import ExperimentManager
+from ceremyn.risk import RiskEngine
 
 
 class TestRolling:

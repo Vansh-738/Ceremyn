@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from alphaquant.backtest.montecarlo import MonteCarloResult
-from alphaquant.backtest.report import BacktestReport
-from alphaquant.backtest.statistics import BacktestStatistics, ReturnBucket
-from alphaquant.domain import PortfolioSnapshot
-from alphaquant.research.statistics import (
+from ceremyn.backtest.montecarlo import MonteCarloResult
+from ceremyn.backtest.report import BacktestReport
+from ceremyn.backtest.statistics import BacktestStatistics, ReturnBucket
+from ceremyn.domain import PortfolioSnapshot
+from ceremyn.research.statistics import (
     ExperimentMetrics,
     composite_score,
     metrics_from_report,

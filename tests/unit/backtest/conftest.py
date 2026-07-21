@@ -3,9 +3,9 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.config import Settings
-from alphaquant.domain import Side, Signal, SignalAction, SignalLeg, StrategyDefinition
-from alphaquant.risk import RiskEngine
+from ceremyn.config import Settings
+from ceremyn.domain import Side, Signal, SignalAction, SignalLeg, StrategyDefinition
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import (
     TestBacktestStrategy,
     make_contract,

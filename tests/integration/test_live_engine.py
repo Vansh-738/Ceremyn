@@ -3,11 +3,11 @@ from datetime import timedelta
 
 import pytest
 
-from alphaquant.core.events import EventBus
-from alphaquant.data.services.chain_analytics import ChainAnalyticsService
-from alphaquant.live import LiveMarketDataEngine
-from alphaquant.live.events import SnapshotBuilt
-from alphaquant.live.stream import StreamTickBatch
+from ceremyn.core.events import EventBus
+from ceremyn.data.services.chain_analytics import ChainAnalyticsService
+from ceremyn.live import LiveMarketDataEngine
+from ceremyn.live.events import SnapshotBuilt
+from ceremyn.live.stream import StreamTickBatch
 from tests.unit.live.conftest import (
     BASE_TS,
     nifty_contracts,

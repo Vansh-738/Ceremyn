@@ -4,15 +4,15 @@ from uuid import uuid4
 
 import pytest
 
-from alphaquant.config import Settings
-from alphaquant.core.exceptions import BrokerError
-from alphaquant.domain import Order, Side
-from alphaquant.domain.enums import OrderType
-from alphaquant.execution import KiteBroker
-from alphaquant.execution.kite_broker import _decimal_or_none, _parse_timestamp
-from alphaquant.oms.broker import BrokerAdapter
-from alphaquant.oms.exceptions import OMSNonRetryableBrokerError, OMSRetryableError
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.config import Settings
+from ceremyn.core.exceptions import BrokerError
+from ceremyn.domain import Order, Side
+from ceremyn.domain.enums import OrderType
+from ceremyn.execution import KiteBroker
+from ceremyn.execution.kite_broker import _decimal_or_none, _parse_timestamp
+from ceremyn.oms.broker import BrokerAdapter
+from ceremyn.oms.exceptions import OMSNonRetryableBrokerError, OMSRetryableError
+from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
 from tests.unit.backtest.helpers import make_contract
 
 T0 = datetime(2026, 7, 15, 4, 20, tzinfo=UTC)

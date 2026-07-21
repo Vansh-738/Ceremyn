@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import Exchange, OptionContract, OptionType, Quote
+from ceremyn.domain import Exchange, OptionContract, OptionType, Quote
 
 
 def make_contract(

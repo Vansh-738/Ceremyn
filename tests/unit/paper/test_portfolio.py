@@ -1,9 +1,9 @@
 from decimal import Decimal
 
-from alphaquant.backtest.portfolio import PortfolioConfig
-from alphaquant.domain import Fill, Order, Side
-from alphaquant.domain.enums import OrderStatus, OrderType
-from alphaquant.paper.portfolio import PaperPortfolio
+from ceremyn.backtest.portfolio import PortfolioConfig
+from ceremyn.domain import Fill, Order, Side
+from ceremyn.domain.enums import OrderStatus, OrderType
+from ceremyn.paper.portfolio import PaperPortfolio
 from tests.unit.backtest.helpers import make_contract
 from tests.unit.paper.conftest import TICK_ZERO
 

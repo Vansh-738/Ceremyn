@@ -9,15 +9,15 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from alphaquant.api.llm import _auth_dependency, build_llm_router
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.dashboard.config import DashboardSettings
-from alphaquant.dashboard.permissions import Permission
-from alphaquant.llm.assistant import Assistant
-from alphaquant.llm.client import ClaudeClient
-from alphaquant.llm.conversation import InMemoryConversationStore
-from alphaquant.llm.snapshots import ExperimentDetailBrief, RecapBrief
-from alphaquant.llm.watchlist import InMemoryWatchlistStore
+from ceremyn.api.llm import _auth_dependency, build_llm_router
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.dashboard.config import DashboardSettings
+from ceremyn.dashboard.permissions import Permission
+from ceremyn.llm.assistant import Assistant
+from ceremyn.llm.client import ClaudeClient
+from ceremyn.llm.conversation import InMemoryConversationStore
+from ceremyn.llm.snapshots import ExperimentDetailBrief, RecapBrief
+from ceremyn.llm.watchlist import InMemoryWatchlistStore
 from tests.unit.llm.conftest import FakeAnthropic, FakeContentBlock, FakeMessage, FakeSDKStream
 
 SECRET = "super-secret-viewer-token"

@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
-from alphaquant.api.app import create_app
-from alphaquant.config import Settings
-from alphaquant.core.container import Container
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.live.events import HeartbeatLost
+from ceremyn.api.app import create_app
+from ceremyn.config import Settings
+from ceremyn.core.container import Container
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.live.events import HeartbeatLost
 
 
 def make_app() -> object:
@@ -19,7 +19,7 @@ def make_app() -> object:
 def test_main_entrypoint_builds_the_single_app() -> None:
     from fastapi import FastAPI
 
-    from alphaquant.api.main import app
+    from ceremyn.api.main import app
 
     assert isinstance(app, FastAPI)
 

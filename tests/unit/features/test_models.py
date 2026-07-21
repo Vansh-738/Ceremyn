@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.features.models import FeatureSet, FeatureValue
+from ceremyn.features.models import FeatureSet, FeatureValue
 
 AS_OF = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
 

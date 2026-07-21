@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from alphaquant.oms import OMSLedger, OMSPortfolio, OMSReconciler
-from alphaquant.oms.ledger import LedgerEntry, LedgerEntryKind
+from ceremyn.oms import OMSLedger, OMSPortfolio, OMSReconciler
+from ceremyn.oms.ledger import LedgerEntry, LedgerEntryKind
 from tests.unit.oms.conftest import T0, FakeBroker
 
 

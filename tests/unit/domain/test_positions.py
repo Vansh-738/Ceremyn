@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import EquityInstrument, Exchange, OptionContract, Position, Side
+from ceremyn.domain import EquityInstrument, Exchange, OptionContract, Position, Side
 from tests.unit.domain.conftest import make_contract
 
 

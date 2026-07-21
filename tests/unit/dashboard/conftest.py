@@ -4,28 +4,28 @@ from uuid import uuid4
 
 import pytest
 
-from alphaquant.backtest.statistics import BacktestStatistics
-from alphaquant.dashboard.backend import DashboardService, DashboardSources, KillSwitchStatus
-from alphaquant.dashboard.models import LogRow, ReconciliationStatus
-from alphaquant.domain import (
+from ceremyn.backtest.statistics import BacktestStatistics
+from ceremyn.dashboard.backend import DashboardService, DashboardSources, KillSwitchStatus
+from ceremyn.dashboard.models import LogRow, ReconciliationStatus
+from ceremyn.domain import (
     Order,
     PortfolioExposure,
     PortfolioGreeks,
     PortfolioSnapshot,
     Position,
 )
-from alphaquant.domain.enums import KillSwitchState, OrderType, Side
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.models import FeatureSet, FeatureValue
-from alphaquant.live.heartbeat import HeartbeatState
-from alphaquant.live.market_hours import MarketStatus
-from alphaquant.live.metrics import LiveMetrics
-from alphaquant.live.reconnect import ReconnectState
-from alphaquant.live.snapshot import MarketSnapshot
-from alphaquant.oms.metrics import OMSMetrics
-from alphaquant.oms.orders import OMSExecutionState, OMSOrder
-from alphaquant.paper.monitor import PaperMonitor
-from alphaquant.risk import RiskDecision
+from ceremyn.domain.enums import KillSwitchState, OrderType, Side
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.models import FeatureSet, FeatureValue
+from ceremyn.live.heartbeat import HeartbeatState
+from ceremyn.live.market_hours import MarketStatus
+from ceremyn.live.metrics import LiveMetrics
+from ceremyn.live.reconnect import ReconnectState
+from ceremyn.live.snapshot import MarketSnapshot
+from ceremyn.oms.metrics import OMSMetrics
+from ceremyn.oms.orders import OMSExecutionState, OMSOrder
+from ceremyn.paper.monitor import PaperMonitor
+from ceremyn.risk import RiskDecision
 from tests.unit.backtest.helpers import make_chain, make_contract
 
 NOW = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)

@@ -1,4 +1,4 @@
-from alphaquant.research.leaderboard import Leaderboard, RankMetric
+from ceremyn.research.leaderboard import Leaderboard, RankMetric
 from tests.unit.research.conftest import make_experiment
 
 

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.research.parameter_grid import (
+from ceremyn.research.parameter_grid import (
     ParameterGrid,
     ParameterGridError,
     random_search_samples,

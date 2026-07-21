@@ -4,9 +4,9 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import OptionType, Position, Side
-from alphaquant.strategies.base import StrategyContext
-from alphaquant.strategies.rules import (
+from ceremyn.domain import OptionType, Position, Side
+from ceremyn.strategies.base import StrategyContext
+from ceremyn.strategies.rules import (
     AdjustmentRule,
     EntryFilter,
     ExitRule,

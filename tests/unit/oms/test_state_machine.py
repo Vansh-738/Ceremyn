@@ -1,7 +1,7 @@
 import pytest
 
-from alphaquant.oms import OMSEvent, OMSEventType, OMSExecutionState
-from alphaquant.oms.exceptions import OMSStateError
+from ceremyn.oms import OMSEvent, OMSEventType, OMSExecutionState
+from ceremyn.oms.exceptions import OMSStateError
 from tests.unit.oms.conftest import T0
 from tests.unit.oms.test_support import make_oms_order
 

@@ -1,9 +1,9 @@
 import pytest
 
-from alphaquant.core.exceptions import ConfigurationError
-from alphaquant.strategies import Strategy, available_types, create
-from alphaquant.strategies.base import StrategyContext
-from alphaquant.strategies.registry import catalog_entries, register, strategy_class
+from ceremyn.core.exceptions import ConfigurationError
+from ceremyn.strategies import Strategy, available_types, create
+from ceremyn.strategies.base import StrategyContext
+from ceremyn.strategies.registry import catalog_entries, register, strategy_class
 from tests.unit.strategies.conftest import make_definition
 
 

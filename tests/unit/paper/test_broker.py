@@ -1,9 +1,9 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from alphaquant.backtest.fills import ExecutionContext
-from alphaquant.domain.enums import OrderStatus, OrderType, Side
-from alphaquant.paper.broker import PaperBroker, PaperBrokerConfig
+from ceremyn.backtest.fills import ExecutionContext
+from ceremyn.domain.enums import OrderStatus, OrderType, Side
+from ceremyn.paper.broker import PaperBroker, PaperBrokerConfig
 from tests.unit.paper.conftest import TICK_ZERO, make_market_order, make_tick
 
 
@@ -63,7 +63,7 @@ class TestFillMechanicsReused:
         assert broker.has_open(order.id)  # remainder still queued
 
     def test_limit_order_only_fills_when_marketable(self) -> None:
-        from alphaquant.domain import Order
+        from ceremyn.domain import Order
         from tests.unit.backtest.helpers import make_contract
 
         broker = PaperBroker(PaperBrokerConfig(latency_seconds=0))

@@ -2,8 +2,8 @@ from collections.abc import Sequence
 
 import pytest
 
-from alphaquant.live.exceptions import LiveConfigurationError
-from alphaquant.live.feed import SubscriptionManager, SubscriptionMode, build_subscription_plan
+from ceremyn.live.exceptions import LiveConfigurationError
+from ceremyn.live.feed import SubscriptionManager, SubscriptionMode, build_subscription_plan
 from tests.unit.live.conftest import CALL_TOKEN, INDEX_TOKEN, PUT_TOKEN
 
 

@@ -1,7 +1,7 @@
-from alphaquant.features.base import Feature
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.models import FeatureScalar
-from alphaquant.features.versioning import cache_key, feature_set_version
+from ceremyn.features.base import Feature
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.models import FeatureScalar
+from ceremyn.features.versioning import cache_key, feature_set_version
 from tests.unit.features.conftest import make_chain, make_context
 
 

@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from alphaquant.backtest.engine import BacktestConfig
-from alphaquant.backtest.events import OptionChainEvent
-from alphaquant.backtest.runner import BacktestRunner
-from alphaquant.domain import StrategyDefinition
-from alphaquant.risk import RiskEngine
+from ceremyn.backtest.engine import BacktestConfig
+from ceremyn.backtest.events import OptionChainEvent
+from ceremyn.backtest.runner import BacktestRunner
+from ceremyn.domain import StrategyDefinition
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import TestBacktestStrategy, make_chain
 
 

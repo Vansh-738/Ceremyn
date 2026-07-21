@@ -3,15 +3,15 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.oms import (
+from ceremyn.oms import (
     BrokerExecutor,
     BrokerOrderSnapshot,
     BrokerOrderStatus,
     BrokerSubmissionResult,
     RetryPolicy,
 )
-from alphaquant.oms.exceptions import OMSNonRetryableBrokerError
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.oms.exceptions import OMSNonRetryableBrokerError
+from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
 from tests.unit.oms.conftest import T0, FakeBroker
 from tests.unit.oms.test_support import make_oms_order
 

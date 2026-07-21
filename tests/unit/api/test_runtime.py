@@ -1,9 +1,9 @@
 from datetime import timedelta
 
-from alphaquant.api.runtime import build_dashboard_sources
-from alphaquant.config import Settings, TradingMode
-from alphaquant.core.container import Container
-from alphaquant.core.timeutils import now_utc
+from ceremyn.api.runtime import build_dashboard_sources
+from ceremyn.config import Settings, TradingMode
+from ceremyn.core.container import Container
+from ceremyn.core.timeutils import now_utc
 from tests.unit.backtest.helpers import make_chain
 
 _PORT_METHODS = {
@@ -112,10 +112,10 @@ def test_oms_reconciliation_is_rate_limited() -> None:
 
 def test_data_feed_source_returns_none_without_kite_credentials() -> None:
     # Regression: building the real poller needs `container.kite_provider`, which
-    # raises BrokerError without ALPHAQUANT_KITE__API_KEY configured -- that's a
+    # raises BrokerError without CEREMYN_KITE__API_KEY configured -- that's a
     # completely normal state (e.g. research-mode-only setups), and must return
     # None rather than propagate and break every other dashboard channel.
-    from alphaquant.api.runtime import _DataFeedSourceAdapter
+    from ceremyn.api.runtime import _DataFeedSourceAdapter
 
     sources = build_dashboard_sources(make_container())
     assert sources.data_feed is not None
@@ -129,7 +129,7 @@ def test_data_feed_source_reflects_the_poller_state() -> None:
     # Deliberately bypasses the real Container/kite_provider (needs real Kite
     # credentials to construct) -- mirrors the same caution
     # test_execution_source_never_touches_kite_credentials takes elsewhere.
-    from alphaquant.api.runtime import _DataFeedSourceAdapter
+    from ceremyn.api.runtime import _DataFeedSourceAdapter
 
     class FakePoller:
         consecutive_failures = 4
@@ -156,8 +156,8 @@ def test_portfolio_source_zero_state() -> None:
 
 
 def test_log_source_reflects_the_ring_buffer() -> None:
-    from alphaquant.core import logging as logging_module
-    from alphaquant.core.logging import _capture_to_ring_buffer
+    from ceremyn.core import logging as logging_module
+    from ceremyn.core.logging import _capture_to_ring_buffer
 
     logging_module._RING_BUFFER.clear()
     try:

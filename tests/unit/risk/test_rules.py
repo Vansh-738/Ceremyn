@@ -2,23 +2,23 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain.enums import Side
-from alphaquant.domain.signals import SignalLeg
-from alphaquant.risk.context import RiskContext
-from alphaquant.risk.rules.drawdown import MaximumDailyLossRule, MaximumDrawdownRule
-from alphaquant.risk.rules.event import EconomicEventFilterRule
-from alphaquant.risk.rules.exposure import PortfolioExposureRule
-from alphaquant.risk.rules.greeks import (
+from ceremyn.domain.enums import Side
+from ceremyn.domain.signals import SignalLeg
+from ceremyn.risk.context import RiskContext
+from ceremyn.risk.rules.drawdown import MaximumDailyLossRule, MaximumDrawdownRule
+from ceremyn.risk.rules.event import EconomicEventFilterRule
+from ceremyn.risk.rules.exposure import PortfolioExposureRule
+from ceremyn.risk.rules.greeks import (
     MaximumDeltaRule,
     MaximumGammaRule,
     MaximumThetaRule,
     MaximumVegaRule,
 )
-from alphaquant.risk.rules.liquidity import BidAskSpreadCheckRule, LiquidityCheckRule
-from alphaquant.risk.rules.margin import MaximumMarginUsageRule
-from alphaquant.risk.rules.position import MaximumLotsRule, PositionLimitRule
-from alphaquant.risk.rules.time import ExpiryRestrictionsRule, TradingHoursRule
-from alphaquant.risk.rules.volatility import HighVolatilityFilterRule
+from ceremyn.risk.rules.liquidity import BidAskSpreadCheckRule, LiquidityCheckRule
+from ceremyn.risk.rules.margin import MaximumMarginUsageRule
+from ceremyn.risk.rules.position import MaximumLotsRule, PositionLimitRule
+from ceremyn.risk.rules.time import ExpiryRestrictionsRule, TradingHoursRule
+from ceremyn.risk.rules.volatility import HighVolatilityFilterRule
 from tests.unit.risk.conftest import make_contract, make_signal
 
 

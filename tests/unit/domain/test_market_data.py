@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import Candle, TimeFrame
+from ceremyn.domain import Candle, TimeFrame
 from tests.unit.domain.conftest import make_quote
 
 
@@ -19,7 +19,7 @@ class TestQuote:
         assert make_quote(bid=None).spread is None
 
     def test_naive_timestamp_rejected(self) -> None:
-        from alphaquant.domain import Quote
+        from ceremyn.domain import Quote
 
         with pytest.raises(ValidationError, match="timezone-aware"):
             Quote(

@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 
-from alphaquant.core.events import EventBus
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.dashboard.events import EventBridge, SnapshotDiffer
-from alphaquant.dashboard.models import Channel, WSFrame
-from alphaquant.live.events import HeartbeatLost, TickReceived
+from ceremyn.core.events import EventBus
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.dashboard.events import EventBridge, SnapshotDiffer
+from ceremyn.dashboard.models import Channel, WSFrame
+from ceremyn.live.events import HeartbeatLost, TickReceived
 
 NOW = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
 CHANNELS = (Channel.OVERVIEW, Channel.HEALTH)

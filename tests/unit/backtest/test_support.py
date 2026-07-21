@@ -1,16 +1,16 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from alphaquant.backtest.engine import BacktestConfig, BacktestEngine
-from alphaquant.backtest.events import CandleEvent, MarketSignalEvent, QuoteEvent
-from alphaquant.backtest.fills import ExecutionContext, terminal_status
-from alphaquant.backtest.metrics import compute_statistics
-from alphaquant.backtest.montecarlo import MonteCarloSimulator
-from alphaquant.backtest.slippage import FixedBpsSlippageModel, NoSlippageModel
-from alphaquant.backtest.statistics import EquityPoint
-from alphaquant.domain import Candle, Quote, StrategyDefinition
-from alphaquant.domain.enums import OrderStatus, Side, TimeFrame
-from alphaquant.risk import RiskEngine
+from ceremyn.backtest.engine import BacktestConfig, BacktestEngine
+from ceremyn.backtest.events import CandleEvent, MarketSignalEvent, QuoteEvent
+from ceremyn.backtest.fills import ExecutionContext, terminal_status
+from ceremyn.backtest.metrics import compute_statistics
+from ceremyn.backtest.montecarlo import MonteCarloSimulator
+from ceremyn.backtest.slippage import FixedBpsSlippageModel, NoSlippageModel
+from ceremyn.backtest.statistics import EquityPoint
+from ceremyn.domain import Candle, Quote, StrategyDefinition
+from ceremyn.domain.enums import OrderStatus, Side, TimeFrame
+from ceremyn.risk import RiskEngine
 from tests.unit.backtest.helpers import TestBacktestStrategy, make_chain, make_contract
 
 

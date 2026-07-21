@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from alphaquant.core.exceptions import BrokerError
-from alphaquant.core.timeutils import IST
-from alphaquant.data.providers.kite import KiteProvider
-from alphaquant.domain import AssetClass, OptionType, TimeFrame
+from ceremyn.core.exceptions import BrokerError
+from ceremyn.core.timeutils import IST
+from ceremyn.data.providers.kite import KiteProvider
+from ceremyn.domain import AssetClass, OptionType, TimeFrame
 
 NFO_DUMP = [
     {

@@ -8,9 +8,9 @@ from datetime import date, datetime
 
 import pytest
 
-from alphaquant.core.timeutils import IST
-from alphaquant.data.services.chain_analytics import EXPIRY_CUTOFF
-from alphaquant.data.services.pricing import (
+from ceremyn.core.timeutils import IST
+from ceremyn.data.services.chain_analytics import EXPIRY_CUTOFF
+from ceremyn.data.services.pricing import (
     bs_greeks,
     bs_price,
     implied_vol,

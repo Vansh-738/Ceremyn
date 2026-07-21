@@ -2,11 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from alphaquant.dashboard.api import _permitted_channels, create_dashboard_app
-from alphaquant.dashboard.backend import DashboardService
-from alphaquant.dashboard.config import DashboardSettings
-from alphaquant.dashboard.models import Channel
-from alphaquant.dashboard.permissions import Role
+from ceremyn.dashboard.api import _permitted_channels, create_dashboard_app
+from ceremyn.dashboard.backend import DashboardService
+from ceremyn.dashboard.config import DashboardSettings
+from ceremyn.dashboard.models import Channel
+from ceremyn.dashboard.permissions import Role
 
 VIEW_PATHS = [
     "/api/overview",
@@ -46,7 +46,7 @@ class TestReadEndpoints:
         response = client.get("/")
         assert response.status_code == 200
         assert "plotly" in response.text.lower()
-        assert "AlphaQuant" in response.text
+        assert "Ceremyn" in response.text
 
 
 class TestReadOnlySurface:

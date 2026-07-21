@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from alphaquant.features.cache import FeatureCache, InMemoryFeatureCache
-from alphaquant.features.models import FeatureValue
+from ceremyn.features.cache import FeatureCache, InMemoryFeatureCache
+from ceremyn.features.models import FeatureValue
 
 AS_OF = datetime(2026, 7, 14, 6, 0, tzinfo=UTC)
 

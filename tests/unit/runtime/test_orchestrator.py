@@ -6,17 +6,17 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel
 
-from alphaquant.core.events import EventBus
-from alphaquant.domain import Side, Signal, SignalAction, SignalLeg, StrategyDefinition
-from alphaquant.live.engine import LiveMarketDataEngine
-from alphaquant.live.stream import StreamTickBatch
-from alphaquant.oms.broker import BrokerExecutionReport, BrokerOrderStatus
-from alphaquant.oms.engine import OrderManagementEngine
-from alphaquant.oms.journal import JSONJournalStore, OMSJournal
-from alphaquant.oms.orders import PlanOrderRole
-from alphaquant.risk import RiskDecision, RiskEngine
-from alphaquant.runtime.orchestrator import RuntimeOrchestrator
-from alphaquant.strategies.base import Strategy, StrategyContext
+from ceremyn.core.events import EventBus
+from ceremyn.domain import Side, Signal, SignalAction, SignalLeg, StrategyDefinition
+from ceremyn.live.engine import LiveMarketDataEngine
+from ceremyn.live.stream import StreamTickBatch
+from ceremyn.oms.broker import BrokerExecutionReport, BrokerOrderStatus
+from ceremyn.oms.engine import OrderManagementEngine
+from ceremyn.oms.journal import JSONJournalStore, OMSJournal
+from ceremyn.oms.orders import PlanOrderRole
+from ceremyn.risk import RiskDecision, RiskEngine
+from ceremyn.runtime.orchestrator import RuntimeOrchestrator
+from ceremyn.strategies.base import Strategy, StrategyContext
 from tests.unit.live.conftest import BASE_TS, nifty_contracts
 from tests.unit.live.conftest import tick_payload as _tick_payload
 from tests.unit.oms.conftest import FakeBroker, permissive_settings
@@ -126,7 +126,7 @@ def contracts():
 
 @pytest.fixture
 def analytics():
-    from alphaquant.data.services.chain_analytics import ChainAnalyticsService
+    from ceremyn.data.services.chain_analytics import ChainAnalyticsService
 
     return ChainAnalyticsService(risk_free_rate=0.065)
 

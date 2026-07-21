@@ -1,13 +1,13 @@
-from alphaquant.dashboard.alerts import derive_alerts
-from alphaquant.dashboard.models import (
+from ceremyn.dashboard.alerts import derive_alerts
+from ceremyn.dashboard.models import (
     AlertCategory,
     AlertSeverity,
     DataFeedStatus,
     ReconciliationStatus,
 )
-from alphaquant.live.heartbeat import HeartbeatState
-from alphaquant.live.reconnect import ReconnectState
-from alphaquant.oms.orders import OMSExecutionState
+from ceremyn.live.heartbeat import HeartbeatState
+from ceremyn.live.reconnect import ReconnectState
+from ceremyn.oms.orders import OMSExecutionState
 from tests.unit.dashboard.conftest import (
     NOW,
     make_oms_metrics,

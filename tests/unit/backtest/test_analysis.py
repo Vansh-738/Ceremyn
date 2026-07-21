@@ -1,15 +1,15 @@
 from datetime import datetime
 from decimal import Decimal
 
-from alphaquant.backtest.engine import BacktestConfig
-from alphaquant.backtest.events import OptionChainEvent
-from alphaquant.backtest.montecarlo import MonteCarloSimulator
-from alphaquant.backtest.optimization import GridSearchOptimizer
-from alphaquant.backtest.runner import BacktestRunner
-from alphaquant.backtest.walkforward import WalkForwardAnalyzer
-from alphaquant.domain import StrategyDefinition
-from alphaquant.risk import RiskEngine
-from alphaquant.strategies import create
+from ceremyn.backtest.engine import BacktestConfig
+from ceremyn.backtest.events import OptionChainEvent
+from ceremyn.backtest.montecarlo import MonteCarloSimulator
+from ceremyn.backtest.optimization import GridSearchOptimizer
+from ceremyn.backtest.runner import BacktestRunner
+from ceremyn.backtest.walkforward import WalkForwardAnalyzer
+from ceremyn.domain import StrategyDefinition
+from ceremyn.risk import RiskEngine
+from ceremyn.strategies import create
 from tests.unit.backtest.helpers import make_chain
 
 

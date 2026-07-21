@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from alphaquant.backtest.statistics import EquityPoint
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.dashboard.models import Channel, StrategyEntry
+from ceremyn.backtest.statistics import EquityPoint
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.dashboard.models import Channel, StrategyEntry
 from tests.unit.dashboard.conftest import (
     FakeExecution,
     FakeOMS,

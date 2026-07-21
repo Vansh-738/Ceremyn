@@ -6,13 +6,13 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from alphaquant.data.records import EodFutureRecord, EodOptionRecord
-from alphaquant.data.repositories.candles import CandleRepository
-from alphaquant.data.repositories.chains import ChainSnapshotRepository, OptionChainEodRepository
-from alphaquant.data.repositories.corporate_actions import CorporateActionRepository
-from alphaquant.data.repositories.futures import FutureChainEodRepository
-from alphaquant.data.repositories.instruments import InstrumentRepository
-from alphaquant.domain import (
+from ceremyn.data.records import EodFutureRecord, EodOptionRecord
+from ceremyn.data.repositories.candles import CandleRepository
+from ceremyn.data.repositories.chains import ChainSnapshotRepository, OptionChainEodRepository
+from ceremyn.data.repositories.corporate_actions import CorporateActionRepository
+from ceremyn.data.repositories.futures import FutureChainEodRepository
+from ceremyn.data.repositories.instruments import InstrumentRepository
+from ceremyn.domain import (
     Candle,
     ChainEntry,
     CorporateAction,

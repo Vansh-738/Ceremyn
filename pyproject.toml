@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "alphaquant"
+name = "ceremyn"
 version = "0.1.0"
 description = "Institutional-grade AI-assisted options trading research platform for Indian markets"
 readme = "README.md"
@@ -38,7 +38,7 @@ select = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["alphaquant", "tests"]
+known-first-party = ["ceremyn", "tests"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection markers are the idiomatic default-argument pattern.
@@ -48,12 +48,12 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", 
 "tests/**" = ["DTZ001", "DTZ005"]
 # The dashboard shell is a single inlined HTML/CSS/JS document, not Python prose:
 # line-length and ambiguous-unicode rules do not apply to that markup blob.
-"src/alphaquant/dashboard/shell.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/ceremyn/dashboard/shell.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
 mypy_path = "src"
-packages = ["alphaquant"]
+packages = ["ceremyn"]
 strict = true
 warn_unreachable = true
 show_error_codes = true
@@ -72,7 +72,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/alphaquant"]
+source = ["src/ceremyn"]
 branch = true
 
 [tool.coverage.report]
@@ -80,24 +80,24 @@ show_missing = true
 skip_covered = true
 
 [tool.importlinter]
-root_package = "alphaquant"
+root_package = "ceremyn"
 
 # Architectural invariant: the domain layer is pure — it may not import any
-# other alphaquant package (infrastructure, services, or interfaces).
+# other ceremyn package (infrastructure, services, or interfaces).
 [[tool.importlinter.contracts]]
 name = "Domain layer is independent"
 type = "independence"
-modules = ["alphaquant.domain"]
+modules = ["ceremyn.domain"]
 
 [[tool.importlinter.contracts]]
 name = "Domain cannot import infrastructure"
 type = "forbidden"
-source_modules = ["alphaquant.domain"]
+source_modules = ["ceremyn.domain"]
 forbidden_modules = [
-    "alphaquant.api",
-    "alphaquant.broker",
-    "alphaquant.data",
-    "alphaquant.execution",
+    "ceremyn.api",
+    "ceremyn.broker",
+    "ceremyn.data",
+    "ceremyn.execution",
 ]
 
 # The dashboard is read-only observability: it may read value/metric snapshots but must
@@ -106,68 +106,68 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Dashboard cannot place orders or bypass the OMS"
 type = "forbidden"
-source_modules = ["alphaquant.dashboard"]
+source_modules = ["ceremyn.dashboard"]
 forbidden_modules = [
-    "alphaquant.oms.engine",
-    "alphaquant.oms.executor",
-    "alphaquant.oms.router",
-    "alphaquant.oms.broker",
-    "alphaquant.live.engine",
-    "alphaquant.live.kite",
-    "alphaquant.paper.broker",
-    "alphaquant.paper.engine",
-    "alphaquant.execution",
-    "alphaquant.broker",
-    "alphaquant.data.providers.kite",
+    "ceremyn.oms.engine",
+    "ceremyn.oms.executor",
+    "ceremyn.oms.router",
+    "ceremyn.oms.broker",
+    "ceremyn.live.engine",
+    "ceremyn.live.kite",
+    "ceremyn.paper.broker",
+    "ceremyn.paper.engine",
+    "ceremyn.execution",
+    "ceremyn.broker",
+    "ceremyn.data.providers.kite",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Strategies cannot import execution"
 type = "forbidden"
-source_modules = ["alphaquant.strategies"]
-forbidden_modules = ["alphaquant.execution"]
+source_modules = ["ceremyn.strategies"]
+forbidden_modules = ["ceremyn.execution"]
 
 [[tool.importlinter.contracts]]
 name = "Strategies cannot import broker"
 type = "forbidden"
-source_modules = ["alphaquant.strategies"]
-forbidden_modules = ["alphaquant.broker"]
+source_modules = ["ceremyn.strategies"]
+forbidden_modules = ["ceremyn.broker"]
 
 [[tool.importlinter.contracts]]
 name = "LLM cannot import execution"
 type = "forbidden"
-source_modules = ["alphaquant.llm"]
-forbidden_modules = ["alphaquant.execution"]
+source_modules = ["ceremyn.llm"]
+forbidden_modules = ["ceremyn.execution"]
 
 [[tool.importlinter.contracts]]
 name = "LLM cannot import risk"
 type = "forbidden"
-source_modules = ["alphaquant.llm"]
-forbidden_modules = ["alphaquant.risk"]
+source_modules = ["ceremyn.llm"]
+forbidden_modules = ["ceremyn.risk"]
 
 [[tool.importlinter.contracts]]
 name = "Live cannot import broker"
 type = "forbidden"
-source_modules = ["alphaquant.live"]
-forbidden_modules = ["alphaquant.broker"]
+source_modules = ["ceremyn.live"]
+forbidden_modules = ["ceremyn.broker"]
 
 [[tool.importlinter.contracts]]
 name = "Live cannot import execution"
 type = "forbidden"
-source_modules = ["alphaquant.live"]
-forbidden_modules = ["alphaquant.execution"]
+source_modules = ["ceremyn.live"]
+forbidden_modules = ["ceremyn.execution"]
 
 [[tool.importlinter.contracts]]
 name = "OMS cannot import strategies"
 type = "forbidden"
-source_modules = ["alphaquant.oms"]
-forbidden_modules = ["alphaquant.strategies"]
+source_modules = ["ceremyn.oms"]
+forbidden_modules = ["ceremyn.strategies"]
 
 [[tool.importlinter.contracts]]
 name = "OMS cannot import paper"
 type = "forbidden"
-source_modules = ["alphaquant.oms"]
-forbidden_modules = ["alphaquant.paper"]
+source_modules = ["ceremyn.oms"]
+forbidden_modules = ["ceremyn.paper"]
 
 # OMS receives BrokerAdapter instances via DI (concrete types constructed at the
 # composition root) and codes only against the protocol it defines itself in
@@ -175,35 +175,35 @@ forbidden_modules = ["alphaquant.paper"]
 [[tool.importlinter.contracts]]
 name = "OMS cannot import broker"
 type = "forbidden"
-source_modules = ["alphaquant.oms"]
-forbidden_modules = ["alphaquant.broker"]
+source_modules = ["ceremyn.oms"]
+forbidden_modules = ["ceremyn.broker"]
 
 [[tool.importlinter.contracts]]
 name = "OMS cannot import execution"
 type = "forbidden"
-source_modules = ["alphaquant.oms"]
-forbidden_modules = ["alphaquant.execution"]
+source_modules = ["ceremyn.oms"]
+forbidden_modules = ["ceremyn.execution"]
 
 [[tool.importlinter.contracts]]
 name = "Risk cannot import broker"
 type = "forbidden"
-source_modules = ["alphaquant.risk"]
-forbidden_modules = ["alphaquant.broker"]
+source_modules = ["ceremyn.risk"]
+forbidden_modules = ["ceremyn.broker"]
 
 [[tool.importlinter.contracts]]
 name = "Risk cannot import execution"
 type = "forbidden"
-source_modules = ["alphaquant.risk"]
-forbidden_modules = ["alphaquant.execution"]
+source_modules = ["ceremyn.risk"]
+forbidden_modules = ["ceremyn.execution"]
 
 [[tool.importlinter.contracts]]
 name = "Risk cannot import strategies"
 type = "forbidden"
-source_modules = ["alphaquant.risk"]
-forbidden_modules = ["alphaquant.strategies"]
+source_modules = ["ceremyn.risk"]
+forbidden_modules = ["ceremyn.strategies"]
 
 [[tool.importlinter.contracts]]
 name = "Risk cannot import llm"
 type = "forbidden"
-source_modules = ["alphaquant.risk"]
-forbidden_modules = ["alphaquant.llm"]
+source_modules = ["ceremyn.risk"]
+forbidden_modules = ["ceremyn.llm"]

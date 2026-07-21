@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from alphaquant.oms import InMemoryIdempotencyStore
+from ceremyn.oms import InMemoryIdempotencyStore
 
 
 def test_idempotency_store_suppresses_duplicates() -> None:

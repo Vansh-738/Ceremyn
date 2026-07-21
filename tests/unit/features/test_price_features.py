@@ -1,7 +1,7 @@
-from alphaquant.features.context import FeatureContext
-from alphaquant.features.models import FeatureScalar
-from alphaquant.features.price_features import MarketRegime
-from alphaquant.features.registry import default_registry
+from ceremyn.features.context import FeatureContext
+from ceremyn.features.models import FeatureScalar
+from ceremyn.features.price_features import MarketRegime
+from ceremyn.features.registry import default_registry
 from tests.unit.features.conftest import make_context, trending_closes
 
 

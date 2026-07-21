@@ -3,8 +3,8 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import OrderType
-from alphaquant.oms import (
+from ceremyn.domain import OrderType
+from ceremyn.oms import (
     BrokerCapabilities,
     BrokerExecutionReport,
     BrokerOrderStatus,
@@ -18,14 +18,14 @@ from alphaquant.oms import (
     OMSReconciler,
     OMSValidator,
 )
-from alphaquant.oms.exceptions import (
+from ceremyn.oms.exceptions import (
     OMSBrokerCapabilityError,
     OMSKillSwitchActiveError,
     OMSValidationError,
 )
-from alphaquant.oms.ledger import OMSLedger
-from alphaquant.oms.orders import OMSOrder, PlanOrderRole, ReplaceOrderCommand, SubmitOrderCommand
-from alphaquant.oms.router import BrokerRouter
+from ceremyn.oms.ledger import OMSLedger
+from ceremyn.oms.orders import OMSOrder, PlanOrderRole, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.oms.router import BrokerRouter
 from tests.unit.oms.conftest import T0, FakeBroker, make_signal
 from tests.unit.oms.test_support import make_oms_order
 
@@ -143,8 +143,8 @@ def test_journal_json_store_metrics_positions_and_reconcile(tmp_path) -> None:
     journal.record_kill_switch(armed=True, reason="manual", at=T0)
     assert len(journal.store.entries()) == 2
 
-    from alphaquant.oms.journal import JSONJournalStore
-    from alphaquant.oms.journal import OMSJournal as DurableJournal
+    from ceremyn.oms.journal import JSONJournalStore
+    from ceremyn.oms.journal import OMSJournal as DurableJournal
 
     durable = DurableJournal("session", store=JSONJournalStore("session", root=tmp_path))
     durable.record_signal(signal, at=T0)
@@ -183,8 +183,8 @@ def test_journal_json_store_metrics_positions_and_reconcile(tmp_path) -> None:
 
 
 def test_order_snapshot_round_trips_through_journal(tmp_path) -> None:
-    from alphaquant.oms.journal import JSONJournalStore
-    from alphaquant.oms.restore import rebuild_oms_state
+    from ceremyn.oms.journal import JSONJournalStore
+    from ceremyn.oms.restore import rebuild_oms_state
 
     store = JSONJournalStore("session", root=tmp_path)
     journal = OMSJournal("session", store=store)

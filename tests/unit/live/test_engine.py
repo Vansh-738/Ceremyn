@@ -3,9 +3,9 @@ from datetime import timedelta
 
 import pytest
 
-from alphaquant.core.events import EventBus
-from alphaquant.live import HeartbeatMonitor, LiveMarketDataEngine, ReconnectManager
-from alphaquant.live.events import (
+from ceremyn.core.events import EventBus
+from ceremyn.live import HeartbeatMonitor, LiveMarketDataEngine, ReconnectManager
+from ceremyn.live.events import (
     HeartbeatLost,
     HeartbeatRecovered,
     MarketOpen,

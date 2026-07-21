@@ -3,10 +3,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 from typing import cast
 
-from alphaquant.backtest.fills import ExecutionContext, PendingOrderState
-from alphaquant.backtest.simulator import ExecutionSimulator, SimulationConfig
-from alphaquant.domain import Candle, Order, Quote, Signal, SignalLeg
-from alphaquant.domain.enums import (
+from ceremyn.backtest.fills import ExecutionContext, PendingOrderState
+from ceremyn.backtest.simulator import ExecutionSimulator, SimulationConfig
+from ceremyn.domain import Candle, Order, Quote, Signal, SignalLeg
+from ceremyn.domain.enums import (
     OrderStatus,
     OrderType,
     ProductType,

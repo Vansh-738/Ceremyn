@@ -1,4 +1,4 @@
-from alphaquant.research.comparison import compare
+from ceremyn.research.comparison import compare
 from tests.unit.research.conftest import make_experiment
 
 

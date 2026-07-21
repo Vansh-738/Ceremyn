@@ -3,9 +3,9 @@ from typing import cast
 
 import pytest
 
-from alphaquant.broker import NullBrokerAdapter
-from alphaquant.oms.broker import BrokerAdapter
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.broker import NullBrokerAdapter
+from ceremyn.oms.broker import BrokerAdapter
+from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
 
 
 def test_satisfies_broker_adapter_protocol() -> None:

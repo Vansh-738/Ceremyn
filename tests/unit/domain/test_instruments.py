@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import (
+from ceremyn.domain import (
     AssetClass,
     EquityInstrument,
     ETFInstrument,

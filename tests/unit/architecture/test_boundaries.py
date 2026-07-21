@@ -3,26 +3,26 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Packages that transitively reach alphaquant.risk or alphaquant.execution (confirmed by
+# Packages that transitively reach ceremyn.risk or ceremyn.execution (confirmed by
 # direct grep during the M12 design review — see the approved design plan §2). `llm/` must
 # never import any of these, even through an apparently-safe submodule: import-linter's two
 # existing contracts ("LLM cannot import execution", "LLM cannot import risk") already forbid
 # these transitively, but this test asserts it directly against the source so a violation is
 # caught with a precise file/line, not just a lint-imports failure.
 _FORBIDDEN_TOP_LEVEL_IMPORTS = {
-    "alphaquant.risk",
-    "alphaquant.execution",
-    "alphaquant.broker",
-    "alphaquant.oms",
-    "alphaquant.paper",
-    "alphaquant.live",
-    "alphaquant.research",
-    "alphaquant.backtest",
-    "alphaquant.dashboard.backend",
-    "alphaquant.dashboard.alerts",
-    "alphaquant.dashboard.views",
-    "alphaquant.dashboard.api",
-    "alphaquant.dashboard.websocket",
+    "ceremyn.risk",
+    "ceremyn.execution",
+    "ceremyn.broker",
+    "ceremyn.oms",
+    "ceremyn.paper",
+    "ceremyn.live",
+    "ceremyn.research",
+    "ceremyn.backtest",
+    "ceremyn.dashboard.backend",
+    "ceremyn.dashboard.alerts",
+    "ceremyn.dashboard.views",
+    "ceremyn.dashboard.api",
+    "ceremyn.dashboard.websocket",
 }
 
 
@@ -39,7 +39,7 @@ def _imported_modules(path: Path) -> set[str]:
 
 def test_llm_package_never_imports_execution_adjacent_packages() -> None:
     root = Path(__file__).resolve().parents[3]
-    llm_dir = root / "src" / "alphaquant" / "llm"
+    llm_dir = root / "src" / "ceremyn" / "llm"
     violations: list[str] = []
     for path in sorted(llm_dir.rglob("*.py")):
         for module in _imported_modules(path):

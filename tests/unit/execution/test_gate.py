@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from alphaquant.config import Settings, TradingMode
-from alphaquant.core.exceptions import LiveTradingLockedError
-from alphaquant.execution.gate import LiveTradingGate
+from ceremyn.config import Settings, TradingMode
+from ceremyn.core.exceptions import LiveTradingLockedError
+from ceremyn.execution.gate import LiveTradingGate
 
 T0 = datetime(2026, 7, 15, 4, 20, tzinfo=UTC)
 

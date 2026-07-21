@@ -11,9 +11,9 @@ import argparse
 import asyncio
 from datetime import date
 
-from alphaquant.config import get_settings
-from alphaquant.core.container import Container
-from alphaquant.core.logging import configure_logging
+from ceremyn.config import get_settings
+from ceremyn.core.container import Container
+from ceremyn.core.logging import configure_logging
 
 
 async def main(start: date, end: date) -> None:

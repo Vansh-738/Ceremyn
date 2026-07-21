@@ -4,10 +4,10 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import ChainEntry, OptionChainSnapshot
-from alphaquant.live.exceptions import TickValidationError
-from alphaquant.live.snapshot import InstrumentKind, LiveTick
-from alphaquant.live.validator import TickValidator
+from ceremyn.domain import ChainEntry, OptionChainSnapshot
+from ceremyn.live.exceptions import TickValidationError
+from ceremyn.live.snapshot import InstrumentKind, LiveTick
+from ceremyn.live.validator import TickValidator
 from tests.unit.domain.conftest import make_contract
 from tests.unit.live.conftest import BASE_TS
 

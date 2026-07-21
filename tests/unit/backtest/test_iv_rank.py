@@ -2,11 +2,11 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from alphaquant.backtest.engine import BacktestEngine
-from alphaquant.backtest.events import OptionChainEvent
-from alphaquant.domain import Greeks, Signal, StrategyDefinition
-from alphaquant.risk import RiskEngine
-from alphaquant.strategies import Strategy, StrategyContext
+from ceremyn.backtest.engine import BacktestEngine
+from ceremyn.backtest.events import OptionChainEvent
+from ceremyn.domain import Greeks, Signal, StrategyDefinition
+from ceremyn.risk import RiskEngine
+from ceremyn.strategies import Strategy, StrategyContext
 from tests.unit.backtest.helpers import make_chain
 
 

@@ -4,8 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from alphaquant.domain import Side, SignalLeg
-from alphaquant.oms import (
+from ceremyn.domain import Side, SignalLeg
+from ceremyn.oms import (
     BrokerCapabilities,
     BrokerExecutionReport,
     BrokerOrderStatus,
@@ -17,8 +17,8 @@ from alphaquant.oms import (
     OrderManagementEngine,
     PlanOrderRole,
 )
-from alphaquant.oms.compensation import compensate_siblings
-from alphaquant.risk import RiskDecision, RiskEngine
+from ceremyn.oms.compensation import compensate_siblings
+from ceremyn.risk import RiskDecision, RiskEngine
 from tests.unit.oms.conftest import T0, FakeBroker, make_multi_leg_signal, make_signal
 
 

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
-from alphaquant.oms.positions import OMSPortfolio
+from ceremyn.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
+from ceremyn.oms.positions import OMSPortfolio
 from tests.unit.oms.conftest import make_signal, permissive_settings
 
 

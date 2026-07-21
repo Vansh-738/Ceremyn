@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import CorporateAction, CorporateActionType
+from ceremyn.domain import CorporateAction, CorporateActionType
 
 
 def test_dividend_requires_amount() -> None:

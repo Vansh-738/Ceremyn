@@ -1,10 +1,10 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from alphaquant.features.engine import FeatureEngine
-from alphaquant.live.aggregator import TickAggregator
-from alphaquant.live.feed import build_subscription_plan
-from alphaquant.live.snapshot import InstrumentKind, LiveTick
+from ceremyn.features.engine import FeatureEngine
+from ceremyn.live.aggregator import TickAggregator
+from ceremyn.live.feed import build_subscription_plan
+from ceremyn.live.snapshot import InstrumentKind, LiveTick
 from tests.unit.live.conftest import BASE_TS
 
 

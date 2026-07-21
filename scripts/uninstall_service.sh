@@ -1,8 +1,8 @@
 #!/bin/bash
-# Remove the AlphaQuant dashboard LaunchAgent installed by install_service.sh.
+# Remove the Ceremyn dashboard LaunchAgent installed by install_service.sh.
 # Usage: ./scripts/uninstall_service.sh
 set -euo pipefail
-LABEL="com.alphaquant.dashboard"
+LABEL="com.ceremyn.dashboard"
 PLIST_PATH="$HOME/Library/LaunchAgents/${LABEL}.plist"
 
 if [ ! -f "$PLIST_PATH" ]; then

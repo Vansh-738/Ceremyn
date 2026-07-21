@@ -1,17 +1,17 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from alphaquant.backtest.commission import CostBreakdown
-from alphaquant.domain import Fill, Order, Side, Signal, SignalLeg
-from alphaquant.domain.enums import OrderStatus, OrderType, SignalAction
-from alphaquant.paper.events import (
+from ceremyn.backtest.commission import CostBreakdown
+from ceremyn.domain import Fill, Order, Side, Signal, SignalLeg
+from ceremyn.domain.enums import OrderStatus, OrderType, SignalAction
+from ceremyn.paper.events import (
     OrderCancelled,
     OrderFilled,
     OrderRejected,
     OrderSubmitted,
     SignalGenerated,
 )
-from alphaquant.paper.monitor import PaperMonitor
+from ceremyn.paper.monitor import PaperMonitor
 from tests.unit.backtest.helpers import make_contract
 from tests.unit.paper.conftest import TICK_ZERO
 

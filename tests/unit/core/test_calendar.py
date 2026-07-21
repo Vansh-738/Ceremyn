@@ -2,9 +2,9 @@ from datetime import date, datetime
 
 import pytest
 
-from alphaquant.core.calendar import DEFAULT_EXPIRY_RULES, ExpiryFrequency, MarketCalendar
-from alphaquant.core.exceptions import CalendarError
-from alphaquant.core.timeutils import IST
+from ceremyn.core.calendar import DEFAULT_EXPIRY_RULES, ExpiryFrequency, MarketCalendar
+from ceremyn.core.exceptions import CalendarError
+from ceremyn.core.timeutils import IST
 
 
 @pytest.fixture

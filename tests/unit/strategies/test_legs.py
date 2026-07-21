@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from alphaquant.domain import OptionType, Side
-from alphaquant.strategies.legs import LegSpec, resolve_leg, resolve_legs
+from ceremyn.domain import OptionType, Side
+from ceremyn.strategies.legs import LegSpec, resolve_leg, resolve_legs
 from tests.unit.strategies.conftest import enriched_chain, marked_chain
 
 

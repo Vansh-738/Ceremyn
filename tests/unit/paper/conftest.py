@@ -4,15 +4,15 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.backtest.portfolio import PortfolioConfig
-from alphaquant.config import Settings
-from alphaquant.domain import Order
-from alphaquant.domain.enums import OrderType, Side
-from alphaquant.paper.broker import PaperBrokerConfig
-from alphaquant.paper.engine import PaperEngineConfig, PaperTradingEngine
-from alphaquant.paper.events import MarketTick
-from alphaquant.risk import RiskEngine
-from alphaquant.strategies import Strategy
+from ceremyn.backtest.portfolio import PortfolioConfig
+from ceremyn.config import Settings
+from ceremyn.domain import Order
+from ceremyn.domain.enums import OrderType, Side
+from ceremyn.paper.broker import PaperBrokerConfig
+from ceremyn.paper.engine import PaperEngineConfig, PaperTradingEngine
+from ceremyn.paper.events import MarketTick
+from ceremyn.risk import RiskEngine
+from ceremyn.strategies import Strategy
 from tests.unit.backtest.helpers import (
     TestBacktestStrategy,
     make_chain,
@@ -42,7 +42,7 @@ def price_path_ticks(prices: Sequence[str]) -> list[MarketTick]:
 
 
 def make_market_order(*, side: Side = Side.BUY, quantity: int = 25) -> Order:
-    from alphaquant.domain.enums import OrderStatus
+    from ceremyn.domain.enums import OrderStatus
 
     return Order(
         contract=make_contract(),

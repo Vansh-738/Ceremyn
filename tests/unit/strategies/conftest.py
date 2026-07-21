@@ -5,13 +5,13 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
-from alphaquant.core.timeutils import IST
-from alphaquant.data.services.chain_analytics import (
+from ceremyn.core.timeutils import IST
+from ceremyn.data.services.chain_analytics import (
     EXPIRY_CUTOFF,
     ChainAnalyticsService,
 )
-from alphaquant.data.services.pricing import bs_price, time_to_expiry_years
-from alphaquant.domain import (
+from ceremyn.data.services.pricing import bs_price, time_to_expiry_years
+from ceremyn.domain import (
     ChainEntry,
     OptionChainSnapshot,
     OptionType,

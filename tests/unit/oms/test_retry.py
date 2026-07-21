@@ -1,5 +1,5 @@
-from alphaquant.oms import RetryPolicy
-from alphaquant.oms.exceptions import OMSNonRetryableBrokerError, OMSRetryableError
+from ceremyn.oms import RetryPolicy
+from ceremyn.oms.exceptions import OMSNonRetryableBrokerError, OMSRetryableError
 
 
 def test_retry_policy_retries_only_retryable_errors() -> None:

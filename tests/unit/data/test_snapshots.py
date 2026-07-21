@@ -3,10 +3,10 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.core.timeutils import IST, now_ist
-from alphaquant.data.services.chain_analytics import ChainAnalyticsService
-from alphaquant.data.services.snapshots import ChainService, ChainSnapshotJob
-from alphaquant.domain import OptionChainSnapshot, OptionContract, OptionType, Quote
+from ceremyn.core.timeutils import IST, now_ist
+from ceremyn.data.services.chain_analytics import ChainAnalyticsService
+from ceremyn.data.services.snapshots import ChainService, ChainSnapshotJob
+from ceremyn.domain import OptionChainSnapshot, OptionContract, OptionType, Quote
 from tests.unit.domain.conftest import make_contract
 
 # ChainService stamps snapshots with the real clock, so enrichment only runs

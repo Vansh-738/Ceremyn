@@ -4,9 +4,9 @@ type-checks), using the dashboard test suite's own fixtures so the coverage is a
 realistic, fully-populated data.
 """
 
-from alphaquant.dashboard.backend import DashboardService, DashboardSources
-from alphaquant.llm.providers import DashboardReader
-from alphaquant.oms.orders import OMSExecutionState
+from ceremyn.dashboard.backend import DashboardService, DashboardSources
+from ceremyn.llm.providers import DashboardReader
+from ceremyn.oms.orders import OMSExecutionState
 from tests.unit.dashboard.conftest import (
     FakeFeatures,
     FakeLive,

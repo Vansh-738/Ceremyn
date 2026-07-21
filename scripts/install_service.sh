@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install AlphaQuant's dashboard as a macOS LaunchAgent: starts automatically on
+# Install Ceremyn's dashboard as a macOS LaunchAgent: starts automatically on
 # login and restarts automatically if it ever crashes. Unlike start_dashboard.sh's
 # plain `nohup ... &`, this survives a reboot and needs no supervision -- launchd
 # does the restarting.
@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PROJECT_DIR="$(pwd)"
-LABEL="com.alphaquant.dashboard"
+LABEL="com.ceremyn.dashboard"
 PLIST_PATH="$HOME/Library/LaunchAgents/${LABEL}.plist"
 
 if [ ! -x "$PROJECT_DIR/.venv/bin/uvicorn" ]; then
@@ -33,7 +33,7 @@ cat > "$PLIST_PATH" <<EOF
         <string>${PROJECT_DIR}/.venv/bin/python3.12</string>
         <string>-m</string>
         <string>uvicorn</string>
-        <string>alphaquant.api.main:app</string>
+        <string>ceremyn.api.main:app</string>
         <string>--host</string>
         <string>127.0.0.1</string>
         <string>--port</string>
@@ -48,16 +48,16 @@ cat > "$PLIST_PATH" <<EOF
     <key>ThrottleInterval</key>
     <integer>10</integer>
     <key>StandardOutPath</key>
-    <string>/tmp/alphaquant.log</string>
+    <string>/tmp/ceremyn.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/alphaquant.log</string>
+    <string>/tmp/ceremyn.log</string>
 </dict>
 </plist>
 EOF
 
 # Stop any manually-started instance first so launchd doesn't fight over port 8000.
-if pgrep -f "uvicorn alphaquant.api.main:app" > /dev/null; then
-    pkill -f "uvicorn alphaquant.api.main:app"
+if pgrep -f "uvicorn ceremyn.api.main:app" > /dev/null; then
+    pkill -f "uvicorn ceremyn.api.main:app"
     sleep 1
 fi
 
@@ -66,6 +66,6 @@ launchctl load "$PLIST_PATH"
 
 echo "Installed as a LaunchAgent -- it will auto-start on login and auto-restart on crash."
 echo "Dashboard: http://127.0.0.1:8000/dashboard/"
-echo "Logs: tail -f /tmp/alphaquant.log"
-echo "Status: launchctl list | grep alphaquant"
+echo "Logs: tail -f /tmp/ceremyn.log"
+echo "Status: launchctl list | grep ceremyn"
 echo "To remove: ./scripts/uninstall_service.sh"

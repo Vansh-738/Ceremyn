@@ -4,13 +4,13 @@ from uuid import uuid4
 
 import pytest
 
-from alphaquant.broker import NullBrokerAdapter, SimulatedBroker
-from alphaquant.config import Settings, TradingMode
-from alphaquant.domain import Order, Side
-from alphaquant.domain.enums import OrderType
-from alphaquant.execution import GatedBrokerAdapter, LiveTradingGate
-from alphaquant.oms.broker import BrokerAdapter
-from alphaquant.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
+from ceremyn.broker import NullBrokerAdapter, SimulatedBroker
+from ceremyn.config import Settings, TradingMode
+from ceremyn.domain import Order, Side
+from ceremyn.domain.enums import OrderType
+from ceremyn.execution import GatedBrokerAdapter, LiveTradingGate
+from ceremyn.oms.broker import BrokerAdapter
+from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
 from tests.unit.backtest.helpers import make_contract
 
 T0 = datetime(2026, 7, 15, 4, 20, tzinfo=UTC)
@@ -54,24 +54,24 @@ class RecordingBroker:
 
     @property
     def capabilities(self):  # type: ignore[no-untyped-def]
-        from alphaquant.oms.broker import BrokerCapabilities
+        from ceremyn.oms.broker import BrokerCapabilities
 
         return BrokerCapabilities()
 
     def submit(self, command):  # type: ignore[no-untyped-def]
-        from alphaquant.oms.broker import BrokerSubmissionResult
+        from ceremyn.oms.broker import BrokerSubmissionResult
 
         self.calls.append("submit")
         return BrokerSubmissionResult(external_order_id=f"{self._name}-1", broker_timestamp=T0)
 
     def cancel(self, command):  # type: ignore[no-untyped-def]
-        from alphaquant.oms.broker import BrokerCancelResult
+        from ceremyn.oms.broker import BrokerCancelResult
 
         self.calls.append("cancel")
         return BrokerCancelResult(broker_timestamp=T0)
 
     def replace(self, command):  # type: ignore[no-untyped-def]
-        from alphaquant.oms.broker import BrokerReplaceResult
+        from ceremyn.oms.broker import BrokerReplaceResult
 
         self.calls.append("replace")
         return BrokerReplaceResult(broker_timestamp=T0)
@@ -93,7 +93,7 @@ class RecordingBroker:
         return ()
 
     def fetch_cash(self):  # type: ignore[no-untyped-def]
-        from alphaquant.oms.broker import BrokerCashSnapshot
+        from ceremyn.oms.broker import BrokerCashSnapshot
 
         self.calls.append("fetch_cash")
         return BrokerCashSnapshot(available_cash=Decimal("0"))

@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from alphaquant.api.app import create_app
-from alphaquant.config import Settings, TradingMode
+from ceremyn.api.app import create_app
+from ceremyn.config import Settings, TradingMode
 
 
 def make_settings(**overrides: object) -> Settings:
