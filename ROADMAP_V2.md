@@ -286,7 +286,7 @@ suite unmodified — new tests are added only for new, additive types.
 | Phase | Scope | Touches execution/risk/OMS? | Effort | Risk |
 |---|---|---|---|---|
 | **1** (this document) | Rebrand + positioning + this architectural review | No | Done | None |
-| **2** | Add `MarketSnapshot` to `domain/market_data.py` or a new `domain/snapshot.py`: `underlying`, `timestamp`, `option_chain: OptionChainSnapshot \| None`, `candle: Candle \| None`. Nothing consumes it yet. | No | S | None — purely additive, unused type |
+| **2** ✅ | Add `MarketSnapshot` to a new `domain/snapshot.py`: `underlying`, `timestamp`, `quote: Quote \| None`, `candle: Candle \| None`, `option_chain: OptionChainSnapshot \| None`. Nothing consumes it yet. **Landed** (`feat(domain): introduce MarketSnapshot abstraction`). | No | S | None — purely additive, unused type |
 | **3** | `StrategyContext` gains an optional `snapshot: MarketSnapshot \| None` field alongside the existing required `chain`. `chain` stays required — zero behavior change for the 15 existing strategies. | No | M | Low — additive field only |
 | **4** | Introduce `Pattern` + `Opportunity` domain types and a `PatternDetector` protocol. Ship 2 built-in detectors that are just relabelings of existing `FeatureSet` outputs already computed today (`iv_rank` → "IV-rank extreme," `pcr` → "PCR divergence") — zero new data dependency. Surface via one new read-only `/intelligence` API endpoint and one new dashboard panel. | No | M–L | Low — net-new, read-only, no path to execution |
 | **5** | Extend `llm/tools.py` with new read-only tools (`get_patterns`, `get_opportunities`). Same import-linter contract shape as today's 16 tools — still barred from `execution`/`risk`. | No | S | None — same contract as today |

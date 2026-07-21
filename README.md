@@ -91,7 +91,7 @@ conventions and dependency rules.
 src/ceremyn/
 ├── config/      settings (pydantic-settings), trading-mode model
 ├── core/        logging, exceptions, event bus, NSE market calendar, DI container
-├── domain/      pure entities: Instrument, OptionChain, Greeks, Signal, Order, ...
+├── domain/      pure entities: Instrument, MarketSnapshot, OptionChain, Greeks, Signal, Order, ...
 ├── data/        providers (Kite, NSE bhavcopy), repositories, analytics services
 │                (greeks, IV, PCR, OI, IV rank, max pain)
 ├── strategies/  strategy engine: Strategy ABC, registry, built-in strategies

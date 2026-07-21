@@ -33,6 +33,7 @@ from ceremyn.domain.orders import VALID_TRANSITIONS, Fill, Order
 from ceremyn.domain.portfolio import PortfolioExposure, PortfolioGreeks, PortfolioSnapshot
 from ceremyn.domain.positions import Position, Trade
 from ceremyn.domain.signals import Signal, SignalLeg
+from ceremyn.domain.snapshot import MarketSnapshot
 from ceremyn.domain.strategy import StrategyDefinition
 
 __all__ = [
@@ -52,6 +53,7 @@ __all__ = [
     "Greeks",
     "Instrument",
     "KillSwitchState",
+    "MarketSnapshot",
     "OptionChainSnapshot",
     "OptionContract",
     "OptionType",
