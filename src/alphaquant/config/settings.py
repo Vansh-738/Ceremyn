@@ -63,6 +63,12 @@ class RuntimeSettings(BaseModel):
     poll_interval_seconds: float = Field(default=2.0, gt=0)
 
 
+class PortfolioSettings(BaseModel):
+    # Starting cash for the paper/simulated portfolio. Set this to your real
+    # capital so position sizing and P&L are meaningful, not a placeholder.
+    initial_cash: Decimal = Field(default=Decimal("1000000"), gt=0)
+
+
 class DataSettings(BaseModel):
     underlyings: tuple[str, ...] = ("NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY")
     # Annualized risk-free rate used for greeks/IV (proxy: 91-day T-bill yield).
@@ -181,6 +187,7 @@ class Settings(BaseSettings):
     risk: RiskSettings = Field(default_factory=RiskSettings)
     execution: ExecutionSettings = Field(default_factory=ExecutionSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    portfolio: PortfolioSettings = Field(default_factory=PortfolioSettings)
 
     @property
     def effective_mode(self) -> TradingMode:

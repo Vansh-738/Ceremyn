@@ -7,6 +7,7 @@ from alphaquant.dashboard.models import (
     Alert,
     AlertCategory,
     AlertSeverity,
+    DataFeedStatus,
     ReconciliationStatus,
 )
 from alphaquant.live.heartbeat import HeartbeatState
@@ -28,6 +29,7 @@ def derive_alerts(
     heartbeat: HeartbeatState | None = None,
     reconnect: ReconnectState | None = None,
     reconciliation: ReconciliationStatus | None = None,
+    data_feed_status: DataFeedStatus | None = None,
 ) -> tuple[Alert, ...]:
     alerts: list[Alert] = []
 
@@ -103,6 +105,35 @@ def derive_alerts(
                     "status_drift": str(reconciliation.status_drift),
                     "position_drift": str(reconciliation.position_drift),
                 },
+            )
+        )
+
+    # A single failed tick is normal transient noise (a slow API call, a brief
+    # network blip); three in a row means the feed is actually down (e.g. an
+    # expired Kite access token) and every strategy is blind until it's fixed.
+    if data_feed_status is not None and data_feed_status.consecutive_failures >= 3:
+        alerts.append(
+            Alert(
+                severity=AlertSeverity.CRITICAL,
+                category=AlertCategory.DATA_FEED_FAILURE,
+                message="Live data feed is failing — strategies cannot see the market",
+                detail={
+                    "consecutive_failures": str(data_feed_status.consecutive_failures),
+                    "last_error": data_feed_status.last_error,
+                },
+            )
+        )
+
+    if data_feed_status is not None and data_feed_status.orphaned_symbols:
+        alerts.append(
+            Alert(
+                severity=AlertSeverity.CRITICAL,
+                category=AlertCategory.ORPHANED_POSITION,
+                message=(
+                    "Open position(s) with no active strategy — nothing will ever "
+                    "exit these on its own"
+                ),
+                detail={"symbols": ", ".join(data_feed_status.orphaned_symbols)},
             )
         )
 

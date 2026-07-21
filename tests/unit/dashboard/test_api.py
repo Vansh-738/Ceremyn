@@ -9,6 +9,7 @@ from alphaquant.dashboard.config import DashboardSettings
 VIEW_PATHS = [
     "/api/overview",
     "/api/portfolio",
+    "/api/equity_history",
     "/api/orders",
     "/api/positions",
     "/api/live",

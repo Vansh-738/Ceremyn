@@ -90,8 +90,16 @@ def test_stop_market_order_triggers_and_partial_fills(
     signal: Signal,
     timestamp_one: datetime,
 ) -> None:
+    # 3 lots requested (contract lot_size is 25 -> 75 units); volume/participation
+    # clears exactly 1 lot's worth (40 * 0.4 = 40, rounded down to the nearest
+    # 25-multiple = 25) -- a real, lot-aligned partial fill. A real broker can
+    # never partially fill below one lot's granularity, so this must land on a
+    # lot boundary, not an arbitrary unit count.
+    multi_lot_signal = signal.model_copy(
+        update={"legs": tuple(leg.model_copy(update={"lots": 3}) for leg in signal.legs)}
+    )
     simulator = ExecutionSimulator(config=SimulationConfig(max_volume_participation=0.4))
-    stop_signal = signal.model_copy(
+    stop_signal = multi_lot_signal.model_copy(
         update={
             "metadata": {
                 "execution": {
@@ -103,7 +111,8 @@ def test_stop_market_order_triggers_and_partial_fills(
         }
     )
     order = simulator.orders_from_signal(stop_signal, created_at=timestamp_one)[0]
-    chain = make_chain(timestamp=timestamp_one, last_price="100", bid="99", ask="101", volume=20)
+    assert order.quantity == 75
+    chain = make_chain(timestamp=timestamp_one, last_price="100", bid="99", ask="101", volume=100)
     pending, fills = simulator.simulate_pending(
         (PendingOrderState(order=order, remaining_quantity=order.quantity),),
         context=ExecutionContext(timestamp=timestamp_one, chain=chain),
@@ -111,9 +120,34 @@ def test_stop_market_order_triggers_and_partial_fills(
     )
 
     assert len(fills) == 1
+    assert fills[0].fill.quantity == 25
     assert fills[0].updated_order.status is OrderStatus.PARTIALLY_FILLED
     assert len(pending) == 1
-    assert pending[0].remaining_quantity == 17
+    assert pending[0].remaining_quantity == 50
+
+
+def test_no_fill_when_available_volume_is_below_one_lot(
+    signal: Signal,
+    timestamp_one: datetime,
+) -> None:
+    """Real volume that doesn't clear even one lot must produce no fill at all
+    this tick (order stays fully pending) -- not a fill for the whole remaining
+    quantity. Silently ignoring the volume cap here would defeat its entire
+    purpose whenever the order is larger than a single lot's worth of volume."""
+    simulator = ExecutionSimulator(config=SimulationConfig(max_volume_participation=0.4))
+    order = simulator.orders_from_signal(signal, created_at=timestamp_one)[0]
+    assert order.quantity == 25  # 1 lot
+    chain = make_chain(timestamp=timestamp_one, last_price="100", bid="99", ask="101", volume=20)
+
+    pending, fills = simulator.simulate_pending(
+        (PendingOrderState(order=order, remaining_quantity=order.quantity),),
+        context=ExecutionContext(timestamp=timestamp_one, chain=chain),
+        strategy_id=signal.strategy_id,
+    )
+
+    assert fills == ()
+    assert len(pending) == 1
+    assert pending[0].remaining_quantity == 25
 
 
 def test_symbol_specific_execution_and_stop_limit_paths(
@@ -272,7 +306,7 @@ def test_simulator_covers_remaining_edge_paths(
         volume=10,
     )
 
-    assert simulator._available_quantity(None, 25) == 25
+    assert simulator._available_quantity(None, 25, contract.lot_size) == 25
     assert (
         simulator._available_quantity(
             Quote(
@@ -284,6 +318,7 @@ def test_simulator_covers_remaining_edge_paths(
                 volume=0,
             ),
             25,
+            contract.lot_size,
         )
         == 25
     )
@@ -298,8 +333,32 @@ def test_simulator_covers_remaining_edge_paths(
                 volume=1,
             ),
             25,
+            contract.lot_size,
         )
         == 0
+    )
+    # Regression: a real broker never partially fills below one lot's granularity.
+    # `max_volume_participation=1.0` (the default) against a volume that isn't a
+    # clean multiple of `lot_size` must round DOWN to the nearest lot boundary,
+    # not return the raw, lot-misaligned volume -- the bug this guards against
+    # left positions holding quantities like 59 units of a 25-lot contract, and a
+    # later full-exit's `lots = quantity // lot_size` silently floored to 0.
+    full_participation_simulator = ExecutionSimulator()
+    assert contract.lot_size == 25
+    assert (
+        full_participation_simulator._available_quantity(
+            Quote(
+                tradingsymbol=contract.tradingsymbol,
+                timestamp=timestamp_one,
+                bid=Decimal("99"),
+                ask=Decimal("101"),
+                last_price=Decimal("100"),
+                volume=59,
+            ),
+            100,
+            contract.lot_size,
+        )
+        == 50
     )
 
     no_limit_order = order.model_copy(update={"limit_price": None})

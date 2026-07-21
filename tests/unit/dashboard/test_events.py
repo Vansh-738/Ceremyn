@@ -37,6 +37,41 @@ class TestSnapshotDiffer:
         assert len(frames) == 1
         assert frames[0].channel == Channel.OVERVIEW.value
 
+    def test_a_channel_that_raises_is_skipped_without_crashing_others(self) -> None:
+        """Regression: one channel's view doing real I/O (e.g. `oms` triggering a
+        broker reconciliation round-trip) must never take down the whole broadcaster
+        loop or block every other channel's updates."""
+
+        class ExplodingOMS:
+            def orders(self):  # type: ignore[no-untyped-def]
+                return ()
+
+            def oms_metrics(self):  # type: ignore[no-untyped-def]
+                raise RuntimeError("broker unreachable")
+
+            def kill_switch(self):  # type: ignore[no-untyped-def]
+                return None
+
+            def portfolio_snapshot(self):  # type: ignore[no-untyped-def]
+                return None
+
+            def reconciliation(self):  # type: ignore[no-untyped-def]
+                return None
+
+            def equity_curve(self):  # type: ignore[no-untyped-def]
+                return ()
+
+        differ = SnapshotDiffer()
+        service = DashboardService(DashboardSources(oms=ExplodingOMS()))
+
+        # Must not raise, and must not emit a frame for the channel that failed.
+        # `research` has no dependency on `oms` at all, unlike `overview` (which also
+        # reads `oms_metrics()` and would legitimately fail too).
+        frames = differ.changed(service, (Channel.OMS, Channel.RESEARCH))
+        assert all(f.channel != Channel.OMS.value for f in frames)
+        # The unrelated, healthy channel still comes through.
+        assert any(f.channel == Channel.RESEARCH.value for f in frames)
+
 
 class TestEventBridge:
     def test_frame_for_mapped_event(self) -> None:

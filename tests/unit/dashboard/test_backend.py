@@ -1,7 +1,12 @@
+from datetime import UTC, datetime
+from decimal import Decimal
+
+from alphaquant.backtest.statistics import EquityPoint
 from alphaquant.dashboard.backend import DashboardService, DashboardSources
 from alphaquant.dashboard.models import Channel, StrategyEntry
 from tests.unit.dashboard.conftest import (
     FakeExecution,
+    FakeOMS,
     FakePaper,
     FakePortfolio,
     make_portfolio_snapshot,
@@ -78,6 +83,25 @@ class TestEmptyService:
         assert service.execution().armed is False
         assert service.execution().active_broker == "simulated"
         assert service.alerts().count == 0
+        assert service.equity_history().points == ()
+
+
+class TestEquityHistoryView:
+    def test_reflects_the_oms_sources_real_curve(self) -> None:
+        point = EquityPoint(
+            timestamp=datetime(2026, 7, 16, 4, 0, tzinfo=UTC),
+            cash=Decimal("99000"),
+            equity=Decimal("99500"),
+            drawdown=Decimal("500"),
+        )
+        service = DashboardService(DashboardSources(oms=FakeOMS(equity_curve=(point,))))
+        view = service.equity_history()
+        assert len(view.points) == 1
+        assert view.points[0].equity == 99500.0
+
+    def test_empty_without_an_oms_source(self) -> None:
+        service = DashboardService(DashboardSources())
+        assert service.equity_history().points == ()
 
 
 class TestPortfolioResolution:

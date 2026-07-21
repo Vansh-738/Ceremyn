@@ -178,6 +178,7 @@ class FakeOMS:
         kill_armed: bool = False,
         reconciled: bool = True,
         portfolio: PortfolioSnapshot | None = None,
+        equity_curve: tuple[object, ...] = (),
     ) -> None:
         self._orders = orders
         self._metrics = make_oms_metrics()
@@ -186,6 +187,7 @@ class FakeOMS:
             reconciled=reconciled, position_drift=0 if reconciled else 1
         )
         self._portfolio = portfolio
+        self._equity_curve = equity_curve
 
     def orders(self):  # type: ignore[no-untyped-def]
         return self._orders
@@ -201,6 +203,9 @@ class FakeOMS:
 
     def reconciliation(self):  # type: ignore[no-untyped-def]
         return self._recon
+
+    def equity_curve(self):  # type: ignore[no-untyped-def]
+        return self._equity_curve
 
 
 class FakePortfolio:

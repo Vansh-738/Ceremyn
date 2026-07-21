@@ -17,6 +17,7 @@ from alphaquant.core.events import EventBus
 # Type-checking-only imports: runtime imports inside the properties stay lazy
 # so that importing the container never drags in heavy infra modules.
 if TYPE_CHECKING:
+    from alphaquant.backtest.portfolio import PortfolioConfig
     from alphaquant.broker.adapter import NullBrokerAdapter
     from alphaquant.broker.simulated import SimulatedBroker
     from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
     from alphaquant.research.experiment_manager import ExperimentManager
     from alphaquant.research.experiment_store import JSONExperimentStore
     from alphaquant.runtime.orchestrator import RuntimeOrchestrator
+    from alphaquant.runtime.rest_poller import RestPricePoller
 
 
 class Container:
@@ -221,13 +223,34 @@ class Container:
 
         return NullBrokerAdapter()
 
+    def _portfolio_config(self) -> "PortfolioConfig":
+        from alphaquant.backtest.portfolio import PortfolioConfig
+
+        # One source of truth for cash + margin-ratio assumptions, shared by the real
+        # OMS portfolio, the `SimulatedBroker`'s shadow ledger, and
+        # `RiskContext.projected_margin_used` (`risk/context.py`) -- all three must
+        # agree, or margin/cash reconciliation and pre-trade risk checks silently
+        # diverge from what actually gets booked on a fill.
+        return PortfolioConfig(
+            initial_cash=self.settings.portfolio.initial_cash,
+            short_option_margin_ratio=self.settings.risk.margin.short_option_margin_ratio,
+            long_option_margin_ratio=self.settings.risk.margin.long_option_margin_ratio,
+        )
+
     @cached_property
     def simulated_broker(self) -> "SimulatedBroker":
         from alphaquant.broker.simulated import SimulatedBroker
 
         # Real market data when it's available (via the live engine's cache), honest
-        # unfilled orders when it isn't — never fabricated fills.
-        return SimulatedBroker(market_data=self.live_engine.cache)
+        # unfilled orders when it isn't — never fabricated fills. `portfolio_config`
+        # must mirror `oms_engine`'s own initial cash: this shadow ledger stands in
+        # for what a real broker's `fetch_cash()` would report, and `reconcile()`
+        # compares it against `oms_engine.portfolio.cash` — a mismatched starting
+        # balance would make `cash_drift` permanently non-zero.
+        return SimulatedBroker(
+            market_data=self.live_engine.cache,
+            portfolio_config=self._portfolio_config(),
+        )
 
     @cached_property
     def kite_broker(self) -> "KiteBroker":
@@ -260,6 +283,7 @@ class Container:
     def oms_engine(self) -> "OrderManagementEngine":
         from alphaquant.oms.engine import OrderManagementEngine
         from alphaquant.oms.journal import JSONJournalStore, OMSJournal
+        from alphaquant.oms.positions import OMSPortfolio
 
         # A stable session id (not a random uuid4) so a restart re-opens the *same*
         # journal file rather than starting a fresh, empty one — the whole point of
@@ -270,11 +294,13 @@ class Container:
         # reaching out to the world on startup).
         session_id = f"oms-{self.settings.environment}"
         journal = OMSJournal(session_id, store=JSONJournalStore(session_id))
+        portfolio = OMSPortfolio(self._portfolio_config())
         engine = OrderManagementEngine(
             risk_engine=self.risk_engine,
             brokers={"execution": self.gated_broker},
             default_broker="execution",
             journal=journal,
+            portfolio=portfolio,
         )
         engine.restore_from_journal()
         return engine
@@ -328,6 +354,49 @@ class Container:
             oms_engine=self.oms_engine,
             strategies=(),
             poll_interval_seconds=self.settings.runtime.poll_interval_seconds,
+        )
+
+    @cached_property
+    def rest_poller(self) -> "RestPricePoller":
+        from alphaquant.domain import StrategyDefinition
+        from alphaquant.runtime.rest_poller import RestPricePoller
+        from alphaquant.strategies import create
+
+        underlying = self.settings.data.underlyings[0]
+
+        # Account reset to 40,000 on 2026-07-20 after a session of real bugs
+        # (whole-portfolio position leak across strategies, restart not restoring
+        # portfolio state, orphaned positions left undetected). Every margin-needing
+        # strategy is out at this size: bear_call_spread's own short leg alone needs
+        # ~2.39L (strike x lot_size x margin_ratio), and short_strangle/iron_condor/
+        # short_straddle need more -- none of them clear 40,000. Only long_contrarian
+        # (buys against extreme put-call OI skew, single BUY leg, debit-only: no
+        # margin needed the same way long_strangle doesn't) fits at all, and it's
+        # also the strategy with the most consistent real evidence this session --
+        # net positive across 6mo/12mo/24mo windows on the corrected (real,
+        # per-date) NIFTY lot sizes (2024-2025 was wrongly hardcoded at 65 in the
+        # backtest scripts for 18 of 24 months; the real history is 25 -> 75 -> 65).
+        # Re-add bear_call_spread (or others) once the account has grown past
+        # their real margin needs -- don't just widen the risk limits to force
+        # them to fit; that was exactly the kind of self-inflicted risk gap this
+        # reset is meant to avoid.
+        long_contrarian = StrategyDefinition(
+            id="long_contrarian_paper",
+            strategy_type="long_contrarian",
+            name="Long Contrarian (paper)",
+            underlyings=(underlying,),
+            params={},
+        )
+        strategies = (create(long_contrarian),)
+        return RestPricePoller(
+            kite_provider=self.kite_provider,
+            oms_engine=self.oms_engine,
+            analytics=self.chain_analytics,
+            cache=self.live_engine.cache,
+            strategies=strategies,
+            underlying=underlying,
+            calendar=self.calendar,
+            feature_engine=self.feature_engine,
         )
 
     @cached_property

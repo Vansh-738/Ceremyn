@@ -51,11 +51,26 @@ class StrategyContext(BaseModel):
             raise ValueError("now must be timezone-aware")
         return value
 
-    @model_validator(mode="after")
-    def _sync_positions(self) -> "StrategyContext":
-        if self.portfolio is not None and not self.positions:
-            object.__setattr__(self, "positions", self.portfolio.positions)
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def _sync_positions(cls, data: Any) -> Any:
+        """When `positions` is genuinely omitted (not just empty), default it to the
+        whole portfolio's positions -- correct for any single-strategy caller (a
+        backtest or a solo paper run), where "the whole portfolio" and "this
+        strategy's own positions" are the same thing by construction.
+
+        Must run on the raw input (`mode="before"`), not the validated model: a
+        multi-strategy runner sharing one account (e.g. `RestPricePoller`) computes
+        each strategy's own positions and passes them explicitly, including an
+        explicitly empty tuple for a strategy that's genuinely flat. An `after`
+        validator can't tell "explicitly empty" from "not provided" once both have
+        collapsed to `()` -- it would silently overwrite a deliberately-flat strategy
+        with every other strategy's positions too, which is exactly the bug this
+        validator used to reintroduce.
+        """
+        if isinstance(data, dict) and "positions" not in data and data.get("portfolio") is not None:
+            data["positions"] = data["portfolio"].positions
+        return data
 
     @property
     def days_to_expiry(self) -> int:

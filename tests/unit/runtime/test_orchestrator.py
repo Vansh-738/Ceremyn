@@ -190,7 +190,7 @@ async def test_maintenance_loop_polls_fills_exactly_once_per_report(
         live_engine=live_engine,
         oms_engine=oms_engine,
         strategies=(strategy,),
-        poll_interval_seconds=1000,  # never fires on its own; call _poll_fills directly
+        poll_interval_seconds=1000,  # never fires on its own; call the fill poller directly
     )
 
     await orchestrator.start()
@@ -211,8 +211,9 @@ async def test_maintenance_loop_polls_fills_exactly_once_per_report(
                 remaining_quantity=0,
             )
         )
-        await orchestrator._poll_fills()
-        await orchestrator._poll_fills()  # fetch_fills() re-returns the same report
+        poll = orchestrator._fill_poller.poll
+        poll(oms_engine=oms_engine, broker=broker)
+        poll(oms_engine=oms_engine, broker=broker)  # fetch_fills() re-returns the same report
     finally:
         await orchestrator.stop()
 
@@ -502,7 +503,7 @@ async def test_poll_fills_survives_a_broker_failure(underlyings, contracts, anal
         raise RuntimeError("fetch_fills failed")
 
     broker.fetch_fills = _boom  # type: ignore[method-assign]
-    await orchestrator._poll_fills()  # must not raise
+    orchestrator._fill_poller.poll(oms_engine=oms_engine, broker=broker)  # must not raise
 
 
 @pytest.mark.asyncio
@@ -528,4 +529,4 @@ async def test_poll_fills_logs_and_skips_a_report_for_an_unknown_order(
         )
     )
 
-    await orchestrator._poll_fills()  # must not raise; the report is simply skipped
+    orchestrator._fill_poller.poll(oms_engine=oms_engine, broker=broker)  # must not raise; skipped

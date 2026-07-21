@@ -7,7 +7,7 @@ from uuid import UUID
 from alphaquant.backtest.ledger import ClosedTrade
 from alphaquant.backtest.metrics import compute_statistics
 from alphaquant.backtest.portfolio import BacktestPortfolio, PortfolioConfig
-from alphaquant.backtest.statistics import BacktestStatistics
+from alphaquant.backtest.statistics import BacktestStatistics, EquityPoint
 from alphaquant.domain import Fill, Order, PortfolioSnapshot, Position
 
 
@@ -26,6 +26,12 @@ class OMSPortfolio:
     @property
     def closed_trades(self) -> tuple[ClosedTrade, ...]:
         return self._portfolio.closed_trades
+
+    @property
+    def equity_curve(self) -> tuple[EquityPoint, ...]:
+        """Every `mark()` call's (timestamp, cash, equity, drawdown), oldest first --
+        real history, not a client-side reconstruction."""
+        return tuple(self._portfolio.equity_curve)
 
     def apply_fill(
         self,

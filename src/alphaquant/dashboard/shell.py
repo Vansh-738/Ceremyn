@@ -170,7 +170,7 @@ const fmtNum=(v,d=2)=>Number(v??0).toLocaleString('en-IN',{minimumFractionDigits
 const money=(v)=>"₹"+fmtNum(v,2);
 const pct=(v)=>fmtNum(v,2)+"%";
 const signCls=(v)=>v>0?"pos":(v<0?"neg":"neu");
-const arrow=(v)=>v>0?"▲":(v<0?"▼":"■");
+const arrow=(v)=>v>0?"▲":(v<0?"▼":"–");
 
 // ---- nav ----
 const nav=$("nav");
@@ -178,7 +178,9 @@ PAGES.forEach(([id,label,d])=>{
  const a=document.createElement("a");a.dataset.page=id;a.className=(id===active?"active":"");
  a.innerHTML=`<svg class="ic" viewBox="0 0 24 24"><path d="${d}"/></svg><span class="lbl">${label}</span>`;
  a.onclick=()=>{active=id;document.querySelectorAll('.nav a').forEach(n=>n.classList.toggle('active',n.dataset.page===id));
-   $("pageTitle").textContent=label;$("sidebar").classList.remove('open');render();};
+   $("pageTitle").textContent=label;$("sidebar").classList.remove('open');
+   if(id==='overview')loadEquityHistory();
+   render();};
  nav.appendChild(a);
 });
 $("collapseBtn").onclick=()=>$("sidebar").classList.toggle('collapsed');
@@ -195,7 +197,14 @@ setInterval(()=>{try{$("clock").textContent=new Intl.DateTimeFormat('en-IN',
 
 // ---- websocket ----
 const BASE=location.pathname.replace(/\/+$/,'');
-const WS_URL=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+BASE+'/ws';
+// Only present when the operator turns on dashboard auth (off by default); harmless
+// no-op otherwise. Pass it via the page URL: /dashboard/?token=<your-token>.
+const TOKEN=new URLSearchParams(location.search).get('token');
+const WS_URL=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+BASE+'/ws'
+ +(TOKEN?('?token='+encodeURIComponent(TOKEN)):'');
+function authedFetch(path){
+ return fetch(BASE+path,TOKEN?{headers:{Authorization:'Bearer '+TOKEN}}:{});
+}
 let ws;
 function connect(){
  ws=new WebSocket(WS_URL);
@@ -205,21 +214,43 @@ function connect(){
  ws.onmessage=(e)=>{const f=JSON.parse(e.data);
   if(f.kind==='snapshot'){state[f.channel]=f.payload;sample(f.channel);statusChips();
     if(dependsOn(active,f.channel))render();}
-  else if(f.kind==='event'){if(active==='overview'||active==='logs')render();}
+  else if(f.kind==='event'){
+    // Event frames carry the raw domain event, not the channel's full view shape
+    // (e.g. a HeartbeatLost payload, not a HealthView) -- refetch the real snapshot
+    // for that channel instead of re-rendering already-stale state against it.
+    authedFetch('/api/'+f.channel).then(r=>r.ok?r.json():null).then(payload=>{
+      if(payload){state[f.channel]=payload;statusChips();
+        if(dependsOn(active,f.channel))render();}
+    }).catch(()=>{});
+  }
  };
 }
 function setChip(id,cls,txt){const c=$(id);c.className="chip "+cls;c.innerHTML=`<span class="dot"></span>${txt}`;}
-function dependsOn(page,ch){const map={overview:['overview','metrics','portfolio','alerts'],
+function dependsOn(page,ch){const map={overview:['overview','metrics','portfolio','positions','alerts'],
  live:['live'],portfolio:['portfolio','metrics'],orders:['orders'],positions:['positions'],
- oms:['oms'],risk:['risk','portfolio'],research:['research'],features:['features'],
+ oms:['oms'],risk:['risk','portfolio','alerts'],research:['research'],features:['features'],
  paper:['paper'],logs:['logs','alerts'],settings:['health','metrics']};
  return (map[page]||[]).includes(ch);}
 function sample(ch){const now=Date.now();
- if(ch==='portfolio'&&state.portfolio){const v=(state.portfolio.buying_power||0)+(state.portfolio.margin_used||0);
-   push(series.equity,now,v);}
+ // series.equity is seeded/refreshed from the real /api/equity_history endpoint
+ // (loadEquityHistory) instead of being reconstructed here from live snapshot
+ // arrival times -- that reconstruction is what produced a chart with a
+ // microsecond-wide, meaningless x-axis on a fresh connect (several channels'
+ // initial snapshots all arriving within the same couple of milliseconds).
  if(ch==='metrics'&&state.metrics){push(series.pnl,now,state.metrics.pnl||0);
    push(series.exposure,now,state.metrics.gross_exposure||0);}}
-function push(arr,t,v){arr.push([t,v]);if(arr.length>MAXP)arr.shift();}
+function push(arr,t,v){
+ // Guard against the same clustering bug for the two series that are still
+ // client-sampled: never record two points closer together than 3s, so a burst
+ // of snapshot frames arriving back-to-back can't zoom the x-axis to nonsense.
+ if(arr.length&&t-arr[arr.length-1][0]<3000)return;
+ arr.push([t,v]);if(arr.length>MAXP)arr.shift();}
+function loadEquityHistory(){
+ authedFetch('/api/equity_history').then(r=>r.ok?r.json():null).then(payload=>{
+  if(!payload||!payload.points)return;
+  series.equity=payload.points.map(p=>[new Date(p.timestamp).getTime(),p.equity]);
+  if(active==='overview')render();
+ }).catch(()=>{});}
 function statusChips(){
  const h=state.health,o=state.oms,l=state.live;
  if(h){const ok=h.heartbeat_healthy!==false;setChip("brokerChip",ok?"ok":"bad",ok?"Broker up":"Broker down");}
@@ -446,6 +477,8 @@ function renderSettings(c){const h=state.health||{};const comps=h.components||[]
  </div>`;}
 
 connect();
+loadEquityHistory();
+setInterval(()=>{if(active==='overview')loadEquityHistory();},30000);
 </script>
 </body></html>
 """

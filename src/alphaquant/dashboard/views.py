@@ -6,7 +6,10 @@ snapshots it needs so it is trivially unit-testable with fakes.
 
 from decimal import Decimal
 
+from alphaquant.backtest.statistics import EquityPoint
 from alphaquant.dashboard.models import (
+    EquityHistoryView,
+    EquityPointRow,
     ExecutionView,
     ExperimentRow,
     ExposureView,
@@ -87,6 +90,25 @@ def build_portfolio(snapshot: PortfolioSnapshot | None) -> PortfolioView:
             by_underlying={k: _f(v) for k, v in exposure.by_underlying.items()},
         ),
     )
+
+
+_MAX_EQUITY_POINTS = 500
+
+
+def build_equity_history(curve: tuple[EquityPoint, ...]) -> EquityHistoryView:
+    """Real history from `OMSPortfolio.equity_curve` -- one point per `mark()` call --
+    not a client-side reconstruction from live snapshot arrival times."""
+    recent = curve[-_MAX_EQUITY_POINTS:]
+    points = tuple(
+        EquityPointRow(
+            timestamp=point.timestamp.isoformat(),
+            cash=_f(point.cash),
+            equity=_f(point.equity),
+            drawdown=_f(point.drawdown),
+        )
+        for point in recent
+    )
+    return EquityHistoryView(points=points)
 
 
 def build_orders(orders: tuple[OMSOrder, ...], *, page: int, page_size: int) -> OrdersView:

@@ -49,12 +49,16 @@ class TestFillMechanicsReused:
         assert fills[0].fill.price == Decimal("100.5")
 
     def test_partial_fill_via_volume_participation(self) -> None:
-        broker = PaperBroker(PaperBrokerConfig(latency_seconds=0, max_volume_participation=0.001))
-        order = make_market_order(quantity=25)
-        # Volume 1000 * 0.001 = 1 unit available per process cycle.
+        # 3 lots requested (contract lot_size is 25 -> 75 units); volume 1000 *
+        # 0.03 = 30, rounded down to the nearest 25-multiple = 25 -- exactly 1
+        # lot. A real broker can never partially fill below one lot's
+        # granularity, so the fill must land on a lot boundary, not an
+        # arbitrary unit count.
+        broker = PaperBroker(PaperBrokerConfig(latency_seconds=0, max_volume_participation=0.03))
+        order = make_market_order(quantity=75)
         broker.submit(order, strategy_id="s", now=TICK_ZERO)
         fills = broker.process(context=context_at(0), now=TICK_ZERO)
-        assert fills[0].fill.quantity == 1
+        assert fills[0].fill.quantity == 25
         assert fills[0].updated_order.status is OrderStatus.PARTIALLY_FILLED
         assert broker.has_open(order.id)  # remainder still queued
 

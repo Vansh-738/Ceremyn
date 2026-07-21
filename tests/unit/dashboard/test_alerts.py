@@ -1,5 +1,10 @@
 from alphaquant.dashboard.alerts import derive_alerts
-from alphaquant.dashboard.models import AlertCategory, AlertSeverity, ReconciliationStatus
+from alphaquant.dashboard.models import (
+    AlertCategory,
+    AlertSeverity,
+    DataFeedStatus,
+    ReconciliationStatus,
+)
 from alphaquant.live.heartbeat import HeartbeatState
 from alphaquant.live.reconnect import ReconnectState
 from alphaquant.oms.orders import OMSExecutionState
@@ -58,6 +63,33 @@ def test_reconnect_alert() -> None:
 def test_reconciliation_mismatch_alert() -> None:
     alerts = derive_alerts(reconciliation=ReconciliationStatus(reconciled=False, position_drift=1))
     assert AlertCategory.RECONCILIATION_MISMATCH in categories(alerts)
+
+
+def test_data_feed_failure_alert_after_three_consecutive_failures() -> None:
+    alerts = derive_alerts(
+        data_feed_status=DataFeedStatus(consecutive_failures=3, last_error="token expired")
+    )
+    assert AlertCategory.DATA_FEED_FAILURE in categories(alerts)
+    assert alerts[0].severity is AlertSeverity.CRITICAL
+    assert alerts[0].detail["last_error"] == "token expired"
+
+
+def test_no_data_feed_alert_for_a_single_transient_failure() -> None:
+    alerts = derive_alerts(data_feed_status=DataFeedStatus(consecutive_failures=1))
+    assert AlertCategory.DATA_FEED_FAILURE not in categories(alerts)
+
+
+def test_orphaned_position_alert() -> None:
+    alerts = derive_alerts(data_feed_status=DataFeedStatus(orphaned_symbols=("NIFTY2672124600CE",)))
+    assert AlertCategory.ORPHANED_POSITION in categories(alerts)
+    orphaned = next(a for a in alerts if a.category is AlertCategory.ORPHANED_POSITION)
+    assert orphaned.severity is AlertSeverity.CRITICAL
+    assert "NIFTY2672124600CE" in orphaned.detail["symbols"]
+
+
+def test_no_orphaned_position_alert_when_none_found() -> None:
+    alerts = derive_alerts(data_feed_status=DataFeedStatus())
+    assert AlertCategory.ORPHANED_POSITION not in categories(alerts)
 
 
 def test_all_alert_types_together() -> None:

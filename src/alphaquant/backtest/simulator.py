@@ -110,7 +110,9 @@ class ExecutionSimulator:
                 (),
             )
 
-        available_quantity = self._available_quantity(quote, pending.remaining_quantity)
+        available_quantity = self._available_quantity(
+            quote, pending.remaining_quantity, pending.order.contract.lot_size
+        )
         if available_quantity <= 0:
             return (pending, ())
         slipped = self.slippage_model.apply(
@@ -152,15 +154,26 @@ class ExecutionSimulator:
             (virtual_fill,),
         )
 
-    def _available_quantity(self, quote: Quote | None, remaining_quantity: int) -> int:
+    def _available_quantity(
+        self, quote: Quote | None, remaining_quantity: int, lot_size: int
+    ) -> int:
         if quote is None or quote.volume <= 0:
             return remaining_quantity
         raw = int(quote.volume * self.config.max_volume_participation)
         if raw <= 0:
             return 0
-        lot_size = 1
+        # Round down to a whole-lot boundary -- a real broker can never partially
+        # fill you below one lot's granularity. Without this, a volume-capped
+        # partial fill can leave a position holding a quantity that isn't a
+        # multiple of its own contract's lot size (e.g. 59 units of a 65-lot
+        # contract), and a later full-exit signal's `lots = quantity // lot_size`
+        # silently floors to 0 -- rejected by `SignalLeg`'s own validation.
+        # `available` can legitimately be 0 here (today's volume doesn't clear
+        # even one lot) -- the caller already treats `<= 0` as "no fill this
+        # tick, stay pending," which is the correct outcome, not "ignore the
+        # volume cap and fill everything."
         available = raw - (raw % lot_size)
-        return min(remaining_quantity, available if available > 0 else remaining_quantity)
+        return min(remaining_quantity, available)
 
     def _evaluate_fillability(
         self,

@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from alphaquant.domain import Side, SignalLeg
 from alphaquant.oms import (
     BrokerCapabilities,
     BrokerExecutionReport,
@@ -292,3 +293,78 @@ def test_restore_from_journal_rebuilds_state_across_engine_instances(
     # suppressed rather than duplicated.
     with pytest.raises(OMSDuplicateRequestError):
         engine_b.submit_signal(signal, now=T0)
+
+
+def test_restore_from_journal_replays_fills_into_portfolio(
+    risk_engine: RiskEngine, tmp_path
+) -> None:
+    """A restart must not just remember order metadata -- it must also reconstruct
+    cash/positions/realized_pnl from the fills that already happened, or a real
+    account's trading history silently vanishes every time the process restarts even
+    though the fills themselves were durably journaled all along."""
+    store = JSONJournalStore("restart-fills", root=tmp_path)
+    journal_a = OMSJournal("restart-fills", store=store)
+    broker = FakeBroker()
+    engine_a = OrderManagementEngine(
+        risk_engine=risk_engine,
+        brokers={"fake": broker},
+        default_broker="fake",
+        journal=journal_a,
+    )
+    (order,) = engine_a.submit_signal(make_signal(), now=T0)
+    assert order.external_order_id is not None
+    filled = engine_a.process_execution_report(
+        BrokerExecutionReport(
+            external_order_id=order.external_order_id,
+            status=BrokerOrderStatus.FILLED,
+            broker_timestamp=T0 + timedelta(seconds=1),
+            fill_id="fill-1",
+            last_fill_quantity=order.order.quantity,
+            fill_price=Decimal("150"),
+            remaining_quantity=0,
+        )
+    )
+    symbol = filled.order.contract.tradingsymbol
+    assert engine_a.portfolio.positions[symbol].quantity == order.order.quantity
+
+    # Close it out at a different price so a real, non-zero realized_pnl exists --
+    # `snapshot()` is a *cached* view, only refreshed by `mark()`; a naive restore
+    # that replays fills via `apply_fill` alone but never calls `mark()` leaves
+    # `snapshot()` returning the empty-account default forever, even though cash and
+    # positions (live properties, not cached) already reflect the real fills.
+    close_signal = make_signal(correlation_id=None)
+    close_signal = close_signal.model_copy(
+        update={"legs": (SignalLeg(contract=order.order.contract, side=Side.SELL, lots=1),)}
+    )
+    (close_order,) = engine_a.submit_signal(close_signal, now=T0 + timedelta(seconds=2))
+    assert close_order.external_order_id is not None
+    engine_a.process_execution_report(
+        BrokerExecutionReport(
+            external_order_id=close_order.external_order_id,
+            status=BrokerOrderStatus.FILLED,
+            broker_timestamp=T0 + timedelta(seconds=3),
+            fill_id="fill-2",
+            last_fill_quantity=close_order.order.quantity,
+            fill_price=Decimal("200"),
+            remaining_quantity=0,
+        )
+    )
+    # `snapshot()` is cached, only refreshed by `mark()` -- mimic what a real runner
+    # (e.g. `RestPricePoller`) does on its next tick, to get an honest ground truth.
+    engine_a.portfolio.mark(timestamp=T0 + timedelta(seconds=3), last_prices={})
+    expected_realized_pnl = engine_a.portfolio.snapshot().realized_pnl
+    assert expected_realized_pnl != 0
+    expected_cash = engine_a.portfolio.cash
+
+    store_b = JSONJournalStore("restart-fills", root=tmp_path)
+    journal_b = OMSJournal("restart-fills", store=store_b)
+    engine_b = OrderManagementEngine(
+        risk_engine=risk_engine,
+        brokers={"fake": FakeBroker()},
+        default_broker="fake",
+        journal=journal_b,
+    )
+    engine_b.restore_from_journal()
+
+    assert engine_b.portfolio.cash == expected_cash
+    assert engine_b.portfolio.snapshot().realized_pnl == expected_realized_pnl

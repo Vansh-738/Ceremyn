@@ -17,6 +17,7 @@ from alphaquant.backtest.events import (
 from alphaquant.backtest.fills import ExecutionContext, PendingOrderState
 from alphaquant.backtest.portfolio import BacktestPortfolio, PortfolioConfig
 from alphaquant.backtest.simulator import ExecutionSimulator, SimulationConfig
+from alphaquant.data.services.chain_analytics import atm_iv, iv_rank
 from alphaquant.domain import (
     Candle,
     OptionChainSnapshot,
@@ -63,6 +64,14 @@ class BacktestEngine:
         self.candles: dict[str, Candle] = {}
         self.pending_orders: dict[str, list[PendingOrderState]] = defaultdict(list)
         self.risk_decisions: list[RiskDecision] = []
+        # Real IV-rank history, accumulated per underlying exactly like
+        # `RestPricePoller._iv_history` -- never fabricated, so strategies that need
+        # it (short_strangle, iron_condor, short_straddle, ...) correctly stay
+        # inactive until there's enough of it to be meaningful. Without this,
+        # `StrategyContext.iv_rank` was always None in every backtest, so any
+        # IV-rank-gated strategy could never be backtested at all -- a real parity
+        # gap with the live/paper runners, not just a scripting limitation.
+        self._iv_history: dict[str, list[float]] = defaultdict(list)
 
     def process_event(self, event: BacktestEvent) -> None:
         if isinstance(event, QuoteEvent):
@@ -95,11 +104,13 @@ class BacktestEngine:
         other_expiries = {
             expiry: c for expiry, c in self.latest_chains.items() if expiry != chain.expiry
         }
+        rank = self._update_iv_history(chain)
         strategy_context = StrategyContext(
             chain=chain,
             portfolio=self.portfolio.snapshot(),
             now=chain.timestamp,
             other_expiries=other_expiries,
+            iv_rank=rank,
         )
         for signal in self.strategy.on_chain(strategy_context):
             decision = self.risk_engine.evaluate(
@@ -116,6 +127,20 @@ class BacktestEngine:
                     PendingOrderState(order=order, remaining_quantity=order.quantity)
                 )
             self._advance_pending_orders(context=self._execution_context(chain.timestamp))
+
+    _IV_HISTORY_MAXLEN = 1000
+
+    def _update_iv_history(self, chain: OptionChainSnapshot) -> float | None:
+        """Mirrors `RestPricePoller`'s own IV-rank bookkeeping so backtests gate on
+        IV rank exactly like live/paper, instead of always seeing `iv_rank=None`."""
+        current_iv = atm_iv(chain)
+        if current_iv is None:
+            return None
+        history = self._iv_history[chain.underlying]
+        rank = iv_rank(current_iv, history)
+        history.append(current_iv)
+        del history[: -self._IV_HISTORY_MAXLEN]
+        return rank
 
     def _advance_pending_orders(self, *, context: ExecutionContext) -> None:
         if not self.pending_orders:

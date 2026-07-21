@@ -1,6 +1,7 @@
 from alphaquant.backtest.statistics import BacktestStatistics
 from alphaquant.dashboard.health import build_health
 from alphaquant.dashboard.metrics import build_metrics
+from alphaquant.dashboard.models import DataFeedStatus
 from alphaquant.live.heartbeat import HeartbeatState
 from alphaquant.live.reconnect import ReconnectState
 from tests.unit.dashboard.conftest import NOW, make_oms_metrics, make_portfolio_snapshot
@@ -54,3 +55,28 @@ class TestHealth:
         view = build_health()
         assert view.heartbeat_healthy is True
         assert view.broker_uptime_ratio == 1.0
+
+    def test_failing_data_feed_makes_overall_unhealthy(self) -> None:
+        # Regression: "Overall: HEALTHY" must not sit next to a critical
+        # data-feed-failure alert derived from the exact same underlying state.
+        view = build_health(
+            components_present={"live": True, "oms": True},
+            data_feed_status=DataFeedStatus(consecutive_failures=3, last_error="token expired"),
+        )
+        assert view.healthy is False
+        feed = next(c for c in view.components if c.name == "data_feed")
+        assert feed.healthy is False
+        assert feed.detail == "token expired"
+
+    def test_single_transient_data_feed_failure_stays_healthy(self) -> None:
+        view = build_health(
+            components_present={"live": True, "oms": True},
+            data_feed_status=DataFeedStatus(consecutive_failures=1),
+        )
+        assert view.healthy is True
+        feed = next(c for c in view.components if c.name == "data_feed")
+        assert feed.healthy is True
+
+    def test_no_data_feed_component_when_source_absent(self) -> None:
+        view = build_health(components_present={"live": True})
+        assert all(c.name != "data_feed" for c in view.components)

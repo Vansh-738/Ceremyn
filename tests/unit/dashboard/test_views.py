@@ -1,3 +1,7 @@
+from datetime import UTC, datetime
+from decimal import Decimal
+
+from alphaquant.backtest.statistics import EquityPoint
 from alphaquant.dashboard import views
 from alphaquant.dashboard.models import ReconciliationStatus
 from alphaquant.oms.orders import OMSExecutionState
@@ -23,6 +27,45 @@ class TestPortfolio:
 
     def test_none_returns_empty(self) -> None:
         assert views.build_portfolio(None).position_count == 0
+
+
+class TestEquityHistory:
+    def test_maps_real_curve_points(self) -> None:
+        curve = (
+            EquityPoint(
+                timestamp=datetime(2026, 7, 16, 4, 0, tzinfo=UTC),
+                cash=Decimal("99000"),
+                equity=Decimal("99500"),
+                drawdown=Decimal("500"),
+            ),
+            EquityPoint(
+                timestamp=datetime(2026, 7, 16, 5, 0, tzinfo=UTC),
+                cash=Decimal("99000"),
+                equity=Decimal("100200"),
+                drawdown=Decimal("0"),
+            ),
+        )
+        view = views.build_equity_history(curve)
+        assert len(view.points) == 2
+        assert view.points[0].equity == 99500.0
+        assert view.points[1].drawdown == 0.0
+
+    def test_empty_curve_returns_no_points(self) -> None:
+        assert views.build_equity_history(()).points == ()
+
+    def test_caps_to_the_most_recent_points(self) -> None:
+        curve = tuple(
+            EquityPoint(
+                timestamp=datetime(2026, 7, 16, 4, i % 60, tzinfo=UTC),
+                cash=Decimal("100000"),
+                equity=Decimal(str(100000 + i)),
+                drawdown=Decimal("0"),
+            )
+            for i in range(600)
+        )
+        view = views.build_equity_history(curve)
+        assert len(view.points) == 500
+        assert view.points[-1].equity == 100599.0
 
 
 class TestOrders:

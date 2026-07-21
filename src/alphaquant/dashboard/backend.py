@@ -12,7 +12,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from alphaquant.backtest.statistics import BacktestStatistics
+from alphaquant.backtest.statistics import BacktestStatistics, EquityPoint
 from alphaquant.dashboard import views
 from alphaquant.dashboard.alerts import derive_alerts
 from alphaquant.dashboard.config import DashboardSettings
@@ -21,6 +21,8 @@ from alphaquant.dashboard.metrics import build_metrics
 from alphaquant.dashboard.models import (
     AlertsView,
     Channel,
+    DataFeedStatus,
+    EquityHistoryView,
     ExecutionView,
     FeatureStoreView,
     HealthView,
@@ -78,6 +80,7 @@ class OMSSource(Protocol):
     def kill_switch(self) -> KillSwitchStatus | None: ...
     def portfolio_snapshot(self) -> PortfolioSnapshot | None: ...
     def reconciliation(self) -> ReconciliationStatus | None: ...
+    def equity_curve(self) -> tuple[EquityPoint, ...]: ...
 
 
 class PortfolioSource(Protocol):
@@ -109,6 +112,13 @@ class LogSource(Protocol):
     def recent_logs(self, limit: int) -> tuple[LogRow, ...]: ...
 
 
+class DataFeedSource(Protocol):
+    """`RestPricePoller`'s own health -- a broken feed (e.g. an expired Kite access
+    token) should be a visible alert, not something only ever found in the logs."""
+
+    def status(self) -> DataFeedStatus | None: ...
+
+
 class ExecutionSource(Protocol):
     """Gate #3 status only — never a broker handle, never order-affecting."""
 
@@ -137,6 +147,7 @@ class DashboardSources:
     logs: LogSource | None = None
     execution: ExecutionSource | None = None
     strategies: StrategySource | None = None
+    data_feed: DataFeedSource | None = None
 
 
 class DashboardService:
@@ -167,6 +178,10 @@ class DashboardService:
 
     def portfolio(self) -> PortfolioView:
         return views.build_portfolio(self._portfolio_snapshot())
+
+    def equity_history(self) -> EquityHistoryView:
+        curve = self.sources.oms.equity_curve() if self.sources.oms is not None else ()
+        return views.build_equity_history(curve)
 
     def orders(self, *, page: int = 1, page_size: int | None = None) -> OrdersView:
         orders = self.sources.oms.orders() if self.sources.oms is not None else ()
@@ -256,6 +271,7 @@ class DashboardService:
         kill = self._kill_switch()
         oms = self.sources.oms
         live = self.sources.live
+        data_feed = self.sources.data_feed
         return AlertsView(
             alerts=derive_alerts(
                 risk_decisions=(self.sources.risk.recent_decisions() if self.sources.risk else ()),
@@ -266,12 +282,14 @@ class DashboardService:
                 heartbeat=live.heartbeat() if live else None,
                 reconnect=live.reconnect() if live else None,
                 reconciliation=oms.reconciliation() if oms else None,
+                data_feed_status=data_feed.status() if data_feed else None,
             )
         )
 
     def health(self) -> HealthView:
         live = self.sources.live
         oms = self.sources.oms
+        data_feed = self.sources.data_feed
         return build_health(
             heartbeat=live.heartbeat() if live else None,
             reconnect=live.reconnect() if live else None,
@@ -285,6 +303,7 @@ class DashboardService:
                 "research": self.sources.research is not None,
                 "risk": self.sources.risk is not None,
             },
+            data_feed_status=data_feed.status() if data_feed else None,
         )
 
     def overview(self) -> OverviewView:

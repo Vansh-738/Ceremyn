@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from alphaquant.backtest.ledger import CashLedgerEntry, ClosedTrade, TradeLedger
 from alphaquant.backtest.statistics import EquityPoint
+from alphaquant.core.timeutils import to_ist
 from alphaquant.domain import (
     Fill,
     Instrument,
@@ -57,6 +58,12 @@ class BacktestPortfolio:
         self._peak_equity = self.config.initial_cash
         self._latest_snapshot = PortfolioSnapshot(buying_power=self.config.initial_cash)
         self._last_prices: dict[str, Decimal] = {}
+        # Baseline for `daily_pnl`: reset to the previous day's closing equity on the
+        # first mark of each new IST trading day, so a bad day doesn't permanently
+        # suppress new entries via `MaximumDailyLossRule` for the account's whole life.
+        self._trading_day: date | None = None
+        self._day_start_equity = self.config.initial_cash
+        self._last_equity = self.config.initial_cash
 
     def apply_fill(
         self,
@@ -105,6 +112,7 @@ class BacktestPortfolio:
     ) -> PortfolioSnapshot:
         self._last_prices.update(last_prices)
         unrealized = Decimal("0")
+        market_value = Decimal("0")
         realized = self._realized_pnl
         gross_notional = Decimal("0")
         net_notional = Decimal("0")
@@ -117,6 +125,12 @@ class BacktestPortfolio:
                 continue
             price = self._last_prices.get(position.contract.tradingsymbol, position.avg_price)
             unrealized += position.unrealized_pnl(price)
+            # `cash` already moved by the position's entry cost/proceeds (see
+            # `apply_fill` below); adding `unrealized_pnl` (a P&L *delta* from entry)
+            # on top of that double-counts it. Equity needs the position's current
+            # market value instead -- `price * quantity` is signed correctly for
+            # both a long asset (positive) and a short liability (negative).
+            market_value += price * position.quantity
             # Notional reference price: strike for options (unchanged formula), else
             # the position's own mark -- asset-class-aware margin/exposure dispatch
             # is out of scope here (M16 only widens the domain vocabulary; no
@@ -132,7 +146,12 @@ class BacktestPortfolio:
             if position.quantity < 0:
                 short_option_units += abs(position.quantity)
 
-        equity = self.cash + unrealized
+        equity = self.cash + market_value
+        trading_day = to_ist(timestamp).date()
+        if self._trading_day != trading_day:
+            self._trading_day = trading_day
+            self._day_start_equity = self._last_equity
+        self._last_equity = equity
         if equity > self._peak_equity:
             self._peak_equity = equity
         drawdown = self._peak_equity - equity
@@ -154,7 +173,7 @@ class BacktestPortfolio:
             margin_used=margin_used,
             realized_pnl=realized,
             unrealized_pnl=unrealized,
-            daily_pnl=equity - self.config.initial_cash,
+            daily_pnl=equity - self._day_start_equity,
             portfolio_greeks=self._portfolio_greeks(),
             exposure=PortfolioExposure(
                 gross_notional=gross_notional,

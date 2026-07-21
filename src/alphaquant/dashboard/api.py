@@ -79,6 +79,10 @@ def build_dashboard_router(
     def portfolio() -> dict[str, Any]:
         return service.portfolio().model_dump(mode="json")
 
+    @router.get("/api/equity_history", dependencies=[view_dashboard])
+    def equity_history() -> dict[str, Any]:
+        return service.equity_history().model_dump(mode="json")
+
     @router.get("/api/orders", dependencies=[view_dashboard])
     def orders(page: int = Query(default=1, ge=1)) -> dict[str, Any]:
         return service.orders(page=page).model_dump(mode="json")

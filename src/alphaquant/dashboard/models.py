@@ -44,6 +44,8 @@ class AlertCategory(StrEnum):
     BROKER_DISCONNECT = "broker_disconnect"
     RECONCILIATION_MISMATCH = "reconciliation_mismatch"
     KILL_SWITCH = "kill_switch"
+    DATA_FEED_FAILURE = "data_feed_failure"
+    ORPHANED_POSITION = "orphaned_position"
 
 
 class Alert(BaseModel):
@@ -98,6 +100,21 @@ class PortfolioView(BaseModel):
     position_count: int = 0
     greeks: GreeksView = Field(default_factory=GreeksView)
     exposure: ExposureView = Field(default_factory=ExposureView)
+
+
+class EquityPointRow(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    timestamp: str
+    cash: float
+    equity: float
+    drawdown: float
+
+
+class EquityHistoryView(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    points: tuple[EquityPointRow, ...] = ()
 
 
 class OrderRow(BaseModel):
@@ -212,6 +229,22 @@ class ReconciliationStatus(BaseModel):
     @property
     def drift_count(self) -> int:
         return self.missing_orders + self.status_drift + self.position_drift
+
+
+class DataFeedStatus(BaseModel):
+    """`RestPricePoller`'s own health as read primitives (avoids importing
+    runtime.rest_poller, which transitively depends on the Kite provider/OMS)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    consecutive_failures: int = 0
+    last_error: str = ""
+    # Tradingsymbols with a real open position that no currently-active strategy
+    # claims (e.g. a strategy was removed from the live roster while it still had
+    # a position open) -- nothing will ever generate an exit for these on its own,
+    # so this must be a loud, persistent alert, not something only found by
+    # noticing an unexplained loss days later.
+    orphaned_symbols: tuple[str, ...] = ()
 
 
 class OMSView(BaseModel):

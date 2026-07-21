@@ -42,7 +42,7 @@ from alphaquant.oms.orders import (
 )
 from alphaquant.oms.positions import OMSPortfolio
 from alphaquant.oms.reconciliation import OMSReconciler, ReconciliationReport
-from alphaquant.oms.restore import rebuild_oms_state
+from alphaquant.oms.restore import rebuild_oms_state, rebuild_portfolio_fills
 from alphaquant.oms.retry import RetryPolicy
 from alphaquant.oms.router import BrokerRouter
 from alphaquant.oms.validators import OMSValidator
@@ -446,14 +446,48 @@ class OrderManagementEngine:
         self.journal.record_order_snapshot(order, at=at)
 
     def restore_from_journal(self) -> None:
-        """Rebuild `orders`/`external_index`/`_children`/idempotency from the journal.
+        """Rebuild `orders`/`external_index`/`_children`/idempotency AND portfolio
+        cash/positions/realized_pnl from the journal.
 
         Pure local-disk state rebuild — never touches a broker. Call once after
         construction (e.g. at the composition root); intentionally not automatic in
         `__init__` so bare-constructed engines (tests) never do file I/O by surprise.
+
+        Replaying fills here matters as much as restoring order metadata: without it, a
+        restart doesn't just forget bookkeeping, it silently resets a real trading
+        account's cash/positions/P&L back to its starting balance, discarding every
+        fill's consequence even though the fills themselves were durably journaled.
         """
         state = rebuild_oms_state(self.journal.store)
         self.orders = dict(state.orders)
         self.external_index = dict(state.external_index)
         self._children = {parent: list(child_ids) for parent, child_ids in state.children.items()}
         self.idempotency.seed(state.idempotency_seed)
+        for replay in rebuild_portfolio_fills(self.journal.store, self.orders):
+            costs = self.commission_model.calculate(
+                side=replay.order.side,
+                quantity=replay.fill.quantity,
+                price=replay.fill.price,
+            )
+            self.portfolio.apply_fill(
+                fill=replay.fill,
+                order=replay.order,
+                strategy_id=replay.strategy_id,
+                signal_id=None,
+                costs=costs.total,
+            )
+        # `OMSPortfolio.snapshot()` returns whatever `mark()` last cached, not a live
+        # read of cash/positions/realized_pnl -- `apply_fill` above updates the
+        # underlying state correctly, but without a `mark()` call here, `snapshot()`
+        # keeps returning the empty-account default from construction until the next
+        # live tick happens to call it. Mark at each position's own average price
+        # (unrealized_pnl honestly reads 0 until the next real quote arrives) so
+        # anything that reads `snapshot()` between restart and the first live tick —
+        # the dashboard, a diagnostic script — sees the real restored state.
+        self.portfolio.mark(
+            timestamp=now_utc(),
+            last_prices={
+                position.contract.tradingsymbol: position.avg_price
+                for position in self.portfolio.positions.values()
+            },
+        )

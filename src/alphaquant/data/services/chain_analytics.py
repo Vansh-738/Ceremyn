@@ -43,13 +43,21 @@ class ChainAnalyticsService:
 
     def atm_iv(self, snapshot: OptionChainSnapshot) -> float | None:
         """Mean of the ATM call/put IVs (the usual scalar 'chain IV')."""
-        atm = snapshot.atm_strike
-        ivs = [
-            entry.greeks.iv
-            for entry in snapshot.entries
-            if entry.contract.strike == atm and entry.greeks is not None and entry.greeks.iv
-        ]
-        return sum(ivs) / len(ivs) if ivs else None
+        return atm_iv(snapshot)
+
+
+def atm_iv(snapshot: OptionChainSnapshot) -> float | None:
+    """Mean of the ATM call/put IVs (the usual scalar 'chain IV'). Free function (no
+    pricing-kernel dependency, unlike `enrich`) so callers that only need this --
+    e.g. `BacktestEngine`'s own IV-rank tracking -- don't need a whole
+    `ChainAnalyticsService` instance just to read greeks a snapshot already has."""
+    atm = snapshot.atm_strike
+    ivs = [
+        entry.greeks.iv
+        for entry in snapshot.entries
+        if entry.contract.strike == atm and entry.greeks is not None and entry.greeks.iv
+    ]
+    return sum(ivs) / len(ivs) if ivs else None
 
 
 def iv_rank(current: float, history: list[float]) -> float | None:
@@ -68,6 +76,15 @@ def iv_percentile(current: float, history: list[float]) -> float | None:
         return None
     below = sum(1 for value in history if value < current)
     return below / len(history) * 100.0
+
+
+def chain_last_prices(snapshot: OptionChainSnapshot) -> dict[str, Decimal]:
+    """Tradingsymbol -> last traded price, for `OMSPortfolio.mark()`'s `last_prices` arg."""
+    return {
+        entry.contract.tradingsymbol: entry.quote.last_price
+        for entry in snapshot.entries
+        if entry.quote is not None
+    }
 
 
 def max_pain(snapshot: OptionChainSnapshot) -> Decimal:

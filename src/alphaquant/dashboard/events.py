@@ -11,6 +11,8 @@ import hashlib
 import json
 from typing import TYPE_CHECKING, Any, Protocol
 
+import structlog
+
 from alphaquant.core.events import EventBus
 from alphaquant.dashboard.models import Channel, WSFrame
 from alphaquant.live.events import (
@@ -25,6 +27,8 @@ from alphaquant.live.events import (
 
 if TYPE_CHECKING:
     from alphaquant.dashboard.backend import DashboardService
+
+logger = structlog.get_logger(__name__)
 
 
 class FrameSink(Protocol):
@@ -56,13 +60,29 @@ class SnapshotDiffer:
     def __init__(self) -> None:
         self._hashes: dict[str, str] = {}
 
+    def _payload_or_none(
+        self, service: "DashboardService", channel: Channel
+    ) -> dict[str, Any] | None:
+        # One channel's view can do real I/O (e.g. `oms` triggers a broker reconciliation
+        # round-trip) -- a transient failure there must never take down every other
+        # channel's updates, and must never kill the broadcaster loop that calls this
+        # every tick (an uncaught exception here would silently freeze the whole
+        # dashboard until the process is restarted).
+        try:
+            return service.channel_payload(channel)
+        except Exception:
+            logger.error("dashboard_channel_payload_failed", channel=channel.value, exc_info=True)
+            return None
+
     def snapshot_all(
         self, service: "DashboardService", channels: tuple[Channel, ...]
     ) -> list[WSFrame]:
         """Full snapshot of every channel (used on connect); primes the hashes."""
         frames: list[WSFrame] = []
         for channel in channels:
-            payload = service.channel_payload(channel)
+            payload = self._payload_or_none(service, channel)
+            if payload is None:
+                continue
             self._hashes[channel.value] = _digest(payload)
             frames.append(WSFrame(kind="snapshot", channel=channel.value, payload=payload))
         return frames
@@ -71,7 +91,9 @@ class SnapshotDiffer:
         """Snapshot frames for only the channels whose content changed since last call."""
         frames: list[WSFrame] = []
         for channel in channels:
-            payload = service.channel_payload(channel)
+            payload = self._payload_or_none(service, channel)
+            if payload is None:
+                continue
             digest = _digest(payload)
             if self._hashes.get(channel.value) != digest:
                 self._hashes[channel.value] = digest

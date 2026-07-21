@@ -21,6 +21,7 @@ from typing import Any
 
 import structlog
 
+from alphaquant.data.services.chain_analytics import chain_last_prices
 from alphaquant.live.engine import LiveMarketDataEngine
 from alphaquant.live.kite import KiteStreamingClient
 from alphaquant.live.snapshot import MarketSnapshot
@@ -28,6 +29,7 @@ from alphaquant.live.stream import AsyncTickStream
 from alphaquant.oms.engine import OrderManagementEngine
 from alphaquant.paper.events import MarketTick
 from alphaquant.paper.scheduler import PaperScheduler
+from alphaquant.runtime.fills import FillPoller
 from alphaquant.strategies import Strategy, StrategyContext
 
 logger = structlog.get_logger(__name__)
@@ -52,7 +54,7 @@ class RuntimeOrchestrator:
         self._streaming_client = streaming_client
         self._stream = stream or AsyncTickStream()
         self._poll_interval_seconds = poll_interval_seconds
-        self._processed_fill_markers: set[str] = set()
+        self._fill_poller = FillPoller()
         self._tick_task: asyncio.Task[None] | None = None
         self._maintenance_task: asyncio.Task[None] | None = None
 
@@ -91,6 +93,12 @@ class RuntimeOrchestrator:
 
     async def _on_snapshot(self, snapshot: MarketSnapshot) -> None:
         tick = self._live_engine.as_paper_tick(snapshot)
+        # `OMSPortfolio.snapshot()` returns whatever `mark()` last computed, not a live
+        # read of `positions`/`cash` -- without this, the dashboard would show
+        # position_count=0 and pnl=0 forever regardless of how many orders fill.
+        self._oms_engine.portfolio.mark(
+            timestamp=tick.as_of, last_prices=chain_last_prices(tick.chain)
+        )
         if not self._scheduler.is_open(tick.as_of):
             self._scheduler.ticks_skipped += 1
             return
@@ -128,7 +136,9 @@ class RuntimeOrchestrator:
     async def _maintenance_loop(self) -> None:
         while True:
             await asyncio.sleep(self._poll_interval_seconds)
-            await self._poll_fills()
+            self._fill_poller.poll(
+                oms_engine=self._oms_engine, broker=self._oms_engine.router.brokers[0]
+            )
             try:
                 await self._live_engine.check_heartbeat()
             except Exception:
@@ -137,24 +147,3 @@ class RuntimeOrchestrator:
                 self._oms_engine.reconcile()
             except Exception:
                 logger.error("periodic_reconciliation_failed", exc_info=True)
-
-    async def _poll_fills(self) -> None:
-        try:
-            broker = self._oms_engine.router.brokers[0]
-            reports = broker.fetch_fills()
-        except Exception:
-            logger.error("fill_poll_failed", exc_info=True)
-            return
-        for report in reports:
-            marker = report.fill_id or f"{report.external_order_id}:{report.broker_timestamp}"
-            if marker in self._processed_fill_markers:
-                continue
-            self._processed_fill_markers.add(marker)
-            try:
-                self._oms_engine.process_execution_report(report)
-            except KeyError:
-                # The report references an order outside `external_index` — e.g. right
-                # after a restart gap. Log and move on; reconciliation will surface it.
-                logger.warning(
-                    "fill_report_unknown_order", external_order_id=report.external_order_id
-                )
