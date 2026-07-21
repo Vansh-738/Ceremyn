@@ -20,8 +20,11 @@ def settings(**over: object) -> DashboardSettings:
 
 
 class TestResolveRole:
-    def test_dev_mode_grants_viewer(self) -> None:
-        assert resolve_role(None, DashboardSettings(auth_enabled=False)) is Role.VIEWER
+    def test_dev_mode_grants_admin(self) -> None:
+        # No login configured at all -> nothing is actually gated, so dev mode grants
+        # full access rather than leaving Viewer-only pages (e.g. Logs) permanently
+        # unreachable.
+        assert resolve_role(None, DashboardSettings(auth_enabled=False)) is Role.ADMIN
 
     def test_admin_token(self) -> None:
         assert resolve_role("ADMIN", settings()) is Role.ADMIN

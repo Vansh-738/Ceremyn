@@ -38,11 +38,14 @@ class ForbiddenError(Exception):
 def resolve_role(token: str | None, settings: DashboardSettings) -> Role:
     """Resolve a bearer token to a role, or raise AuthError.
 
-    Dev mode (auth disabled) always yields VIEWER. In prod the token must match a
+    Dev mode (auth disabled) always yields ADMIN: with no login configured at all,
+    restricting any one page (e.g. Logs) behind a role nobody can reach is just a
+    confusing dead end, not real access control -- there's no boundary to enforce
+    until an operator actually turns auth on. In prod the token must match a
     configured token exactly.
     """
     if not settings.auth_enabled:
-        return Role.VIEWER
+        return Role.ADMIN
     if not token:
         raise AuthError("missing bearer token")
     if settings.admin_token and token == settings.admin_token:
