@@ -53,20 +53,26 @@ class KiteProvider:
 
         if not settings.kite.api_key:
             raise BrokerError("ALPHAQUANT_KITE__API_KEY is not configured")
-        return cls(KiteConnect(api_key=settings.kite.api_key))
+        kite = KiteConnect(api_key=settings.kite.api_key)
+        access_token = settings.kite.access_token.get_secret_value()
+        if access_token:
+            kite.set_access_token(access_token)
+        return cls(kite)
 
     # -- auth -------------------------------------------------------------
 
     def login_url(self) -> str:
         return str(self._kite.login_url())
 
-    async def authenticate(self, request_token: str, api_secret: str) -> None:
+    async def authenticate(self, request_token: str, api_secret: str) -> str:
         """Exchange the login redirect's request token for an access token."""
         try:
             session = await asyncio.to_thread(
                 self._kite.generate_session, request_token, api_secret=api_secret
             )
-            self._kite.set_access_token(session["access_token"])
+            access_token = str(session["access_token"])
+            self._kite.set_access_token(access_token)
+            return access_token
         except Exception as exc:
             raise BrokerError(f"Kite session exchange failed: {exc}") from exc
 

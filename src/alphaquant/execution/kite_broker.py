@@ -81,7 +81,11 @@ class KiteBroker:
 
         if not settings.kite.api_key:
             raise BrokerError("ALPHAQUANT_KITE__API_KEY is not configured")
-        return cls(KiteConnect(api_key=settings.kite.api_key))
+        kite = KiteConnect(api_key=settings.kite.api_key)
+        access_token = settings.kite.access_token.get_secret_value()
+        if access_token:
+            kite.set_access_token(access_token)
+        return cls(kite)
 
     @property
     def name(self) -> str:

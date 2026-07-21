@@ -43,6 +43,9 @@ class RedisSettings(BaseModel):
 class KiteSettings(BaseModel):
     api_key: str = ""
     api_secret: SecretStr = SecretStr("")
+    # Kite's daily-expiring session token (obtained via scripts/kite_login.py).
+    # Never lives longer than one trading day — refresh it each morning.
+    access_token: SecretStr = SecretStr("")
 
 
 class AnthropicSettings(BaseModel):
