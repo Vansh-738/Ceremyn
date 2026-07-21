@@ -5,7 +5,7 @@ from datetime import datetime
 from alphaquant.config import RiskSettings, Settings
 from alphaquant.core.timeutils import now_utc
 from alphaquant.domain import PortfolioSnapshot, Signal
-from alphaquant.domain.enums import KillSwitchState
+from alphaquant.domain.enums import KillSwitchState, SignalAction
 from alphaquant.risk.context import RiskContext
 from alphaquant.risk.exceptions import RiskConfigurationError, RiskEvaluationError
 from alphaquant.risk.models import RiskCategory, RiskDecision, RuleResult
@@ -40,6 +40,18 @@ class RiskEngine:
         evaluated_at: datetime | None = None,
     ) -> RiskDecision:
         timestamp = evaluated_at or now_utc()
+        # An EXIT only ever closes/reduces an existing position -- it can't create new
+        # risk, so nothing (including a triggered kill switch) should be able to trap
+        # a strategy holding a position it can no longer close. ADJUST is not exempt:
+        # rolling a strike can still change margin/exposure, so it goes through the
+        # normal checks below like ENTER does.
+        if signal.signal_type is SignalAction.EXIT:
+            return RiskDecision(
+                approved=True,
+                risk_score=0.0,
+                warnings=("risk checks bypassed: exit signal always allowed to close risk",),
+                timestamp=timestamp,
+            )
         context = RiskContext.from_inputs(
             portfolio=portfolio,
             signal=signal,

@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from alphaquant.domain import KillSwitchState
+from alphaquant.domain import KillSwitchState, SignalAction
 from alphaquant.risk import (
     RiskConfigurationError,
     RiskEngine,
@@ -51,6 +51,24 @@ def test_engine_blocks_on_kill_switch(base_settings, portfolio, signal, utc_now:
 
     assert decision.approved is False
     assert "kill switch is triggered" in decision.violations
+
+
+def test_engine_always_approves_exit_signals(
+    base_settings, portfolio, signal, utc_now: datetime
+) -> None:
+    """An EXIT only closes/reduces an existing position -- it must never be blocked,
+    even by a triggered kill switch or a limit the account is already breaching.
+    (Regression: this exact gap trapped `long_strangle` in a losing position with no
+    way to close it in a real-data backtest.)"""
+    exit_signal = signal.model_copy(update={"signal_type": SignalAction.EXIT})
+    armed_portfolio = portfolio.model_copy(update={"kill_switch_state": KillSwitchState.TRIGGERED})
+    base_settings.risk.margin.max_margin_used = Decimal("1")  # impossible to clear
+
+    engine = RiskEngine(base_settings)
+    decision = engine.evaluate(armed_portfolio, exit_signal, evaluated_at=utc_now)
+
+    assert decision.approved is True
+    assert decision.violations == ()
 
 
 def test_engine_returns_warning_when_disabled(
