@@ -43,7 +43,6 @@ RUNTIME_ENGINE_ATTRS = (
     "risk_engine",
     "feature_cache",
     "feature_engine",
-    "null_broker",
     "simulated_broker",
     "live_trading_gate",
     "gated_broker",

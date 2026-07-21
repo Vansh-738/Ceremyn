@@ -666,6 +666,10 @@ populated at import time.
 - No milestone is currently in progress. Every milestone through M13, plus M12 and M14 (both
   landed after M13 in this session), is ✅ (see §2); the roadmap has no further numbered
   milestone defined yet — next steps are user-directed.
+- Deferred architectural questions surfaced by a post-M17 cleanup audit (`PaperTradingEngine`'s
+  fate, the `RuntimeOrchestrator`/WebSocket-streaming future, `ChainSnapshotJob` scheduling, and
+  the 1-of-15 live-selectable-strategies gap) are recorded in `ARCHITECTURE_DECISIONS.md` rather
+  than acted on — each needs a product decision, not a mechanical fix.
 
 ---
 

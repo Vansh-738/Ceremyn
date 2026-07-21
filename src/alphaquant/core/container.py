@@ -18,7 +18,6 @@ from alphaquant.core.events import EventBus
 # so that importing the container never drags in heavy infra modules.
 if TYPE_CHECKING:
     from alphaquant.backtest.portfolio import PortfolioConfig
-    from alphaquant.broker.adapter import NullBrokerAdapter
     from alphaquant.broker.simulated import SimulatedBroker
     from alphaquant.core.instrumentation import ObservableRiskEngine, ReadableHeartbeatMonitor
     from alphaquant.data.providers.kite import KiteProvider
@@ -216,12 +215,6 @@ class Container:
         from alphaquant.features.engine import FeatureEngine
 
         return FeatureEngine(cache=self.feature_cache)
-
-    @cached_property
-    def null_broker(self) -> "NullBrokerAdapter":
-        from alphaquant.broker.adapter import NullBrokerAdapter
-
-        return NullBrokerAdapter()
 
     def _portfolio_config(self) -> "PortfolioConfig":
         from alphaquant.backtest.portfolio import PortfolioConfig
