@@ -115,12 +115,50 @@ class RiskContext(BaseModel):
         )
 
     @property
+    def signal_margin_required(self) -> Decimal:
+        """Total margin for the *net projected* position (current holdings with this
+        signal's legs applied), using the same per-leg model
+        `backtest.portfolio.BacktestPortfolio._margin_used()` applies to filled
+        positions: net-short symbols at `short_option_margin_ratio`, net-long at
+        `long_option_margin_ratio`. Kept in sync via `RiskMarginSettings` and
+        `Container._portfolio_config()`, the shared source both read from.
+
+        Computed from the net position per symbol, not the signal's legs in
+        isolation -- a SELL leg that *closes* an existing long (e.g. an exit signal)
+        must not be charged short-side margin just because the leg itself sells;
+        only a leg that leaves the symbol net short should be."""
+        strikes: dict[str, Decimal] = {
+            position.contract.tradingsymbol: position.contract.strike
+            for position in self.portfolio.positions
+            if isinstance(position.contract, OptionContract)
+        }
+        for leg in self.signal.legs:
+            if isinstance(leg.contract, OptionContract):
+                strikes[leg.contract.tradingsymbol] = leg.contract.strike
+        total = Decimal("0")
+        for symbol, quantity in self.projected_position_quantities.items():
+            if quantity == 0:
+                continue
+            ratio = (
+                self.config.margin.short_option_margin_ratio
+                if quantity < 0
+                else self.config.margin.long_option_margin_ratio
+            )
+            # Non-option symbols contribute no margin here (asset-aware margin
+            # dispatch is out of scope for this widening); every symbol reachable
+            # today is an option, so `strikes` always has a real entry in practice.
+            total += strikes.get(symbol, Decimal("0")) * abs(quantity) * ratio
+        return total
+
+    @property
     def projected_margin_used(self) -> Decimal:
         projected = self.metadata.get("projected_margin_used")
         if projected is not None:
             return _as_decimal(projected)
-        margin_required = _as_decimal(self.metadata.get("margin_required"))
-        return self.portfolio.margin_used + margin_required
+        margin_required = self.metadata.get("margin_required")
+        if margin_required is not None:
+            return self.portfolio.margin_used + _as_decimal(margin_required)
+        return self.signal_margin_required
 
     @property
     def total_capital_base(self) -> Decimal:

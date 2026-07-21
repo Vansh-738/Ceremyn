@@ -80,6 +80,12 @@ class RiskPositionSettings(BaseModel):
 class RiskMarginSettings(BaseModel):
     max_margin_used: Decimal = Field(default=Decimal("1000000"), ge=0)
     max_margin_usage_ratio: float = Field(default=0.8, gt=0, le=1)
+    # Same ratios `backtest.portfolio.PortfolioConfig` uses to compute *actual* margin
+    # from filled positions — kept here too so `RiskContext.projected_margin_used` can
+    # estimate a signal's own margin need with the same model before it's ever
+    # submitted, instead of only checking margin already used by prior fills.
+    short_option_margin_ratio: Decimal = Field(default=Decimal("0.15"), ge=0)
+    long_option_margin_ratio: Decimal = Field(default=Decimal("0.0"), ge=0)
 
 
 class RiskDrawdownSettings(BaseModel):
