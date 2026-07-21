@@ -57,6 +57,14 @@ python3.12 -m venv .venv
 
 Or run everything in Docker: `docker compose up --build`.
 
+**Running unattended (macOS):** the two commands above only run in your current
+terminal/foreground session and won't survive a reboot or crash. For a paper-trading
+setup you want left running, use `scripts/install_service.sh` instead — it installs a
+macOS LaunchAgent that starts the dashboard on login and restarts it automatically if
+it ever crashes. Remove it with `scripts/uninstall_service.sh`. Once installed, manage
+it via `launchctl` (or the uninstall script), not `scripts/stop_dashboard.sh` — that
+script talks to the process directly and launchd would just restart it underneath you.
+
 ## Development
 
 ```bash
