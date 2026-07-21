@@ -11,9 +11,10 @@ from datetime import datetime, timedelta
 
 from alphaquant.backtest.statistics import BacktestStatistics, EquityPoint
 from alphaquant.core.container import Container
+from alphaquant.core.logging import recent_log_entries
 from alphaquant.core.timeutils import now_utc
 from alphaquant.dashboard.backend import DashboardSources, KillSwitchStatus
-from alphaquant.dashboard.models import DataFeedStatus, ReconciliationStatus, StrategyEntry
+from alphaquant.dashboard.models import DataFeedStatus, LogRow, ReconciliationStatus, StrategyEntry
 from alphaquant.domain import PortfolioSnapshot
 from alphaquant.features.context import FeatureContext
 from alphaquant.features.models import FeatureSet
@@ -221,6 +222,26 @@ class _ExecutionSourceAdapter:
         return "kite" if self.live_trading_permitted() else "simulated"
 
 
+class _LogSourceAdapter:
+    """Reads the in-memory ring buffer every log call feeds
+    (`core.logging.recent_log_entries`) -- nothing else retains structured logs for
+    this purpose, so without this the dashboard's "System Logs" page is permanently
+    empty regardless of real application log volume."""
+
+    def recent_logs(self, limit: int) -> tuple[LogRow, ...]:
+        rows: list[LogRow] = []
+        for entry in recent_log_entries(limit):
+            data = dict(entry)
+            timestamp = data.pop("timestamp", None)
+            if timestamp is None:
+                continue
+            level = str(data.pop("level", "info"))
+            event = str(data.pop("event", ""))
+            context = {str(key): str(value) for key, value in data.items()}
+            rows.append(LogRow(timestamp=timestamp, level=level, event=event, context=context))
+        return tuple(rows)
+
+
 class _DataFeedSourceAdapter:
     """`RestPricePoller`'s own health -- reads the SAME cached_property instance
     `api/app.py` actually starts, not a fresh one."""
@@ -265,5 +286,6 @@ def build_dashboard_sources(container: Container) -> DashboardSources:
         research=_ResearchSourceAdapter(container),
         execution=_ExecutionSourceAdapter(container),
         strategies=_StrategySourceAdapter(),
+        logs=_LogSourceAdapter(),
         data_feed=_DataFeedSourceAdapter(container),
     )

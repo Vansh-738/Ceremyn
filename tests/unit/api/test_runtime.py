@@ -23,6 +23,7 @@ _PORT_METHODS = {
     "research": ("experiments",),
     "execution": ("is_armed", "live_trading_permitted", "active_broker_name"),
     "strategies": ("catalog",),
+    "logs": ("recent_logs",),
     "data_feed": ("status",),
 }
 
@@ -152,6 +153,28 @@ def test_portfolio_source_zero_state() -> None:
     stats = sources.portfolio.session_statistics()
     assert stats is not None
     assert stats.sharpe == 0.0
+
+
+def test_log_source_reflects_the_ring_buffer() -> None:
+    from alphaquant.core import logging as logging_module
+    from alphaquant.core.logging import _capture_to_ring_buffer
+
+    logging_module._RING_BUFFER.clear()
+    try:
+        entry = {
+            "event": "signal_submitted",
+            "level": "info",
+            "timestamp": "2026-07-16T00:00:00Z",
+        }
+        _capture_to_ring_buffer(None, "info", entry)
+        sources = build_dashboard_sources(make_container())
+        assert sources.logs is not None
+        rows = sources.logs.recent_logs(10)
+        assert len(rows) == 1
+        assert rows[0].event == "signal_submitted"
+        assert rows[0].level == "info"
+    finally:
+        logging_module._RING_BUFFER.clear()
 
 
 def test_risk_source_starts_empty() -> None:

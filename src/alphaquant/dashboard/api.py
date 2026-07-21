@@ -34,6 +34,7 @@ from alphaquant.dashboard.permissions import (
     Role,
     authorize,
     bearer_token,
+    role_has,
 )
 from alphaquant.dashboard.shell import SHELL_HTML
 from alphaquant.dashboard.websocket import ConnectionManager, broadcast_changes
@@ -146,11 +147,11 @@ def build_dashboard_router(
         channels: list[str] | None = Query(default=None),
     ) -> None:
         try:
-            authorize(token, Permission.VIEW_DASHBOARD, settings)
+            role = authorize(token, Permission.VIEW_DASHBOARD, settings)
         except (AuthError, ForbiddenError):
             await websocket.close(code=4401)
             return
-        selected = _parse_channels(channels)
+        selected = _permitted_channels(_parse_channels(channels), role)
         await websocket.accept()
         connection = manager.add(websocket, selected)
         # Initial full snapshot for the subscribed channels; the shared broadcaster then
@@ -162,7 +163,7 @@ def build_dashboard_router(
         try:
             while True:
                 message = await websocket.receive_json()
-                _handle_control(manager, connection, message)
+                _handle_control(manager, connection, message, role)
                 await websocket.send_json({"kind": "ack", "channel": "", "payload": message})
         except WebSocketDisconnect:
             manager.remove(connection)
@@ -182,14 +183,23 @@ def _parse_channels(channels: list[str] | None) -> tuple[Channel, ...]:
     return tuple(result) or tuple(Channel)
 
 
+def _permitted_channels(channels: tuple[Channel, ...], role: Role) -> tuple[Channel, ...]:
+    # The REST `/api/logs` endpoint already requires VIEW_LOGS (see `view_logs` above) --
+    # without this, any VIEWER-role token could get identical log content simply by
+    # subscribing to the `logs` channel over the WebSocket instead.
+    if role_has(role, Permission.VIEW_LOGS):
+        return channels
+    return tuple(channel for channel in channels if channel is not Channel.LOGS)
+
+
 def _handle_control(
-    manager: ConnectionManager, connection: object, message: dict[str, Any]
+    manager: ConnectionManager, connection: object, message: dict[str, Any], role: Role
 ) -> None:
     from alphaquant.dashboard.websocket import Connection
 
     assert isinstance(connection, Connection)
     action = message.get("action")
-    channels = _parse_channels(message.get("channels"))
+    channels = _permitted_channels(_parse_channels(message.get("channels")), role)
     if action == "subscribe":
         manager.subscribe(connection, channels)
     elif action == "unsubscribe":

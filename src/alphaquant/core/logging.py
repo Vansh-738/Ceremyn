@@ -9,10 +9,30 @@ anywhere with `structlog.get_logger(__name__)`.
 
 import logging
 import sys
+from collections import deque
+from typing import Any
 
 import structlog
 
 from alphaquant.config import Settings
+
+# Bounded in-memory tail of recent log events, for the dashboard's "System Logs"
+# page (`api/runtime.py::_LogSourceAdapter`) -- nothing else retains structured
+# logs anywhere for that purpose, so without this the Logs page is permanently
+# empty regardless of real application log volume.
+_RING_BUFFER: deque[dict[str, Any]] = deque(maxlen=1000)
+
+
+def recent_log_entries(limit: int) -> list[dict[str, Any]]:
+    """The most recent `limit` captured log events, newest first."""
+    return list(reversed(_RING_BUFFER))[:limit]
+
+
+def _capture_to_ring_buffer(
+    logger: object, method_name: str, event_dict: structlog.typing.EventDict
+) -> structlog.typing.EventDict:
+    _RING_BUFFER.append(dict(event_dict))
+    return event_dict
 
 
 def configure_logging(settings: Settings) -> None:
@@ -26,6 +46,7 @@ def configure_logging(settings: Settings) -> None:
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
+        _capture_to_ring_buffer,
     ]
 
     renderer: structlog.typing.Processor

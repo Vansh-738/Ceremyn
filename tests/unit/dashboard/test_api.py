@@ -2,9 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from alphaquant.dashboard.api import create_dashboard_app
+from alphaquant.dashboard.api import _permitted_channels, create_dashboard_app
 from alphaquant.dashboard.backend import DashboardService
 from alphaquant.dashboard.config import DashboardSettings
+from alphaquant.dashboard.models import Channel
+from alphaquant.dashboard.permissions import Role
 
 VIEW_PATHS = [
     "/api/overview",
@@ -117,3 +119,25 @@ class TestWebSocket:
         secured = TestClient(create_dashboard_app(service, settings=settings))
         with secured.websocket_connect("/ws?token=VIEW&channels=overview") as ws:
             assert ws.receive_json()["kind"] == "snapshot"
+
+    def test_viewer_role_is_not_subscribed_to_logs_even_when_requested(
+        self, service: DashboardService
+    ) -> None:
+        settings = DashboardSettings(auth_enabled=True, viewer_token="VIEW")
+        secured = TestClient(create_dashboard_app(service, settings=settings))
+        # Requesting both logs and overview as a viewer token: the initial snapshot
+        # batch is only ever built from the *permitted* channel set, matching the REST
+        # endpoint's own VIEW_LOGS gate -- so the one frame sent back is overview.
+        with secured.websocket_connect("/ws?token=VIEW&channels=logs&channels=overview") as ws:
+            frame = ws.receive_json()
+            assert frame["channel"] == "overview"
+
+
+class TestPermittedChannels:
+    def test_viewer_role_is_filtered_out_of_logs(self) -> None:
+        result = _permitted_channels((Channel.LOGS, Channel.OVERVIEW), Role.VIEWER)
+        assert result == (Channel.OVERVIEW,)
+
+    def test_admin_role_keeps_logs(self) -> None:
+        result = _permitted_channels((Channel.LOGS, Channel.OVERVIEW), Role.ADMIN)
+        assert result == (Channel.LOGS, Channel.OVERVIEW)
