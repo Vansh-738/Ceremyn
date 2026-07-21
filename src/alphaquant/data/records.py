@@ -25,6 +25,12 @@ class EodOptionRecord(BaseModel):
     open_interest: int = Field(default=0, ge=0)
     oi_change: int = 0
     underlying_close: Decimal | None = None
+    # NSE revises this periodically per SEBI's lot-size framework -- it is NOT a
+    # constant across a multi-year backtest window (NIFTY alone was 25, then 75,
+    # then 65 across 2024-2026). Read per-row from bhavcopy's own `NewBrdLotQty`
+    # column rather than hardcoded, or historical P&L/margin figures silently use
+    # the wrong contract size for whichever months don't match today's value.
+    lot_size: int = Field(gt=0)
 
 
 class EodFutureRecord(BaseModel):
@@ -44,3 +50,5 @@ class EodFutureRecord(BaseModel):
     open_interest: int = Field(default=0, ge=0)
     oi_change: int = 0
     underlying_close: Decimal | None = None
+    # Same NSE per-underlying/periodic-revision caveat as `EodOptionRecord.lot_size`.
+    lot_size: int = Field(gt=0)

@@ -42,6 +42,17 @@ class TestParser:
         assert call.oi_change == 352_500
         assert call.volume == 8_956_234
         assert call.underlying_close == Decimal("24502.15")
+        assert call.lot_size == 75
+
+    def test_lot_size_varies_by_underlying_not_hardcoded(self) -> None:
+        # NSE sets lot size per underlying (and revises it periodically) -- a single
+        # hardcoded constant across underlyings, or across a multi-year backtest
+        # window, silently misprices every rupee figure that depends on it.
+        records = parse_bhavcopy(fixture_zip(), UNDERLYINGS, TRADE_DATE)
+        nifty = next(r for r in records if r.underlying == "NIFTY")
+        bank = next(r for r in records if r.underlying == "BANKNIFTY")
+        assert nifty.lot_size == 75
+        assert bank.lot_size == 30
 
     def test_negative_oi_change_preserved(self) -> None:
         records = parse_bhavcopy(fixture_zip(), UNDERLYINGS, TRADE_DATE)

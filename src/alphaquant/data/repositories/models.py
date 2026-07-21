@@ -74,6 +74,7 @@ class OptionChainEodRow(Base):
     open_interest: Mapped[int] = mapped_column(BigInteger, default=0)
     oi_change: Mapped[int] = mapped_column(BigInteger, default=0)
     underlying_close: Mapped[Decimal | None] = mapped_column(PRICE)
+    lot_size: Mapped[int] = mapped_column(BigInteger, default=1)
 
 
 class ChainSnapshotEntryRow(Base):
@@ -113,6 +114,7 @@ class FutureChainEodRow(Base):
     open_interest: Mapped[int] = mapped_column(BigInteger, default=0)
     oi_change: Mapped[int] = mapped_column(BigInteger, default=0)
     underlying_close: Mapped[Decimal | None] = mapped_column(PRICE)
+    lot_size: Mapped[int] = mapped_column(BigInteger, default=1)
 
 
 class CorporateActionRow(Base):

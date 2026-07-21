@@ -93,6 +93,7 @@ def parse_bhavcopy(
                 open_interest=_as_int(row["OpnIntrst"]),
                 oi_change=_as_int(row["ChngInOpnIntrst"]),
                 underlying_close=_as_decimal(row["UndrlygPric"]),
+                lot_size=_as_int(row["NewBrdLotQty"]),
             )
         )
     logger.info(
@@ -136,6 +137,7 @@ def parse_bhavcopy_futures(
                 open_interest=_as_int(row["OpnIntrst"]),
                 oi_change=_as_int(row["ChngInOpnIntrst"]),
                 underlying_close=_as_decimal(row["UndrlygPric"]),
+                lot_size=_as_int(row["NewBrdLotQty"]),
             )
         )
     logger.info(

@@ -181,6 +181,7 @@ class TestChainRepositories:
                 open_interest=50_000,
                 oi_change=-1200,
                 underlying_close=Decimal("24502.15"),
+                lot_size=75,
             )
 
         rows = [record(24000, "CE"), record(24000, "PE"), record(24100, "CE")]

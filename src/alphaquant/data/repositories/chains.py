@@ -36,6 +36,7 @@ class OptionChainEodRepository:
                     "open_interest",
                     "oi_change",
                     "underlying_close",
+                    "lot_size",
                 )
             },
         )
@@ -98,6 +99,7 @@ def _eod_to_record(row: OptionChainEodRow) -> EodOptionRecord:
         open_interest=row.open_interest,
         oi_change=row.oi_change,
         underlying_close=row.underlying_close,
+        lot_size=row.lot_size,
     )
 
 
