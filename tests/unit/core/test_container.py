@@ -38,6 +38,7 @@ def test_containers_are_isolated() -> None:
 
 
 RUNTIME_ENGINE_ATTRS = (
+    "active_runtime_strategies",
     "heartbeat_monitor",
     "reconnect_manager",
     "risk_engine",
@@ -165,3 +166,22 @@ def test_oms_engine_journal_is_persisted_and_stable_across_containers(
     assert isinstance(first.journal.store, JSONJournalStore)
     assert first.journal.session_id == second.journal.session_id == f"oms-{settings.environment}"
     assert first.journal.store.path == second.journal.store.path
+
+
+def test_active_runtime_strategies_are_wired_from_settings() -> None:
+    container = make_container()
+    strategies = container.active_runtime_strategies
+    assert len(strategies) == 1
+    assert strategies[0].definition.id == "long_contrarian_runtime"
+    assert strategies[0].definition.strategy_type == "long_contrarian"
+
+
+def test_rest_poller_and_orchestrator_share_the_same_strategy_roster() -> None:
+    settings = Settings(_env_file=None, kite={"api_key": "test-key"})  # type: ignore[call-arg]
+    container = Container(settings)
+    assert tuple(s.definition.id for s in container.orchestrator._strategies) == tuple(
+        s.definition.id for s in container.active_runtime_strategies
+    )
+    assert tuple(s.definition.id for s in container.rest_poller._strategies) == tuple(
+        s.definition.id for s in container.active_runtime_strategies
+    )

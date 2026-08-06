@@ -73,6 +73,19 @@ class TestSecrets:
         assert "change-me" not in str(settings.db.password)
 
 
+class TestRuntimeSettings:
+    def test_default_runtime_strategy_roster_is_explicit(self) -> None:
+        settings = make_settings()
+        assert settings.runtime.active_strategy_types == ("long_contrarian",)
+
+    def test_runtime_strategy_roster_loads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(
+            "CEREMYN_RUNTIME__ACTIVE_STRATEGY_TYPES", '["long_contrarian", "long_skew"]'
+        )
+        settings = make_settings()
+        assert settings.runtime.active_strategy_types == ("long_contrarian", "long_skew")
+
+
 class TestRiskSettings:
     def test_risk_defaults_are_available(self) -> None:
         settings = make_settings()

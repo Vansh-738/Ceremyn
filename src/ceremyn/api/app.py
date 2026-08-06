@@ -62,6 +62,10 @@ class SystemStatus(BaseModel):
     configured_mode: str
     effective_mode: str
     live_trading_enabled: bool
+    kite_api_configured: bool
+    kite_access_token_configured: bool
+    active_strategy_ids: tuple[str, ...]
+    runtime_ready: bool
 
 
 def create_app(
@@ -123,12 +127,24 @@ def create_app(
 
     @app.get("/system/status", response_model=SystemStatus)
     def system_status() -> SystemStatus:
+        active_strategy_ids: tuple[str, ...] = ()
+        if container is not None:
+            active_strategy_ids = tuple(
+                strategy.definition.id for strategy in container.active_runtime_strategies
+            )
+        kite_api_configured = bool(settings.kite.api_key)
+        kite_access_token_configured = bool(settings.kite.access_token.get_secret_value())
+        runtime_ready = bool(active_strategy_ids) and kite_api_configured
         return SystemStatus(
             version=ceremyn.__version__,
             environment=settings.environment,
             configured_mode=settings.trading_mode.value,
             effective_mode=settings.effective_mode.value,
             live_trading_enabled=settings.live_trading_enabled,
+            kite_api_configured=kite_api_configured,
+            kite_access_token_configured=kite_access_token_configured,
+            active_strategy_ids=active_strategy_ids,
+            runtime_ready=runtime_ready,
         )
 
     app.include_router(

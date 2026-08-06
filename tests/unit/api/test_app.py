@@ -30,3 +30,17 @@ def test_system_status_defaults() -> None:
     body = client.get("/system/status").json()
     assert body["configured_mode"] == "research"
     assert body["effective_mode"] == "research"
+    assert body["kite_api_configured"] is False
+    assert body["kite_access_token_configured"] is False
+    assert body["active_strategy_ids"] == ["long_contrarian_runtime"]
+    assert body["runtime_ready"] is False
+
+
+def test_system_status_reports_runtime_readiness_when_kite_is_configured() -> None:
+    settings = make_settings(kite={"api_key": "demo-key", "access_token": "token"})
+    client = TestClient(create_app(settings))
+    body = client.get("/system/status").json()
+    assert body["kite_api_configured"] is True
+    assert body["kite_access_token_configured"] is True
+    assert body["active_strategy_ids"] == ["long_contrarian_runtime"]
+    assert body["runtime_ready"] is True

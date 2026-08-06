@@ -6,13 +6,14 @@ never instantiate each other's collaborators; they receive them from here
 """
 
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from ceremyn.config import Settings
 from ceremyn.core.calendar import MarketCalendar
 from ceremyn.core.events import EventBus
+from ceremyn.domain import StrategyDefinition
 
 # Type-checking-only imports: runtime imports inside the properties stay lazy
 # so that importing the container never drags in heavy infra modules.
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
     from ceremyn.research.experiment_store import JSONExperimentStore
     from ceremyn.runtime.orchestrator import RuntimeOrchestrator
     from ceremyn.runtime.rest_poller import RestPricePoller
+    from ceremyn.strategies.base import Strategy
 
 
 class Container:
@@ -333,54 +335,55 @@ class Container:
             reconnect=self.reconnect_manager,
         )
 
+    def _runtime_strategy_definitions(self, *, suffix: str) -> tuple[StrategyDefinition, ...]:
+        underlying = self.settings.data.underlyings[0]
+        seen: set[str] = set()
+        definitions: list[StrategyDefinition] = []
+        for strategy_type in self.settings.runtime.active_strategy_types:
+            if strategy_type in seen:
+                continue
+            seen.add(strategy_type)
+            definitions.append(
+                StrategyDefinition(
+                    id=f"{strategy_type}_{suffix}",
+                    strategy_type=strategy_type,
+                    name=f"{strategy_type.replace('_', ' ').title()} ({suffix})",
+                    underlyings=(underlying,),
+                    params={},
+                )
+            )
+        return tuple(definitions)
+
+    @cached_property
+    def active_runtime_strategies(self) -> tuple["Strategy[Any]", ...]:
+        from ceremyn.strategies import create
+
+        return tuple(
+            create(definition)
+            for definition in self._runtime_strategy_definitions(suffix="runtime")
+        )
+
     @cached_property
     def orchestrator(self) -> "RuntimeOrchestrator":
         from ceremyn.runtime.orchestrator import RuntimeOrchestrator
 
-        # Empty strategies by default — same safe posture as `paper_engine`: which
-        # strategies actually trade is a product decision, not part of runtime wiring.
-        # No streaming client either (no Kite session-auth flow exists yet, see
-        # PROJECT_CONTEXT.md), so the tick consumer stays correctly wired but inert
-        # until both are configured.
+        # No streaming client yet (no Kite session-auth flow exists here), but the
+        # orchestrator now uses the same explicit active-strategy roster the REST
+        # poller uses, so the runtime's intended trading posture is visible and
+        # consistent across both entry paths.
         return RuntimeOrchestrator(
             live_engine=self.live_engine,
             oms_engine=self.oms_engine,
-            strategies=(),
+            strategies=self.active_runtime_strategies,
             poll_interval_seconds=self.settings.runtime.poll_interval_seconds,
         )
 
     @cached_property
     def rest_poller(self) -> "RestPricePoller":
-        from ceremyn.domain import StrategyDefinition
         from ceremyn.runtime.rest_poller import RestPricePoller
-        from ceremyn.strategies import create
 
         underlying = self.settings.data.underlyings[0]
-
-        # Account reset to 40,000 on 2026-07-20 after a session of real bugs
-        # (whole-portfolio position leak across strategies, restart not restoring
-        # portfolio state, orphaned positions left undetected). Every margin-needing
-        # strategy is out at this size: bear_call_spread's own short leg alone needs
-        # ~2.39L (strike x lot_size x margin_ratio), and short_strangle/iron_condor/
-        # short_straddle need more -- none of them clear 40,000. Only long_contrarian
-        # (buys against extreme put-call OI skew, single BUY leg, debit-only: no
-        # margin needed the same way long_strangle doesn't) fits at all, and it's
-        # also the strategy with the most consistent real evidence this session --
-        # net positive across 6mo/12mo/24mo windows on the corrected (real,
-        # per-date) NIFTY lot sizes (2024-2025 was wrongly hardcoded at 65 in the
-        # backtest scripts for 18 of 24 months; the real history is 25 -> 75 -> 65).
-        # Re-add bear_call_spread (or others) once the account has grown past
-        # their real margin needs -- don't just widen the risk limits to force
-        # them to fit; that was exactly the kind of self-inflicted risk gap this
-        # reset is meant to avoid.
-        long_contrarian = StrategyDefinition(
-            id="long_contrarian_paper",
-            strategy_type="long_contrarian",
-            name="Long Contrarian (paper)",
-            underlyings=(underlying,),
-            params={},
-        )
-        strategies = (create(long_contrarian),)
+        strategies = self.active_runtime_strategies
         return RestPricePoller(
             kite_provider=self.kite_provider,
             oms_engine=self.oms_engine,

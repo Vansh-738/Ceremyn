@@ -8,7 +8,7 @@ from datetime import time
 from decimal import Decimal
 from functools import lru_cache
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ceremyn.config.modes import TradingMode
@@ -64,6 +64,18 @@ class RuntimeSettings(BaseModel):
     # Cadence of the orchestrator's maintenance loop: fill polling, heartbeat
     # staleness checks, and reconciliation.
     poll_interval_seconds: float = Field(default=2.0, gt=0)
+    # Strategies intentionally active in the day-to-day runtime. Kept explicit here
+    # so the platform does something useful by default, but only with a small,
+    # operator-auditable roster.
+    active_strategy_types: tuple[str, ...] = ("long_contrarian",)
+
+    @field_validator("active_strategy_types", mode="before")
+    @classmethod
+    def _parse_strategy_types(cls, value: object) -> object:
+        if isinstance(value, str):
+            items = tuple(part.strip() for part in value.split(",") if part.strip())
+            return items or ("long_contrarian",)
+        return value
 
 
 class PortfolioSettings(BaseModel):
