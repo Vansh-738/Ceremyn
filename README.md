@@ -55,21 +55,36 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pip install --no-deps -e .
 
-# 4. Run the API
-.venv/bin/uvicorn ceremyn.api.main:app --reload
+# 4. Pick your active runtime strategy roster in .env
+# CEREMYN_RUNTIME__ACTIVE_STRATEGY_TYPES=["long_contrarian"]
+
+# 5. Daily-use checks
+./scripts/ceremyn.sh doctor
+
+# 6. Start Ceremyn locally
+./scripts/ceremyn.sh start
 # http://127.0.0.1:8000/health          -> {"status": "ok"}
 # http://127.0.0.1:8000/system/status   -> mode & gate status
+# http://127.0.0.1:8000/dashboard/      -> main UI
+```
+
+For day-to-day use, prefer the operator wrapper instead of raw `uvicorn`:
+
+```bash
+./scripts/ceremyn.sh status
+./scripts/ceremyn.sh logs
+./scripts/ceremyn.sh restart
+./scripts/ceremyn.sh open
 ```
 
 Or run everything in Docker: `docker compose up --build`.
 
-**Running unattended (macOS):** the two commands above only run in your current
-terminal/foreground session and won't survive a reboot or crash. For a paper-trading
-setup you want left running, use `scripts/install_service.sh` instead — it installs a
-macOS LaunchAgent that starts the dashboard on login and restarts it automatically if
-it ever crashes. Remove it with `scripts/uninstall_service.sh`. Once installed, manage
-it via `launchctl` (or the uninstall script), not `scripts/stop_dashboard.sh` — that
-script talks to the process directly and launchd would just restart it underneath you.
+**Running unattended (macOS):** if you want Ceremyn available every day without
+manually starting it, use `./scripts/ceremyn.sh install`. That installs a macOS
+LaunchAgent which starts Ceremyn on login and restarts it automatically if it crashes.
+Remove it with `./scripts/ceremyn.sh uninstall`. Once installed, manage it via
+`launchctl` or the wrapper above rather than `scripts/stop_dashboard.sh`, because a
+LaunchAgent will restart the app after a manual kill.
 
 ## Development
 

@@ -32,3 +32,4 @@ htmlcov/
 /data/
 /logs/
 *.log
+.claude/
