@@ -52,3 +52,21 @@ class EodFutureRecord(BaseModel):
     underlying_close: Decimal | None = None
     # Same NSE per-underlying/periodic-revision caveat as `EodOptionRecord.lot_size`.
     lot_size: int = Field(gt=0)
+
+
+class EodEquityRecord(BaseModel):
+    """One cash-equity's end-of-day row (bhavcopy granularity, `SctySrs == "EQ"`).
+
+    No expiry/strike/lot-size concept -- a plain equity settles T+1 in whole shares.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    trade_date: date
+    tradingsymbol: str = Field(min_length=1)
+    isin: str | None = None
+    open: Decimal | None = None
+    high: Decimal | None = None
+    low: Decimal | None = None
+    close: Decimal | None = None
+    volume: int = Field(default=0, ge=0)

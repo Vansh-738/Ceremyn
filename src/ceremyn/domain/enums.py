@@ -79,3 +79,11 @@ class TimeFrame(StrEnum):
     FIFTEEN_MINUTE = "15minute"
     HOUR = "60minute"
     DAY = "day"
+
+
+class PatternDirection(StrEnum):
+    """What a detected `Pattern` implies about near-term price direction."""
+
+    BULLISH = "bullish"
+    BEARISH = "bearish"
+    NEUTRAL = "neutral"

@@ -8,7 +8,11 @@ import pytest
 
 from ceremyn.core.calendar import MarketCalendar
 from ceremyn.core.exceptions import DataError
-from ceremyn.data.providers.bhavcopy import parse_bhavcopy, parse_bhavcopy_futures
+from ceremyn.data.providers.bhavcopy import (
+    parse_bhavcopy,
+    parse_bhavcopy_equity,
+    parse_bhavcopy_futures,
+)
 from ceremyn.data.records import EodFutureRecord, EodOptionRecord
 from ceremyn.data.services.ingest import BhavcopyIngestService
 
@@ -93,6 +97,37 @@ class TestFutureParser:
     def test_invalid_zip_raises(self) -> None:
         with pytest.raises(DataError, match="zip"):
             parse_bhavcopy_futures(b"not a zip", UNDERLYINGS, TRADE_DATE)
+
+
+class TestEquityParser:
+    def test_keeps_only_eq_series_for_wanted_symbols(self) -> None:
+        records = parse_bhavcopy_equity(fixture_zip(), ("RELIANCE",), TRADE_DATE)
+        # Fixture: 1 STK/EQ RELIANCE row; the STO (stock option) RELIANCE row is a
+        # different FinInstrmTp and must not leak into equity parsing.
+        assert len(records) == 1
+        assert records[0].tradingsymbol == "RELIANCE"
+
+    def test_field_mapping(self) -> None:
+        (record,) = parse_bhavcopy_equity(fixture_zip(), ("RELIANCE",), TRADE_DATE)
+        assert record.trade_date == TRADE_DATE
+        assert record.isin == "INE002A01018"
+        assert record.open == Decimal("1480.5")
+        assert record.high == Decimal("1495.2")
+        assert record.low == Decimal("1472.1")
+        assert record.close == Decimal("1489.25")
+        assert record.volume == 8_234_567
+
+    def test_unwanted_symbol_excluded(self) -> None:
+        records = parse_bhavcopy_equity(fixture_zip(), ("SOMEOTHERSTOCK",), TRADE_DATE)
+        assert records == []
+
+    def test_trade_date_mismatch_raises(self) -> None:
+        with pytest.raises(DataError, match="mismatch"):
+            parse_bhavcopy_equity(fixture_zip(), ("RELIANCE",), date(2025, 7, 10))
+
+    def test_invalid_zip_raises(self) -> None:
+        with pytest.raises(DataError, match="zip"):
+            parse_bhavcopy_equity(b"not a zip", ("RELIANCE",), TRADE_DATE)
 
 
 class FakeClient:

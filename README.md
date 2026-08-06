@@ -95,6 +95,8 @@ src/ceremyn/
 ├── data/        providers (Kite, NSE bhavcopy), repositories, analytics services
 │                (greeks, IV, PCR, OI, IV rank, max pain)
 ├── strategies/  strategy engine: Strategy ABC, registry, built-in strategies
+├── patterns/    read-only market intelligence: Pattern detection (candlestick, via
+│                TA-Lib) + historical hit-rate study -- no path to execution/risk/OMS
 ├── risk/        pre-trade rule pipeline, portfolio-greek limits, kill switch
 ├── backtest/    event-driven backtester, Indian cost model, performance metrics
 ├── execution/   broker protocol, paper broker, Kite broker (gated), OMS

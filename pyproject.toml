@@ -59,7 +59,7 @@ warn_unreachable = true
 show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = ["kiteconnect.*", "apscheduler.*", "scipy.*", "plotly.*"]
+module = ["kiteconnect.*", "apscheduler.*", "scipy.*", "plotly.*", "talib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -207,3 +207,31 @@ name = "Risk cannot import llm"
 type = "forbidden"
 source_modules = ["ceremyn.risk"]
 forbidden_modules = ["ceremyn.llm"]
+
+# `patterns` is read-only market-intelligence discovery (see ROADMAP_V2.md): it may
+# detect and study patterns but must never reach execution/risk/OMS/broker, the same
+# structural guarantee already enforced for `llm`. A `Pattern` has no path to become
+# an order except by a human or a versioned `Strategy` acting on it independently.
+[[tool.importlinter.contracts]]
+name = "Patterns cannot import execution"
+type = "forbidden"
+source_modules = ["ceremyn.patterns"]
+forbidden_modules = ["ceremyn.execution"]
+
+[[tool.importlinter.contracts]]
+name = "Patterns cannot import risk"
+type = "forbidden"
+source_modules = ["ceremyn.patterns"]
+forbidden_modules = ["ceremyn.risk"]
+
+[[tool.importlinter.contracts]]
+name = "Patterns cannot import OMS"
+type = "forbidden"
+source_modules = ["ceremyn.patterns"]
+forbidden_modules = ["ceremyn.oms"]
+
+[[tool.importlinter.contracts]]
+name = "Patterns cannot import broker"
+type = "forbidden"
+source_modules = ["ceremyn.patterns"]
+forbidden_modules = ["ceremyn.broker"]
