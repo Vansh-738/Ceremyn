@@ -46,7 +46,7 @@ class TestMountedDashboard:
             # Professional shell markers (not the old minimal demo).
             assert 'data-theme="dark"' in body
             assert 'class="sidebar"' in body
-            assert "Live Market" in body
+            assert "Markets" in body
             assert "plotly" in body.lower()
 
     def test_dashboard_json_endpoints(self) -> None:
