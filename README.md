@@ -133,7 +133,8 @@ src/ceremyn/
 │                (greeks, IV, PCR, OI, IV rank, max pain)
 ├── strategies/  strategy engine: Strategy ABC, registry, built-in strategies
 ├── patterns/    read-only market intelligence: Pattern detection (candlestick via
-│                TA-Lib, swing-structure Higher-High, Cup-and-Handle chart shape)
+│                TA-Lib; swing structure -- Higher/Lower High/Low; chart shapes --
+│                Cup-and-Handle, Double Top/Bottom, Head-and-Shoulders + Inverse)
 │                + historical hit-rate study -- no path to execution/risk/OMS
 ├── risk/        pre-trade rule pipeline, portfolio-greek limits, kill switch
 ├── backtest/    event-driven backtester, Indian cost model, performance metrics

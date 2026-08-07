@@ -12,6 +12,8 @@ from ceremyn.domain import Candle, Opportunity, Pattern
 from ceremyn.domain.enums import AssetClass
 from ceremyn.patterns.candlestick import detect as detect_candlestick
 from ceremyn.patterns.chart_shape import detect as detect_chart_shapes
+from ceremyn.patterns.double_pattern import detect as detect_double_patterns
+from ceremyn.patterns.head_shoulders import detect as detect_head_shoulders
 from ceremyn.patterns.study import historical_performance
 from ceremyn.patterns.swing import detect as detect_swing
 
@@ -68,6 +70,8 @@ def find_opportunities(
             detect_candlestick(candles, tradingsymbol=symbol)
             + detect_swing(candles, tradingsymbol=symbol)
             + detect_chart_shapes(candles, tradingsymbol=symbol)
+            + detect_double_patterns(candles, tradingsymbol=symbol)
+            + detect_head_shoulders(candles, tradingsymbol=symbol)
         )
         performance = {
             (p.pattern_name, p.direction): p
