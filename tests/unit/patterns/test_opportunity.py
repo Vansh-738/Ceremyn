@@ -45,8 +45,11 @@ class TestFindOpportunities:
 
     def test_recurring_pattern_at_latest_bar_is_surfaced(self) -> None:
         candles = _oscillating("TEST", 60, doji_every=5)
+        # min_hit_rate=0.0 isolates "did the latest-bar mechanic surface DOJI at
+        # all" from the separate hit-rate-quality filter tested below -- DOJI's
+        # own real hit rate here (~0.42) is below the default 0.5 quality bar.
         opportunities = find_opportunities(
-            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10, min_hit_rate=0.0
         )
         assert len(opportunities) > 0
         doji = next(o for o in opportunities if o.pattern_name == "DOJI")
@@ -60,7 +63,7 @@ class TestFindOpportunities:
     def test_results_sorted_by_edge_score_descending(self) -> None:
         candles = _oscillating("TEST", 60, doji_every=5)
         opportunities = find_opportunities(
-            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10, min_hit_rate=0.0
         )
         scores = [o.edge_score for o in opportunities]
         assert scores == sorted(scores, reverse=True)
@@ -68,20 +71,64 @@ class TestFindOpportunities:
     def test_min_occurrences_filters_low_evidence_patterns(self) -> None:
         candles = _oscillating("TEST", 60, doji_every=5)
         loose = find_opportunities(
-            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10, min_hit_rate=0.0
         )
         strict = find_opportunities(
-            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=30
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=30, min_hit_rate=0.0
         )
         assert len(strict) < len(loose)
         assert all(o.occurrences >= 30 for o in strict)
 
+    def test_min_hit_rate_excludes_patterns_no_better_than_a_coin_flip(self) -> None:
+        """A large average move must never make up for an unreliable hit rate --
+        the real fixture here has DOJI at ~42% (below chance) and DOJISTAR at
+        ~56% (above chance); only DOJISTAR should survive the default filter."""
+        candles = _oscillating("TEST", 60, doji_every=5)
+        loose = find_opportunities(
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10, min_hit_rate=0.0
+        )
+        strict = find_opportunities(
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
+        )
+        assert any(o.pattern_name == "DOJI" for o in loose)
+        assert all(o.hit_rate > 0.5 for o in strict)
+        assert not any(o.pattern_name == "DOJI" for o in strict)
+        assert len(strict) < len(loose)
+
     def test_too_few_candles_excluded(self) -> None:
         candles = _oscillating("SHORT", 10, doji_every=5)
         opportunities = find_opportunities(
-            {"SHORT": candles}, {"SHORT": AssetClass.EQUITY}, min_occurrences=1
+            {"SHORT": candles}, {"SHORT": AssetClass.EQUITY}, min_occurrences=1, min_hit_rate=0.0
         )
         assert opportunities == ()
+
+    def test_stale_symbol_excluded_even_if_otherwise_qualifying(self) -> None:
+        """A thinly-traded/suspended symbol whose own last bar is weeks behind the
+        rest of the scan must not be surfaced as if it were a live opportunity --
+        regression for a real symbol (RSSOFTWARE) whose last bhavcopy appearance
+        was ~3.5 months before the scan's newest bar getting ranked as "current"."""
+        fresh = _oscillating("FRESH", 60, doji_every=5)
+        stale = _oscillating("STALE", 40, doji_every=5)  # last bar 20 days behind FRESH
+        opportunities = find_opportunities(
+            {"FRESH": fresh, "STALE": stale},
+            {"FRESH": AssetClass.EQUITY, "STALE": AssetClass.EQUITY},
+            min_occurrences=10,
+            min_hit_rate=0.0,
+        )
+        assert any(o.tradingsymbol == "FRESH" for o in opportunities)
+        assert not any(o.tradingsymbol == "STALE" for o in opportunities)
+
+    def test_max_staleness_days_is_configurable(self) -> None:
+        fresh = _oscillating("FRESH", 60, doji_every=5)
+        stale = _oscillating("STALE", 40, doji_every=5)
+        opportunities = find_opportunities(
+            {"FRESH": fresh, "STALE": stale},
+            {"FRESH": AssetClass.EQUITY, "STALE": AssetClass.EQUITY},
+            min_occurrences=10,
+            min_hit_rate=0.0,
+            max_staleness_days=30,  # wide enough to include STALE's 20-day lag
+        )
+        assert any(o.tradingsymbol == "STALE" for o in opportunities)
 
     def test_multiple_symbols_and_asset_classes_combined_and_ranked_together(self) -> None:
         equity = _oscillating("RELIANCE", 60, doji_every=5)
@@ -90,6 +137,7 @@ class TestFindOpportunities:
             {"RELIANCE": equity, "CRUDEOIL": commodity},
             {"RELIANCE": AssetClass.EQUITY, "CRUDEOIL": AssetClass.COMMODITY},
             min_occurrences=10,
+            min_hit_rate=0.0,
         )
         assert len(opportunities) > 0
         assert all(o.tradingsymbol == "RELIANCE" for o in opportunities)
@@ -97,6 +145,8 @@ class TestFindOpportunities:
 
     def test_unknown_symbol_defaults_asset_class_to_equity(self) -> None:
         candles = _oscillating("MYSTERY", 60, doji_every=5)
-        opportunities = find_opportunities({"MYSTERY": candles}, {}, min_occurrences=10)
+        opportunities = find_opportunities(
+            {"MYSTERY": candles}, {}, min_occurrences=10, min_hit_rate=0.0
+        )
         assert len(opportunities) > 0
         assert all(o.asset_class is AssetClass.EQUITY for o in opportunities)

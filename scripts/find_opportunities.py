@@ -1,7 +1,10 @@
 """Runnable demo: find and rank opportunities across equities AND commodities, live.
 
 Combines two real data sources into one ranked watchlist:
-  - Equities: NSE cash-market bhavcopy (free, no credentials needed).
+  - Equities: NSE cash-market bhavcopy (free, no credentials needed). `--all-equities`
+    scans the whole real listed universe (~2,400 "EQ"-series symbols on a typical day)
+    with exactly ONE bhavcopy download per trading day -- not one download per symbol,
+    which would mean hundreds of thousands of redundant downloads at this scale.
   - Commodities: MCX futures via the operator's own Kite Connect account (real
     market data the account is already entitled to -- requires Kite API key +
     access token in .env, and the account's MCX segment to be enabled).
@@ -13,12 +16,18 @@ is read-only market intelligence (see ARCHITECTURE_DECISIONS.md / ROADMAP_V2.md)
 it ranks what's worth a look, never places or proposes a concrete order.
 
 Usage:
+    # Whole real equity universe, last ~2 months, top 25 shown:
+    .venv/bin/python scripts/find_opportunities.py --start 2026-06-01 --end 2026-08-05 \
+        --all-equities
+
+    # A specific watchlist plus commodities:
     .venv/bin/python scripts/find_opportunities.py --start 2026-02-01 --end 2026-08-05 \
         --equities RELIANCE TCS INFY --commodities CRUDEOIL GOLD SILVER
 """
 
 import argparse
 import asyncio
+from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 
 from ceremyn.config import get_settings
@@ -35,10 +44,11 @@ from ceremyn.patterns import find_opportunities
 CLOSE_TIME = time(15, 30)
 FORWARD_DAYS = 5
 MIN_OCCURRENCES = 10
+DEFAULT_TOP = 25
 
 
 def _equity_candle(symbol: str, trade_date: date, record: EodEquityRecord) -> Candle | None:
-    if record.close is None:
+    if record.close is None or record.close <= 0:
         return None
     return Candle(
         tradingsymbol=symbol,
@@ -52,11 +62,18 @@ def _equity_candle(symbol: str, trade_date: date, record: EodEquityRecord) -> Ca
     )
 
 
-async def fetch_equity_candles(symbol: str, start: date, end: date) -> tuple[Candle, ...]:
+async def fetch_all_equity_candles(
+    start: date, end: date, symbols: set[str] | None = None
+) -> dict[str, tuple[Candle, ...]]:
+    """One bhavcopy download per trading day; every wanted symbol's candle history
+    is built from that same single pass. `symbols=None` scans the entire real
+    listed equity universe found in each day's file, not a hand-picked list.
+    """
     calendar = MarketCalendar()
     client = EquityBhavcopyClient()
-    candles: list[Candle] = []
+    accumulator: dict[str, list[Candle]] = defaultdict(list)
     day = start
+    days_fetched = 0
     while day <= end:
         if calendar.is_trading_day(day):
             try:
@@ -64,12 +81,17 @@ async def fetch_equity_candles(symbol: str, start: date, end: date) -> tuple[Can
             except DataError:
                 pass
             else:
-                for record in parse_bhavcopy_equity(payload, (symbol,), day):
-                    candle = _equity_candle(symbol, day, record)
+                days_fetched += 1
+                for record in parse_bhavcopy_equity(payload, symbols, day):
+                    candle = _equity_candle(record.tradingsymbol, day, record)
                     if candle is not None:
-                        candles.append(candle)
+                        accumulator[record.tradingsymbol].append(candle)
         day += timedelta(days=1)
-    return tuple(candles)
+    print(
+        f"Equities: {days_fetched} trading day(s) downloaded, "
+        f"{len(accumulator)} symbol(s) with data (NSE bhavcopy)"
+    )
+    return {symbol: tuple(candles) for symbol, candles in accumulator.items()}
 
 
 async def fetch_commodity_candles(
@@ -91,15 +113,20 @@ async def fetch_commodity_candles(
     )
 
 
-def _print_ranked(opportunities: tuple[Opportunity, ...]) -> None:
+def _print_ranked(opportunities: tuple[Opportunity, ...], *, top: int, total_scanned: int) -> None:
     if not opportunities:
         print("No opportunities cleared the minimum-evidence bar in this window.")
         return
+    shown = opportunities[:top]
     print(
-        f"\n{'RANK':<5}{'SYMBOL':<14}{'ASSET':<11}{'PATTERN':<20}{'DIR':<9}"
+        f"\n{len(opportunities)} opportunit{'y' if len(opportunities) == 1 else 'ies'} found "
+        f"across {total_scanned} symbol(s) scanned -- top {len(shown)} shown:\n"
+    )
+    print(
+        f"{'RANK':<5}{'SYMBOL':<14}{'ASSET':<11}{'PATTERN':<20}{'DIR':<9}"
         f"{'HIT%':>7}{'AVG MOVE':>10}{'N':>5}"
     )
-    for i, o in enumerate(opportunities, start=1):
+    for i, o in enumerate(shown, start=1):
         print(
             f"{i:<5}{o.tradingsymbol:<14}{o.asset_class.value:<11}{o.pattern_name:<20}"
             f"{o.direction.value:<9}{o.hit_rate * 100:>6.0f}%{o.average_forward_return_pct:>+9.1f}%"
@@ -107,15 +134,22 @@ def _print_ranked(opportunities: tuple[Opportunity, ...]) -> None:
         )
 
 
-async def main(equities: list[str], commodities: list[str], start: date, end: date) -> None:
+async def main(
+    equities: list[str],
+    all_equities: bool,
+    commodities: list[str],
+    start: date,
+    end: date,
+    top: int,
+) -> None:
     candles_by_symbol: dict[str, tuple[Candle, ...]] = {}
     asset_class_by_symbol: dict[str, AssetClass] = {}
 
-    for symbol in equities:
-        candles = await fetch_equity_candles(symbol, start, end)
-        print(f"{symbol}: {len(candles)} equity trading day(s) fetched (NSE bhavcopy)")
-        if candles:
-            candles_by_symbol[symbol] = candles
+    if all_equities or equities:
+        wanted = None if all_equities else set(equities)
+        equity_candles = await fetch_all_equity_candles(start, end, symbols=wanted)
+        candles_by_symbol.update(equity_candles)
+        for symbol in equity_candles:
             asset_class_by_symbol[symbol] = AssetClass.EQUITY
 
     if commodities:
@@ -142,14 +176,14 @@ async def main(equities: list[str], commodities: list[str], start: date, end: da
         forward_days=FORWARD_DAYS,
         min_occurrences=MIN_OCCURRENCES,
     )
-    _print_ranked(opportunities)
+    _print_ranked(opportunities, top=top, total_scanned=len(candles_by_symbol))
     if opportunities:
-        top = opportunities[0]
+        best = opportunities[0]
         print(
-            f"\nTop-ranked: {top.tradingsymbol} {top.pattern_name} ({top.direction.value}), "
-            f"detected {to_ist(top.detected_at):%Y-%m-%d} -- historically {top.hit_rate:.0%} hit "
-            f"rate, {top.average_forward_return_pct:+.1f}% avg move over {FORWARD_DAYS} days "
-            f"across {top.occurrences} past occurrences. Not investment advice."
+            f"\nTop-ranked: {best.tradingsymbol} {best.pattern_name} ({best.direction.value}), "
+            f"detected {to_ist(best.detected_at):%Y-%m-%d} -- historically {best.hit_rate:.0%} "
+            f"hit rate, {best.average_forward_return_pct:+.1f}% avg move over {FORWARD_DAYS} days "
+            f"across {best.occurrences} past occurrences. Not investment advice."
         )
 
 
@@ -157,7 +191,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start", type=date.fromisoformat, required=True)
     parser.add_argument("--end", type=date.fromisoformat, required=True)
-    parser.add_argument("--equities", nargs="*", default=[])
+    parser.add_argument("--equities", nargs="*", default=[], help="specific tradingsymbols to scan")
+    parser.add_argument(
+        "--all-equities",
+        action="store_true",
+        help="scan the entire real NSE equity universe instead of a hand-picked list",
+    )
     parser.add_argument("--commodities", nargs="*", default=[])
+    parser.add_argument(
+        "--top", type=int, default=DEFAULT_TOP, help="how many ranked results to print"
+    )
     args = parser.parse_args()
-    asyncio.run(main(args.equities, args.commodities, args.start, args.end))
+    asyncio.run(
+        main(args.equities, args.all_equities, args.commodities, args.start, args.end, args.top)
+    )

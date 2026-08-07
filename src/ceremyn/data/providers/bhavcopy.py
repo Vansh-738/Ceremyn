@@ -179,17 +179,22 @@ def parse_bhavcopy_futures(
 
 
 def parse_bhavcopy_equity(
-    zip_bytes: bytes, tradingsymbols: Iterable[str], trade_date: date
+    zip_bytes: bytes, tradingsymbols: Iterable[str] | None, trade_date: date
 ) -> list[EodEquityRecord]:
     """Extract cash-equity rows for `tradingsymbols` from a CM bhavcopy zip
-    (`EquityBhavcopyClient.download`) -- a separate file from the F&O one."""
+    (`EquityBhavcopyClient.download`) -- a separate file from the F&O one.
+
+    `tradingsymbols=None` returns every "EQ"-series row in the file (the whole
+    day's ~2,400 listed equities) -- for scanning the full market in one pass
+    per day, rather than downloading the same file once per symbol wanted.
+    """
     frame = _read_csv_from_zip(zip_bytes)
-    wanted = set(tradingsymbols)
     filtered = frame.filter(
-        (pl.col("FinInstrmTp") == _EQUITY_INSTRUMENT_TYPE)
-        & (pl.col("SctySrs") == _EQUITY_SERIES)
-        & pl.col("TckrSymb").is_in(wanted)
+        (pl.col("FinInstrmTp") == _EQUITY_INSTRUMENT_TYPE) & (pl.col("SctySrs") == _EQUITY_SERIES)
     )
+    if tradingsymbols is not None:
+        wanted = set(tradingsymbols)
+        filtered = filtered.filter(pl.col("TckrSymb").is_in(wanted))
 
     records: list[EodEquityRecord] = []
     for row in filtered.iter_rows(named=True):

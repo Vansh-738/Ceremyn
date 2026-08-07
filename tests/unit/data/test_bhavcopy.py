@@ -121,6 +121,13 @@ class TestEquityParser:
         records = parse_bhavcopy_equity(fixture_zip(), ("SOMEOTHERSTOCK",), TRADE_DATE)
         assert records == []
 
+    def test_none_returns_every_eq_series_row(self) -> None:
+        # Fixture has exactly 1 STK/EQ row (RELIANCE) among IDO/STO/IDF rows for
+        # other segments -- None must return all EQ rows, not require a symbol list.
+        records = parse_bhavcopy_equity(fixture_zip(), None, TRADE_DATE)
+        assert len(records) == 1
+        assert records[0].tradingsymbol == "RELIANCE"
+
     def test_trade_date_mismatch_raises(self) -> None:
         with pytest.raises(DataError, match="mismatch"):
             parse_bhavcopy_equity(fixture_zip(), ("RELIANCE",), date(2025, 7, 10))
