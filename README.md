@@ -77,10 +77,19 @@ repeated NSE bhavcopy fetch, so it shouldn't run implicitly. Turn it on in `.env
 
 ```bash
 CEREMYN_OPPORTUNITIES__SCAN_ENABLED=true
-# Optional: scan the whole real listed equity universe (~2,400+ symbols) instead of
-# the small built-in watchlist. Same network cost, much more CPU time per scan.
-CEREMYN_OPPORTUNITIES__SCAN_ALL_EQUITIES=true
+# watchlist | nifty500 (default) | all_equities -- see .env.example for what each means
+CEREMYN_OPPORTUNITIES__UNIVERSE=nifty500
 ```
+
+**Universe defaults to NIFTY 500, not the raw full listing.** A plain "every listed
+symbol" scan surfaces thin, easily-manipulated micro-caps at the top of the ranking —
+a stock with a wild average move on 10-15 historical occurrences is often just an
+illiquid penny stock, not a real edge. `nifty500` restricts the scan to NSE's own
+published constituent list (established, index-vetted companies), and a second,
+independent liquidity floor (`CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER`, default
+₹1 crore/day average traded value) is applied on top of that — thin daily turnover,
+not nominal market cap, is what actually makes a stock cheap to move. `all_equities`
+is still available as an explicit opt-out for anyone who wants the unfiltered universe.
 
 It then runs as a background task (never blocking the dashboard/WebSocket), once at
 startup and every `CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS` (default 6) after that —

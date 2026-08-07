@@ -8,6 +8,7 @@ equity universe found in each day's file rather than a hand-picked list.
 
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 import structlog
 
@@ -63,3 +64,25 @@ async def fetch_all_equity_candles(
         day += timedelta(days=1)
     logger.info("equity_history_fetched", days_fetched=days_fetched, symbols_found=len(accumulator))
     return {symbol: tuple(candles) for symbol, candles in accumulator.items()}
+
+
+def filter_by_min_avg_turnover(
+    candles_by_symbol: dict[str, tuple[Candle, ...]], min_avg_daily_turnover: Decimal
+) -> dict[str, tuple[Candle, ...]]:
+    """Keep only symbols whose average daily traded value (close price x volume)
+    over the fetched history meets `min_avg_daily_turnover`.
+
+    A liquidity floor, not a market-cap one: thin daily turnover is what makes a
+    stock cheap to move with a small amount of money, regardless of how large
+    its nominal market cap is. Applied on top of an already-fetched history, so
+    it costs no extra network I/O.
+    """
+    kept: dict[str, tuple[Candle, ...]] = {}
+    for symbol, candles in candles_by_symbol.items():
+        if not candles:
+            continue
+        total_turnover = sum((c.close * c.volume for c in candles), Decimal(0))
+        avg_turnover = total_turnover / len(candles)
+        if avg_turnover >= min_avg_daily_turnover:
+            kept[symbol] = candles
+    return kept

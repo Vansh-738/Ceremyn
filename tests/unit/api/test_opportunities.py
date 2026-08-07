@@ -1,7 +1,8 @@
 """Full HTTP flow for the read-only opportunities router (`api/opportunities.py`).
-No database or real network fetch is needed -- `fetch_all_equity_candles` and
-`find_opportunities` are monkeypatched so this only verifies the router's own
-wiring/serialization, not pattern-detection correctness (already covered by
+No database or real network fetch is needed -- `fetch_all_equity_candles`,
+`fetch_index_constituents`, and `find_opportunities` are monkeypatched so this
+only verifies the router's own wiring/universe-selection/serialization, not
+pattern-detection correctness (already covered by
 tests/unit/patterns/test_opportunity.py). The background periodic scan itself
 is exercised by calling `run_scan_once` directly, the same way
 `run_periodic_scan` would -- no real network I/O and no sleeping.
@@ -39,15 +40,18 @@ def make_opportunity(tradingsymbol: str = "RELIANCE") -> Opportunity:
     )
 
 
-def _dummy_candle() -> Candle:
+def _dummy_candle(
+    symbol: str = "RELIANCE", *, close: float = 1489.25, volume: int = 1_000_000
+) -> Candle:
     return Candle(
-        tradingsymbol="RELIANCE",
+        tradingsymbol=symbol,
         timeframe=TimeFrame.DAY,
         timestamp=datetime(2026, 8, 7, tzinfo=UTC),
-        open=Decimal("1480"),
-        high=Decimal("1495"),
-        low=Decimal("1470"),
-        close=Decimal("1489.25"),
+        open=Decimal(str(close)),
+        high=Decimal(str(close)),
+        low=Decimal(str(close)),
+        close=Decimal(str(close)),
+        volume=volume,
     )
 
 
@@ -84,7 +88,7 @@ class TestListEquityOpportunities:
             "find_opportunities",
             lambda *a, **k: (make_opportunity("RELIANCE"), make_opportunity("TCS")),
         )
-        await opportunities_module.run_scan_once(OpportunitiesSettings())
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="watchlist"))
 
         with TestClient(create_app(make_settings())) as client:
             response = client.get("/opportunities/equity")
@@ -108,7 +112,7 @@ class TestListEquityOpportunities:
             "find_opportunities",
             lambda *a, **k: tuple(make_opportunity(f"SYM{i}") for i in range(5)),
         )
-        await opportunities_module.run_scan_once(OpportunitiesSettings())
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="watchlist"))
 
         with TestClient(create_app(make_settings())) as client:
             response = client.get("/opportunities/equity?limit=2")
@@ -124,7 +128,9 @@ class TestListEquityOpportunities:
             raise RuntimeError("NSE is down")
 
         monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", failing_fetch)
-        await opportunities_module.run_scan_once(OpportunitiesSettings())  # must not raise
+        await opportunities_module.run_scan_once(
+            OpportunitiesSettings(universe="watchlist")
+        )  # must not raise
 
         with TestClient(create_app(make_settings())) as client:
             response = client.get("/opportunities/equity")
@@ -136,3 +142,83 @@ class TestListEquityOpportunities:
         with TestClient(create_app(make_settings())) as client:
             response = client.post("/opportunities/equity")
         assert response.status_code == 405
+
+
+class TestScanUniverseSelection:
+    async def test_watchlist_universe_uses_the_built_in_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        async def capturing_fetch(
+            start: object, end: object, symbols: object = None
+        ) -> dict[str, tuple[Candle, ...]]:
+            seen.append(symbols)
+            return {}
+
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", capturing_fetch)
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="watchlist"))
+
+        assert seen == [set(opportunities_module.WATCHLIST)]
+
+    async def test_all_equities_universe_passes_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        seen: list[object] = []
+
+        async def capturing_fetch(
+            start: object, end: object, symbols: object = None
+        ) -> dict[str, tuple[Candle, ...]]:
+            seen.append(symbols)
+            return {}
+
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", capturing_fetch)
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="all_equities"))
+
+        assert seen == [None]
+
+    async def test_nifty500_universe_fetches_index_constituents(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        seen: list[object] = []
+
+        async def capturing_fetch(
+            start: object, end: object, symbols: object = None
+        ) -> dict[str, tuple[Candle, ...]]:
+            seen.append(symbols)
+            return {}
+
+        async def fake_index(index: str) -> frozenset[str]:
+            assert index == "nifty500"
+            return frozenset({"RELIANCE", "TCS"})
+
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", capturing_fetch)
+        monkeypatch.setattr(opportunities_module, "fetch_index_constituents", fake_index)
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="nifty500"))
+
+        assert seen == [{"RELIANCE", "TCS"}]
+
+
+class TestTurnoverFilterIntegration:
+    async def test_thin_symbols_are_excluded_before_ranking(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async def fetch_liquid_and_thin(
+            start: object, end: object, symbols: object = None
+        ) -> dict[str, tuple[Candle, ...]]:
+            return {
+                "LIQUID": (_dummy_candle("LIQUID", close=1000.0, volume=1_000_000),),  # 100cr
+                "THIN": (_dummy_candle("THIN", close=10.0, volume=10),),  # 100
+            }
+
+        seen_symbols: list[object] = []
+
+        def capturing_find(candles_by_symbol: dict, asset_class_by_symbol: dict) -> tuple:  # type: ignore[type-arg]
+            seen_symbols.append(set(candles_by_symbol))
+            return ()
+
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", fetch_liquid_and_thin)
+        monkeypatch.setattr(opportunities_module, "find_opportunities", capturing_find)
+        await opportunities_module.run_scan_once(
+            OpportunitiesSettings(universe="watchlist", min_avg_daily_turnover=Decimal("10000000"))
+        )
+
+        assert seen_symbols == [{"LIQUID"}]

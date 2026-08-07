@@ -3,6 +3,8 @@
 These are the most important tests in M0: they pin down the safety defaults.
 """
 
+from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
@@ -105,16 +107,31 @@ class TestOpportunitiesSettings:
     def test_scan_disabled_by_default(self) -> None:
         settings = make_settings()
         assert settings.opportunities.scan_enabled is False
-        assert settings.opportunities.scan_all_equities is False
+
+    def test_default_universe_is_nifty500_not_raw_full_list(self) -> None:
+        # Default must be the index-vetted universe, not "all_equities" -- a raw
+        # full-universe scan surfaces thin, easily-manipulated penny stocks.
+        settings = make_settings()
+        assert settings.opportunities.universe == "nifty500"
+
+    def test_default_turnover_floor_is_positive(self) -> None:
+        settings = make_settings()
+        assert settings.opportunities.min_avg_daily_turnover > 0
 
     def test_loads_from_nested_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_ENABLED", "true")
-        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_ALL_EQUITIES", "true")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__UNIVERSE", "all_equities")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER", "50000000")
         monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS", "3")
         settings = make_settings()
         assert settings.opportunities.scan_enabled is True
-        assert settings.opportunities.scan_all_equities is True
+        assert settings.opportunities.universe == "all_equities"
+        assert settings.opportunities.min_avg_daily_turnover == Decimal("50000000")
         assert settings.opportunities.scan_interval_hours == pytest.approx(3.0)
+
+    def test_invalid_universe_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            make_settings(opportunities={"universe": "nasdaq100"})
 
 
 def test_get_settings_is_cached() -> None:

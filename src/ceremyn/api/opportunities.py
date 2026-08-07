@@ -19,16 +19,18 @@ from pydantic import BaseModel
 
 from ceremyn.config import OpportunitiesSettings
 from ceremyn.core.timeutils import now_utc, to_ist
-from ceremyn.data.services.equity_history import fetch_all_equity_candles
+from ceremyn.data.providers.nse_indices import fetch_index_constituents
+from ceremyn.data.services.equity_history import (
+    fetch_all_equity_candles,
+    filter_by_min_avg_turnover,
+)
 from ceremyn.domain import Opportunity
 from ceremyn.domain.enums import AssetClass
 from ceremyn.patterns import find_opportunities
 
 logger = structlog.get_logger(__name__)
 
-# A small, liquid, known-good watchlist, used unless scan_all_equities is set --
-# a full-universe scan is much slower (same one-download-per-day network cost,
-# but CPU-bound detection across ~2,400 symbols instead of a handful).
+# A small, liquid, known-good watchlist -- only used when universe="watchlist".
 WATCHLIST = frozenset(
     {"RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "TATAMOTORS", "LT"}
 )
@@ -76,6 +78,16 @@ def _to_view(o: Opportunity) -> OpportunityView:
     )
 
 
+async def _scan_universe(settings: OpportunitiesSettings) -> set[str] | None:
+    """Which symbols to fetch, per `settings.universe`. None means "every listed
+    symbol" (only for the explicit "all_equities" opt-in)."""
+    if settings.universe == "watchlist":
+        return set(WATCHLIST)
+    if settings.universe == "nifty500":
+        return set(await fetch_index_constituents("nifty500"))
+    return None
+
+
 async def run_scan_once(settings: OpportunitiesSettings) -> None:
     """One full scan, storing its result for the endpoint to serve. Errors are
     logged and swallowed -- a failed scan must not crash the background loop or
@@ -86,8 +98,13 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
     try:
         end = to_ist(now_utc()).date()
         start = end - timedelta(days=settings.lookback_days)
-        symbols = None if settings.scan_all_equities else set(WATCHLIST)
+        symbols = await _scan_universe(settings)
         candles_by_symbol = await fetch_all_equity_candles(start, end, symbols=symbols)
+        # A liquidity floor within the chosen universe -- thin daily turnover is
+        # what makes a stock cheap to move, even one that's index-vetted.
+        candles_by_symbol = filter_by_min_avg_turnover(
+            candles_by_symbol, settings.min_avg_daily_turnover
+        )
         asset_class_by_symbol = dict.fromkeys(candles_by_symbol, AssetClass.EQUITY)
         # find_opportunities is CPU-bound (no I/O) -- run it off the event loop so
         # a whole-universe scan doesn't freeze every other request for minutes.
