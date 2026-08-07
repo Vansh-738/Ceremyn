@@ -26,6 +26,7 @@ from ceremyn.api.execution import build_execution_router
 from ceremyn.api.llm import build_llm_router
 from ceremyn.api.llm_runtime import build_assistant
 from ceremyn.api.runtime import build_dashboard_sources
+from ceremyn.api.trading import build_trading_router
 from ceremyn.config import Settings, get_settings
 from ceremyn.core.container import Container
 from ceremyn.core.logging import configure_logging
@@ -39,6 +40,7 @@ from ceremyn.dashboard.websocket import ConnectionManager
 DASHBOARD_PREFIX = "/dashboard"
 EXECUTION_PREFIX = "/execution"
 LLM_PREFIX = "/llm"
+TRADING_PREFIX = "/trading"
 
 
 class _FrameSink:
@@ -167,6 +169,10 @@ def create_app(
             ),
             prefix=LLM_PREFIX,
         )
+        # The one place outside a Strategy that may submit a Signal -- still gated by
+        # the exact same RiskEngine/GatedBrokerAdapter every strategy-emitted signal
+        # goes through (see ceremyn.api.trading's own docstring).
+        app.include_router(build_trading_router(container), prefix=TRADING_PREFIX)
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
     app.state.dashboard_service = service

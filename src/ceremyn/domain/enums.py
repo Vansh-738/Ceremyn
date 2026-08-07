@@ -35,8 +35,9 @@ class Side(StrEnum):
 class ProductType(StrEnum):
     """Broker product type (Kite semantics)."""
 
-    NRML = "NRML"  # overnight / carry-forward
+    NRML = "NRML"  # F&O overnight / carry-forward
     MIS = "MIS"  # intraday, auto square-off
+    CNC = "CNC"  # cash-and-carry: equity delivery, held beyond the trading day
 
 
 class OrderType(StrEnum):

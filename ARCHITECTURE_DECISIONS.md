@@ -95,3 +95,23 @@ documented, account-size-driven decision (see the inline comment on
 additional strategies be added to the live roster?
 
 Not actioned: this is a trading/risk decision, not a code cleanup.
+
+---
+
+## 5. `SimulatedBroker` only simulates fills against the option-chain cache
+
+`broker.simulated.SimulatedBroker._build_context` builds its fill quotes purely
+from `LiveDataCache.latest_chain(underlying)` — an option-chain snapshot. Since
+`api/trading.py`'s manual-trade endpoint (see git history around
+`feat(api): manual equity trade submission`) now lets a plain equity `Signal`
+reach the OMS, a paper-mode equity order is risk-validated and submitted
+correctly but has no quote to fill against, so it sits open indefinitely
+instead of auto-filling the way an option order does.
+
+**Open question:** wire a live equity quote source (e.g. `KiteProvider.quotes()`,
+already generic) into `SimulatedBroker`'s fill context, or accept that equity
+paper trades only resolve once live trading is armed?
+
+Not actioned: extending the fill simulator is more invasive than the trade-
+submission path itself, and reasonable people could want either answer
+depending on how much paper-trading fidelity equities need before going live.

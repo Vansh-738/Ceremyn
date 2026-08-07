@@ -41,6 +41,28 @@ If any gate is missing, the platform degrades to **paper** mode. Additional inva
 
 Set via `CEREMYN_TRADING_MODE` (default: `research`).
 
+## Placing a manual trade
+
+`POST /trading/equity` submits one specific equity order you choose — `tradingsymbol`,
+`side`, `quantity`, `reference_price` (required: an equity has no static price the way
+an option has a strike, so there is no safe default). It goes through the *exact same*
+`RiskEngine`/`GatedBrokerAdapter` pipeline a strategy's own signal does — paper unless
+all three live-trading gates above are open. This is the one endpoint outside a
+`Strategy` that may submit an order; it never decides *what* to trade, only submits
+what you explicitly asked for.
+
+```bash
+curl -X POST localhost:8000/trading/equity -H 'Content-Type: application/json' -d '{
+  "tradingsymbol": "RELIANCE", "side": "BUY", "quantity": 10, "reference_price": "1489.25"
+}'
+```
+
+**Known gap:** in paper/simulated mode, fills are currently only simulated against the
+live *option-chain* cache (`broker.simulated.SimulatedBroker._build_context`) — an
+equity order is risk-validated and submitted correctly, but may sit open rather than
+auto-filling until a live equity quote feed is wired into the simulator. Live orders
+(once armed) go straight to Kite and fill for real, unaffected by this.
+
 ## Quickstart
 
 ```bash
