@@ -67,6 +67,8 @@ const PAGE_IDS=PAGES.map(p=>p[0]);
 const labelFor=(id)=>{const p=PAGES.find(p=>p[0]===id);return p?p[1]:'Overview';};
 const pageFromHash=()=>{const h=location.hash.replace('#','');return PAGE_IDS.includes(h)?h:'overview';};
 let active=pageFromHash(); let logFilter="all"; let logSearch="";
+let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",product:"CNC"};
+let tradeBusy=false; let tradeMsg=null;
 
 const $=(id)=>document.getElementById(id);
 const fmtNum=(v,d=2)=>Number(v??0).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -305,12 +307,71 @@ function expBody(e){const by=e.by_underlying||{};const keys=Object.keys(by);
  const max=Math.max(...keys.map(k=>Math.abs(by[k])),1);
  return `<div class="kv">`+keys.map(k=>`<div class="row"><span class="k" style="flex:1">${k}${bar(Math.abs(by[k])/max*100)}</span>
   <span class="v">${money(by[k])}</span></div>`).join('')+`</div>`;}
+function tradeFormCard(){
+ const mode=(state.sys&&state.sys.effective_mode)||'paper';
+ return card('Place Manual Trade',`
+  <div class="grid cols-2" style="gap:10px 14px">
+   <div><label class="k" style="display:block;margin-bottom:4px">Symbol</label>
+    <input class="input" id="tradeSymbol" placeholder="e.g. RELIANCE" value="${tradeForm.symbol}"/></div>
+   <div><label class="k" style="display:block;margin-bottom:4px">Side</label>
+    <select class="input" id="tradeSide">
+     <option value="BUY" ${tradeForm.side==='BUY'?'selected':''}>BUY</option>
+     <option value="SELL" ${tradeForm.side==='SELL'?'selected':''}>SELL</option>
+    </select></div>
+   <div><label class="k" style="display:block;margin-bottom:4px">Quantity</label>
+    <input class="input" id="tradeQty" type="number" min="1" step="1" placeholder="10" value="${tradeForm.quantity}"/></div>
+   <div><label class="k" style="display:block;margin-bottom:4px">Reference price (₹)</label>
+    <input class="input" id="tradePrice" type="number" min="0" step="0.05" placeholder="1489.25" value="${tradeForm.price}"/></div>
+   <div><label class="k" style="display:block;margin-bottom:4px">Product</label>
+    <select class="input" id="tradeProduct">
+     <option value="CNC" ${tradeForm.product==='CNC'?'selected':''}>CNC — delivery</option>
+     <option value="MIS" ${tradeForm.product==='MIS'?'selected':''}>MIS — intraday</option>
+    </select></div>
+  </div>
+  <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+   <button class="pill on" id="tradeSubmitBtn" style="padding:8px 18px"${tradeBusy?' disabled':''}>${tradeBusy?'Submitting…':'Submit order'}</button>
+   <span style="font-size:11.5px;color:var(--muted)">Routes through the same risk engine as every strategy · mode: <b>${mode}</b></span>
+  </div>
+  ${tradeMsg?`<div class="sub ${tradeMsg.ok?'pos':'neg'}" style="margin-top:10px">${tradeMsg.text}</div>`:''}`);
+}
+function wireTradeForm(){
+ const sy=$("tradeSymbol");if(sy)sy.oninput=(e)=>{tradeForm.symbol=e.target.value;};
+ const sd=$("tradeSide");if(sd)sd.onchange=(e)=>{tradeForm.side=e.target.value;};
+ const qt=$("tradeQty");if(qt)qt.oninput=(e)=>{tradeForm.quantity=e.target.value;};
+ const pr=$("tradePrice");if(pr)pr.oninput=(e)=>{tradeForm.price=e.target.value;};
+ const pd=$("tradeProduct");if(pd)pd.onchange=(e)=>{tradeForm.product=e.target.value;};
+ const sb=$("tradeSubmitBtn");if(sb)sb.onclick=submitTrade;
+}
+function submitTrade(){
+ const symbol=(tradeForm.symbol||'').trim().toUpperCase();
+ const qty=parseInt(tradeForm.quantity,10);
+ const price=parseFloat(tradeForm.price);
+ if(!symbol){tradeMsg={ok:false,text:'Enter a trading symbol.'};render();return;}
+ if(!qty||qty<=0){tradeMsg={ok:false,text:'Quantity must be a positive whole number.'};render();return;}
+ if(!price||price<=0){tradeMsg={ok:false,text:'Reference price must be greater than zero.'};render();return;}
+ const mode=(state.sys&&state.sys.effective_mode)||'paper';
+ if(!confirm(`Submit ${tradeForm.side} ${qty} ${symbol} @ ₹${price} (${tradeForm.product}) in ${mode.toUpperCase()} mode?`))return;
+ tradeBusy=true;tradeMsg=null;render();
+ fetch('/trading/equity',{method:'POST',
+  headers:Object.assign({'Content-Type':'application/json'},TOKEN?{Authorization:'Bearer '+TOKEN}:{}),
+  body:JSON.stringify({tradingsymbol:symbol,side:tradeForm.side,quantity:qty,
+   reference_price:String(price),product:tradeForm.product})
+ }).then(async(r)=>{
+  const body=await r.json().catch(()=>null);
+  if(r.ok){const first=(body&&body[0])||{};
+    tradeMsg={ok:true,text:`Submitted — ${first.execution_state||'accepted'} (order ${first.oms_order_id||'—'})`};
+    tradeForm.quantity='';tradeForm.price='';}
+  else{tradeMsg={ok:false,text:(body&&body.detail)||`Request failed (${r.status})`};}
+ }).catch(()=>{tradeMsg={ok:false,text:'Network error — could not reach the trading API.'};})
+ .finally(()=>{tradeBusy=false;render();});
+}
 function renderOrders(c){const o=state.orders||{};const rows=o.orders||[];const m=state.oms||{};
  c.innerHTML=`<div class="grid kpis">
   ${kpi('Open',o.open_count??0)}${kpi('Filled',o.filled_count??0,null,'pos')}
   ${kpi('Rejected',o.rejected_count??0,null,(o.rejected_count?'neg':'neu'))}
   ${kpi('Fill Ratio',pct((m.fill_ratio||0)*100))}
   ${kpi('Broker Latency',fmtNum((m.broker_latency_seconds||0)*1000,0)+' ms')}</div>
+  ${tradeFormCard()}
   ${card('Order Book ('+(o.total??0)+')',rows.length?tbl(
     [['Instrument'],['Side'],['Filled / Qty','r'],['State'],['']],
     rows.map(r=>`<tr><td class="num">${r.tradingsymbol}</td>
@@ -328,7 +389,8 @@ function renderOrders(c){const o=state.orders||{};const rows=o.orders||[];const 
      kvrow('Kill switch',`<span class="badge ${m.kill_switch_armed?'red':'green'}">${m.kill_switch_armed?'ARMED':'safe'}</span>`)+
      (m.kill_switch_reason?kvrow('Reason',m.kill_switch_reason):'')+
      kvrow('Reconciliation',`<span class="badge ${m.reconciled?'green':'red'}">${m.reconciled?'clean':'drift '+(m.reconciliation_drift||0)}</span>`)))}
-  </div>`;}
+  </div>`;
+ wireTradeForm();}
 function renderRisk(c){const r=state.risk||{};const pf=state.portfolio||{};const e=pf.exposure||{};
  const decs=r.decisions||[];
  c.innerHTML=`<div class="grid kpis">
