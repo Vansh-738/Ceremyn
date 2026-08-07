@@ -47,7 +47,7 @@ Clean architecture, src layout (`src/ceremyn/`):
 - Logging via `structlog.get_logger(__name__)`; never `print`.
 - Config only via `ceremyn.config.get_settings()`; never read `os.environ`
   elsewhere.
-- Files ≤ 500 lines; split before you exceed it.
+- Files ≤ 800 lines; split before you exceed it.
 - Every module lands with tests. Unit tests in `tests/unit` (mirror src);
   integration tests in `tests/integration`, marked `@pytest.mark.integration`.
 
