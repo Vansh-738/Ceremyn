@@ -63,6 +63,31 @@ equity order is risk-validated and submitted correctly, but may sit open rather 
 auto-filling until a live equity quote feed is wired into the simulator. Live orders
 (once armed) go straight to Kite and fill for real, unaffected by this.
 
+## Finding opportunities
+
+`GET /opportunities/equity` is read-only market intelligence: it runs every pattern
+detector in `ceremyn.patterns` (candlestick, swing structure, Cup-and-Handle, Double
+Top/Bottom, Head-and-Shoulders) and ranks what fired on the latest bar by its own real
+historical hit rate — same guarantee as `ceremyn.patterns` itself, no path to
+execution/risk/OMS. It's what the dashboard's Markets page shows under "Top
+Opportunities."
+
+Off by default (`CEREMYN_OPPORTUNITIES__SCAN_ENABLED=false`) — a real scan is a real,
+repeated NSE bhavcopy fetch, so it shouldn't run implicitly. Turn it on in `.env`:
+
+```bash
+CEREMYN_OPPORTUNITIES__SCAN_ENABLED=true
+# Optional: scan the whole real listed equity universe (~2,400+ symbols) instead of
+# the small built-in watchlist. Same network cost, much more CPU time per scan.
+CEREMYN_OPPORTUNITIES__SCAN_ALL_EQUITIES=true
+```
+
+It then runs as a background task (never blocking the dashboard/WebSocket), once at
+startup and every `CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS` (default 6) after that —
+bhavcopy only updates once per trading day, so scanning more often wouldn't find
+anything new. For a one-off scan from the command line instead, see
+`scripts/find_opportunities.py --all-equities`.
+
 ## Quickstart
 
 ```bash

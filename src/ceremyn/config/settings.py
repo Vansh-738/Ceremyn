@@ -92,6 +92,20 @@ class DataSettings(BaseModel):
     snapshot_interval_minutes: int = 5
 
 
+class OpportunitiesSettings(BaseModel):
+    """Background pattern-opportunity scan (dashboard Markets page). Off by
+    default -- a real scan is a real, repeated NSE bhavcopy fetch across
+    hundreds of trading days, not something to run implicitly (e.g. every time
+    a test spins up an app). Enable explicitly once you actually want it."""
+
+    scan_enabled: bool = False
+    # False = the small built-in liquid watchlist; True = the whole real listed
+    # equity universe (~2,400+ symbols) -- much slower, same one-download-per-day cost.
+    scan_all_equities: bool = False
+    scan_interval_hours: float = Field(default=6.0, gt=0)
+    lookback_days: int = Field(default=400, gt=0)
+
+
 class RiskPositionSettings(BaseModel):
     max_open_positions: int = Field(default=20, gt=0)
     max_positions_per_underlying: int = Field(default=10, gt=0)
@@ -199,6 +213,7 @@ class Settings(BaseSettings):
     kite: KiteSettings = Field(default_factory=KiteSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     data: DataSettings = Field(default_factory=DataSettings)
+    opportunities: OpportunitiesSettings = Field(default_factory=OpportunitiesSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)
     execution: ExecutionSettings = Field(default_factory=ExecutionSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)

@@ -72,7 +72,8 @@ const pageFromHash=()=>{const h=location.hash.replace('#','');return PAGE_IDS.in
 let active=pageFromHash(); let logFilter="all"; let logSearch="";
 let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",product:"CNC"};
 let tradeBusy=false; let tradeMsg=null;
-let opportunities=[]; const dismissedOpps=new Set();
+let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set();
+let scanState={scanning:false,last_scanned_at:null,symbols_scanned:0};
 
 const $=(id)=>document.getElementById(id);
 const fmtNum=(v,d=2)=>Number(v??0).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -171,7 +172,7 @@ function loadSystemStatus(){
  }).catch(()=>{});}
 function loadOpportunities(){
  fetch('/opportunities/equity').then(r=>r.ok?r.json():null).then(payload=>{
-  if(Array.isArray(payload)){opportunities=payload;if(active==='markets')render();}
+  if(payload){opportunities=payload.opportunities||[];scanState=payload;if(active==='markets')render();}
  }).catch(()=>{});}
 function statusChips(){
  const h=state.health,l=state.live,s=state.sys;
@@ -283,23 +284,43 @@ function marketsEmptyMessage(){const s=state.sys;
  if(!s.kite_access_token_configured)return'No market feed — the session token is missing or expired. Run scripts/kite_login.py.';
  return'Credentials are configured, but no ticks have arrived yet — the market may be closed, or the feed is still connecting.';}
 function opportunityKey(o){return o.tradingsymbol+'|'+o.pattern_name+'|'+o.detected_at;}
+function opportunityStatusLine(){
+ if(scanState.scanning)return '<div class="sub" style="margin:-6px 0 4px">Scanning the market for opportunities — first results may take a few minutes…</div>';
+ if(scanState.last_scanned_at){
+  const t=new Date(scanState.last_scanned_at);
+  const label=isNaN(t)?scanState.last_scanned_at:t.toLocaleString('en-IN',
+   {hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+  return `<div class="sub" style="margin:-6px 0 4px">Last scanned ${label} · ${scanState.symbols_scanned} symbol(s) checked</div>`;
+ }
+ return '';}
 function opportunityCards(){
  const visible=opportunities.filter(o=>!dismissedOpps.has(opportunityKey(o)));
- if(!visible.length)return card('Top Opportunities',
-  empty('No qualifying opportunities right now — checked against real historical hit-rate, not every pattern that fires.'));
+ if(!visible.length)return opportunityStatusLine()+card('Top Opportunities',
+  empty(scanState.scanning?'Scanning the market for opportunities — check back shortly.':
+   'No qualifying opportunities right now — checked against real historical hit-rate, not every pattern that fires.'));
  const items=visible.map(o=>{
-  const key=opportunityKey(o);const bullish=o.direction==='bullish';
-  return `<div class="card kpi">${CORNERS}
+  const key=opportunityKey(o);const bullish=o.direction==='bullish';const isOpen=openOppDetails.has(key);
+  const detail=isOpen?`<div class="sub num" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+    Potential move: <span class="${o.average_forward_return_pct>=0?'pos':'neg'}">${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}%</span>
+    over ${o.forward_days} trading day${o.forward_days===1?'':'s'} (historical average, n=${o.occurrences})</div>`:'';
+  return `<div class="card kpi" data-oppkey="${key}" style="cursor:pointer">${CORNERS}
    <div class="label">${o.tradingsymbol}<span class="badge ${bullish?'green':'red'}" style="float:right">${o.direction}</span></div>
    <div class="val" style="font-size:16px">${humanize(o.pattern_name)}</div>
    <div class="sub num">Hit rate ${pct(o.hit_rate*100)} · avg ${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}% · n=${o.occurrences}</div>
+   ${detail}
    <div style="margin-top:10px;display:flex;gap:8px">
     <button class="btn" style="flex:1" data-reject="${key}">Reject</button>
     <button class="btn btn-primary" style="flex:1" data-approve="${key}" data-symbol="${o.tradingsymbol}"
      data-side="${bullish?'BUY':'SELL'}">Approve</button>
    </div></div>`;}).join('');
- return `<div class="section-label">Top Opportunities</div><div class="grid kpis">${items}</div>`;}
+ return `${opportunityStatusLine()}<div class="section-label">Top Opportunities</div><div class="grid kpis">${items}</div>`;}
 function wireOpportunityButtons(){
+ document.querySelectorAll('[data-oppkey]').forEach(el=>{
+  el.onclick=(e)=>{
+   if(e.target.closest('button'))return;
+   const key=el.dataset.oppkey;
+   if(openOppDetails.has(key))openOppDetails.delete(key);else openOppDetails.add(key);
+   render();};});
  document.querySelectorAll('[data-reject]').forEach(btn=>{
   btn.onclick=()=>{dismissedOpps.add(btn.dataset.reject);render();};});
  document.querySelectorAll('[data-approve]').forEach(btn=>{

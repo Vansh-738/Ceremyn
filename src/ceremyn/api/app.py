@@ -28,6 +28,7 @@ from ceremyn.api.execution import build_execution_router
 from ceremyn.api.llm import build_llm_router
 from ceremyn.api.llm_runtime import build_assistant
 from ceremyn.api.opportunities import router as opportunities_router
+from ceremyn.api.opportunities import run_periodic_scan
 from ceremyn.api.runtime import build_dashboard_sources
 from ceremyn.api.trading import build_trading_router
 from ceremyn.config import Settings, get_settings
@@ -114,12 +115,24 @@ def create_app(
             if poller_started:
                 await container.rest_poller.start()
         task = asyncio.create_task(run_broadcaster(service, differ, manager, dashboard_settings))
+        # Off by default (see OpportunitiesSettings) -- a real scan means real,
+        # repeated NSE network calls, which must never happen implicitly just
+        # because an app (e.g. in a test) was created.
+        opportunities_task = (
+            asyncio.create_task(run_periodic_scan(settings.opportunities))
+            if settings.opportunities.scan_enabled
+            else None
+        )
         try:
             yield
         finally:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+            if opportunities_task is not None:
+                opportunities_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await opportunities_task
             if container is not None:
                 await container.orchestrator.stop()
                 if poller_started:

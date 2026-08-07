@@ -101,6 +101,22 @@ class TestRiskSettings:
         assert settings.risk.time.allow_expiry_day is True
 
 
+class TestOpportunitiesSettings:
+    def test_scan_disabled_by_default(self) -> None:
+        settings = make_settings()
+        assert settings.opportunities.scan_enabled is False
+        assert settings.opportunities.scan_all_equities is False
+
+    def test_loads_from_nested_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_ENABLED", "true")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_ALL_EQUITIES", "true")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS", "3")
+        settings = make_settings()
+        assert settings.opportunities.scan_enabled is True
+        assert settings.opportunities.scan_all_equities is True
+        assert settings.opportunities.scan_interval_hours == pytest.approx(3.0)
+
+
 def test_get_settings_is_cached() -> None:
     get_settings.cache_clear()
     try:
