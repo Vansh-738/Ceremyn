@@ -48,7 +48,10 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", 
 "tests/**" = ["DTZ001", "DTZ005"]
 # The dashboard shell is a single inlined HTML/CSS/JS document, not Python prose:
 # line-length and ambiguous-unicode rules do not apply to that markup blob.
+# shell_styles.py is the same shell's CSS, split out only to stay under the
+# 500-line file limit -- same exemption applies for the same reason.
 "src/ceremyn/dashboard/shell.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+"src/ceremyn/dashboard/shell_styles.py" = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
