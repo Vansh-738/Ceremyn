@@ -3,9 +3,10 @@
 A single self-contained HTML document (inline CSS + JS, Plotly from CDN) rendering the
 Ceremyn operations console. Pure presentation: it opens the existing WebSocket, subscribes
 to every channel, and renders each page from pushed snapshot frames — no business logic.
-Design language: clean, light-first fintech research UI — white bordered cards on a soft
-neutral page background, a single blue identity accent, system sans typography,
-green/red reserved for P&L, dense tables, tabular numerals.
+Design language: "Industry" blueprint/schematic system — square corners, hairline
+dividers, small "+" corner registration marks on every card, Barlow Condensed
+headings/numerics over Barlow body text, a single steel-blue accent reserved for
+the one primary action per screen, green/red reserved for P&L.
 
 CSS lives in `shell_styles.py`, split out to keep this file under the project's
 500-line limit.
@@ -20,6 +21,8 @@ SHELL_HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Ceremyn</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet"/>
 <style>
 </style>
 </head>
@@ -69,6 +72,7 @@ const pageFromHash=()=>{const h=location.hash.replace('#','');return PAGE_IDS.in
 let active=pageFromHash(); let logFilter="all"; let logSearch="";
 let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",product:"CNC"};
 let tradeBusy=false; let tradeMsg=null;
+let opportunities=[]; const dismissedOpps=new Set();
 
 const $=(id)=>document.getElementById(id);
 const fmtNum=(v,d=2)=>Number(v??0).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -165,6 +169,10 @@ function loadSystemStatus(){
   if(payload){state.sys=payload;statusChips();$("verFoot").textContent='v'+(payload.version||'—')
    +' · '+(payload.effective_mode||'');if(active==='overview')render();}
  }).catch(()=>{});}
+function loadOpportunities(){
+ fetch('/opportunities/equity').then(r=>r.ok?r.json():null).then(payload=>{
+  if(Array.isArray(payload)){opportunities=payload;if(active==='markets')render();}
+ }).catch(()=>{});}
 function statusChips(){
  const h=state.health,l=state.live,s=state.sys;
  if(s)setChip("runChip",s.runtime_ready?"ok":"warn",s.runtime_ready?"Runtime ready":"Runtime off");
@@ -173,9 +181,10 @@ function statusChips(){
  if(ms)setChip("marketChip",ms==='open'?"ok":"warn",ms==='open'?"Market open":("Market "+ms));
 }
 
-function kpi(label,val,sub,cls){return `<div class="card kpi"><div class="label">${label}</div>
+const CORNERS='<i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>';
+function kpi(label,val,sub,cls){return `<div class="card kpi">${CORNERS}<div class="label">${label}</div>
  <div class="val ${cls||''}">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;}
-function card(title,body){return `<div class="card"><h3>${title}</h3>${body}</div>`;}
+function card(title,body){return `<div class="card">${CORNERS}<h3>${title}</h3>${body}</div>`;}
 function kvrow(k,v){return `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
 function kv(rows){return `<div class="kv">${rows}</div>`;}
 function empty(t){return `<div class="empty">${t||'No data yet'}</div>`;}
@@ -273,8 +282,33 @@ function marketsEmptyMessage(){const s=state.sys;
  if(!s.kite_api_configured)return'No market feed — add a Kite API key to .env to enable live data.';
  if(!s.kite_access_token_configured)return'No market feed — the session token is missing or expired. Run scripts/kite_login.py.';
  return'Credentials are configured, but no ticks have arrived yet — the market may be closed, or the feed is still connecting.';}
+function opportunityKey(o){return o.tradingsymbol+'|'+o.pattern_name+'|'+o.detected_at;}
+function opportunityCards(){
+ const visible=opportunities.filter(o=>!dismissedOpps.has(opportunityKey(o)));
+ if(!visible.length)return card('Top Opportunities',
+  empty('No qualifying opportunities right now — checked against real historical hit-rate, not every pattern that fires.'));
+ const items=visible.map(o=>{
+  const key=opportunityKey(o);const bullish=o.direction==='bullish';
+  return `<div class="card kpi">${CORNERS}
+   <div class="label">${o.tradingsymbol}<span class="badge ${bullish?'green':'red'}" style="float:right">${o.direction}</span></div>
+   <div class="val" style="font-size:16px">${humanize(o.pattern_name)}</div>
+   <div class="sub num">Hit rate ${pct(o.hit_rate*100)} · avg ${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}% · n=${o.occurrences}</div>
+   <div style="margin-top:10px;display:flex;gap:8px">
+    <button class="btn" style="flex:1" data-reject="${key}">Reject</button>
+    <button class="btn btn-primary" style="flex:1" data-approve="${key}" data-symbol="${o.tradingsymbol}"
+     data-side="${bullish?'BUY':'SELL'}">Approve</button>
+   </div></div>`;}).join('');
+ return `<div class="section-label">Top Opportunities</div><div class="grid kpis">${items}</div>`;}
+function wireOpportunityButtons(){
+ document.querySelectorAll('[data-reject]').forEach(btn=>{
+  btn.onclick=()=>{dismissedOpps.add(btn.dataset.reject);render();};});
+ document.querySelectorAll('[data-approve]').forEach(btn=>{
+  btn.onclick=()=>{
+   tradeForm.symbol=btn.dataset.symbol;tradeForm.side=btn.dataset.side;
+   tradeForm.quantity='';tradeForm.price='';tradeMsg=null;
+   goToPage('orders');};});}
 function renderMarkets(c){const l=state.live||{};const u=l.underlyings||[];
- const cards=u.length?u.map(r=>`<div class="card kpi"><div class="label">${r.underlying}
+ const cards=u.length?u.map(r=>`<div class="card kpi">${CORNERS}<div class="label">${r.underlying}
    <span class="badge ${r.market_status==='open'?'green':'amber'}" style="float:right">${r.market_status}</span></div>
    <div class="val">${fmtNum(r.spot,2)}</div>
    <div class="sub num">ATM ${fmtNum(r.atm_strike,0)} · PCR ${fmtNum(r.pcr,2)} · ${fmtNum(r.latency_ms,1)}ms</div></div>`).join('')
@@ -283,7 +317,9 @@ function renderMarkets(c){const l=state.live||{};const u=l.underlyings||[];
   ${card('Feed',kv(
     kvrow('Messages / sec',fmtNum(l.messages_per_second,1))+
     kvrow('Reconnects',l.reconnect_count??0)+
-    kvrow('Heartbeat delay',fmtNum(l.heartbeat_delay_seconds,2)+'s')))}`;}
+    kvrow('Heartbeat delay',fmtNum(l.heartbeat_delay_seconds,2)+'s')))}
+  ${opportunityCards()}`;
+ wireOpportunityButtons();}
 function renderPortfolio(c){const pf=state.portfolio||{};const g=pf.greeks||{};const e=pf.exposure||{};
  const p=state.positions||{};const rows=p.positions||[];
  const val=(pf.buying_power||0)+(pf.margin_used||0);
@@ -329,7 +365,7 @@ function tradeFormCard(){
     </select></div>
   </div>
   <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-   <button class="pill on" id="tradeSubmitBtn" style="padding:8px 18px"${tradeBusy?' disabled':''}>${tradeBusy?'Submitting…':'Submit order'}</button>
+   <button class="btn btn-primary" id="tradeSubmitBtn"${tradeBusy?' disabled':''}>${tradeBusy?'Submitting…':'Submit order'}</button>
    <span style="font-size:11.5px;color:var(--muted)">Routes through the same risk engine as every strategy · mode: <b>${mode}</b></span>
   </div>
   ${tradeMsg?`<div class="sub ${tradeMsg.ok?'pos':'neg'}" style="margin-top:10px">${tradeMsg.text}</div>`:''}`);
@@ -449,8 +485,10 @@ render();
 connect();
 loadEquityHistory();
 loadSystemStatus();
+loadOpportunities();
 setInterval(loadSystemStatus,30000);
 setInterval(()=>{if(active==='overview')loadEquityHistory();},30000);
+setInterval(loadOpportunities,5*60000);
 </script>
 </body></html>
 """
