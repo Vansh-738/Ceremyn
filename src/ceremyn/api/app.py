@@ -1,10 +1,12 @@
 """FastAPI application factory — the single production application.
 
 This is the only production entry point (`uvicorn ceremyn.api.main:app`). It serves the
-health/system endpoints, the Swagger docs (`/docs`), and mounts three independent routers:
-the read-only observability dashboard (`/dashboard`), the triple-gated live-trading admin
-surface (`/execution`, M13), and the read-only LLM assistant (`/llm`, M12). There is no
-second FastAPI application, and each router is structurally separate from the others.
+health/system endpoints, the Swagger docs (`/docs`), and mounts several independent
+routers: the read-only observability dashboard (`/dashboard`), the triple-gated
+live-trading admin surface (`/execution`, M13), the read-only LLM assistant (`/llm`,
+M12), manual trade submission (`/trading`), and read-only pattern-based opportunity
+discovery (`/opportunities`). There is no second FastAPI application, and each router
+is structurally separate from the others.
 
 The dashboard is presentation only: it is wired with read-only sources and can never place an
 order. By default everything reads from a `Container` (the composition root,
@@ -25,6 +27,7 @@ import ceremyn
 from ceremyn.api.execution import build_execution_router
 from ceremyn.api.llm import build_llm_router
 from ceremyn.api.llm_runtime import build_assistant
+from ceremyn.api.opportunities import router as opportunities_router
 from ceremyn.api.runtime import build_dashboard_sources
 from ceremyn.api.trading import build_trading_router
 from ceremyn.config import Settings, get_settings
@@ -41,6 +44,7 @@ DASHBOARD_PREFIX = "/dashboard"
 EXECUTION_PREFIX = "/execution"
 LLM_PREFIX = "/llm"
 TRADING_PREFIX = "/trading"
+OPPORTUNITIES_PREFIX = "/opportunities"
 
 
 class _FrameSink:
@@ -153,6 +157,9 @@ def create_app(
         build_dashboard_router(service, settings=dashboard_settings, manager=manager),
         prefix=DASHBOARD_PREFIX,
     )
+    # Needs no container -- a self-contained bhavcopy scan, same as ceremyn.patterns
+    # itself -- so it's mounted unconditionally, like the dashboard router above.
+    app.include_router(opportunities_router, prefix=OPPORTUNITIES_PREFIX)
     if container is not None:
         # Separate from /dashboard by construction: the dashboard router is built above
         # from read-only sources alone and never sees the gate or a broker.
