@@ -3,8 +3,9 @@
 A single self-contained HTML document (inline CSS + JS, Plotly from CDN) rendering the
 Ceremyn operations console. Pure presentation: it opens the existing WebSocket, subscribes
 to every channel, and renders each page from pushed snapshot frames — no business logic.
-Design language: "quiet terminal" — near-black surfaces, hairline borders, a single warm
-gold identity accent, green/red reserved for P&L, dense tables, tabular numerals.
+Design language: clean, light-first fintech research UI — white bordered cards on a soft
+neutral page background, a single blue identity accent, system sans typography,
+green/red reserved for P&L, dense tables, tabular numerals.
 
 CSS lives in `shell_styles.py`, split out to keep this file under the project's
 500-line limit.
@@ -13,7 +14,7 @@ CSS lives in `shell_styles.py`, split out to keep this file under the project's
 from ceremyn.dashboard.shell_styles import SHELL_CSS
 
 SHELL_HTML = r"""<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -46,7 +47,7 @@ SHELL_HTML = r"""<!doctype html>
        <span class="chip" id="marketChip"><span class="dot"></span>Market</span>
       </div>
       <span class="clock num" id="clock">--:--:--</span>
-      <button class="theme-btn" id="themeBtn" title="Toggle theme">☾</button>
+      <button class="theme-btn" id="themeBtn" title="Toggle theme">☀</button>
     </header>
     <main class="content" id="content"><div class="empty">Connecting to live feed…</div></main>
   </div>
@@ -256,8 +257,8 @@ function renderOverview(c){
   ${card('Equity Curve',chartBox('cEq'))}
   ${card('Session P&L',chartBox('cPnl'))}
  </div>`;
- line('cEq',series.equity,'rgb(217,164,65)');
- line('cPnl',series.pnl,'rgb(67,184,106)');
+ line('cEq',series.equity,'rgb(44,121,247)');
+ line('cPnl',series.pnl,'rgb(30,143,77)');
 }
 function renderAlertList(){const a=(state.alerts&&state.alerts.alerts)||[];
  if(!a.length)return empty('No active alerts');
@@ -353,8 +354,8 @@ function renderResearch(c){const r=state.research||{};const lb=r.leaderboard||[]
   <div class="grid cols-2">${card('Sharpe',lb.length?chartBox('cSharpe'):empty('No data yet'))}${card('Return',lb.length?chartBox('cRet'):empty('No data yet'))}</div>
   ${card('Latest Features',f.sample&&Object.keys(f.sample).length?kv(
     Object.entries(f.sample).map(([k,v])=>kvrow(k,v)).join('')):empty('No features computed yet'))}`;
- if(lb.length){barsChart('cSharpe',lb.map(x=>x.strategy_name),lb.map(x=>x.sharpe),'#d9a441');
-  barsChart('cRet',lb.map(x=>x.strategy_name),lb.map(x=>x.total_return),'#43b86a');}}
+ if(lb.length){barsChart('cSharpe',lb.map(x=>x.strategy_name),lb.map(x=>x.sharpe),'#2c79f7');
+  barsChart('cRet',lb.map(x=>x.strategy_name),lb.map(x=>x.total_return),'#1e8f4d');}}
 function renderSystem(c){const h=state.health||{};const comps=h.components||[];
  const rows=(state.logs&&state.logs.logs)||[];
  const levels=['all','info','warning','error'];
