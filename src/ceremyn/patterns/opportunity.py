@@ -10,8 +10,10 @@ from datetime import timedelta
 
 from ceremyn.domain import Candle, Opportunity, Pattern
 from ceremyn.domain.enums import AssetClass
-from ceremyn.patterns.candlestick import detect
+from ceremyn.patterns.candlestick import detect as detect_candlestick
+from ceremyn.patterns.chart_shape import detect as detect_chart_shapes
 from ceremyn.patterns.study import historical_performance
+from ceremyn.patterns.swing import detect as detect_swing
 
 DEFAULT_MIN_OCCURRENCES = 10
 DEFAULT_MIN_CANDLES = 20
@@ -62,7 +64,11 @@ def find_opportunities(
         latest_timestamp = candles[-1].timestamp
         if latest_timestamp < staleness_cutoff:
             continue
-        patterns: tuple[Pattern, ...] = detect(candles, tradingsymbol=symbol)
+        patterns: tuple[Pattern, ...] = (
+            detect_candlestick(candles, tradingsymbol=symbol)
+            + detect_swing(candles, tradingsymbol=symbol)
+            + detect_chart_shapes(candles, tradingsymbol=symbol)
+        )
         performance = {
             (p.pattern_name, p.direction): p
             for p in historical_performance(candles, patterns, forward_days=forward_days)
