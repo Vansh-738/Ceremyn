@@ -108,26 +108,38 @@ class TestOpportunitiesSettings:
         settings = make_settings()
         assert settings.opportunities.scan_enabled is False
 
-    def test_default_universe_is_nifty500_not_raw_full_list(self) -> None:
-        # Default must be the index-vetted universe, not "all_equities" -- a raw
-        # full-universe scan surfaces thin, easily-manipulated penny stocks.
+    def test_default_universe_is_all_equities_not_market_cap_tiered(self) -> None:
+        # Default must not commit to a market-cap tier (NIFTY 500 membership) --
+        # only to the liquidity floor (min_avg_daily_turnover) below.
         settings = make_settings()
-        assert settings.opportunities.universe == "nifty500"
+        assert settings.opportunities.universe == "all_equities"
 
     def test_default_turnover_floor_is_positive(self) -> None:
         settings = make_settings()
         assert settings.opportunities.min_avg_daily_turnover > 0
 
+    def test_default_forward_window_is_a_month_or_more(self) -> None:
+        settings = make_settings()
+        assert settings.opportunities.forward_days >= 20  # ~1 trading month
+
+    def test_default_min_return_is_15_percent(self) -> None:
+        settings = make_settings()
+        assert settings.opportunities.min_avg_forward_return_pct == pytest.approx(15.0)
+
     def test_loads_from_nested_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_ENABLED", "true")
-        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__UNIVERSE", "all_equities")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__UNIVERSE", "nifty500")
         monkeypatch.setenv("CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER", "50000000")
         monkeypatch.setenv("CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS", "3")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__FORWARD_DAYS", "45")
+        monkeypatch.setenv("CEREMYN_OPPORTUNITIES__MIN_AVG_FORWARD_RETURN_PCT", "20")
         settings = make_settings()
         assert settings.opportunities.scan_enabled is True
-        assert settings.opportunities.universe == "all_equities"
+        assert settings.opportunities.universe == "nifty500"
         assert settings.opportunities.min_avg_daily_turnover == Decimal("50000000")
         assert settings.opportunities.scan_interval_hours == pytest.approx(3.0)
+        assert settings.opportunities.forward_days == 45
+        assert settings.opportunities.min_avg_forward_return_pct == pytest.approx(20.0)
 
     def test_invalid_universe_rejected(self) -> None:
         with pytest.raises(ValidationError):

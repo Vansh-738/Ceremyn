@@ -100,16 +100,23 @@ class OpportunitiesSettings(BaseModel):
     a test spins up an app). Enable explicitly once you actually want it."""
 
     scan_enabled: bool = False
-    # "watchlist" = the small built-in liquid names; "nifty500" (default) = NSE's
-    # own published NIFTY 500 constituent list -- established, index-vetted
-    # companies, not the raw full listing (which includes thin penny stocks);
-    # "all_equities" = literally every listed symbol, unfiltered by index membership.
-    universe: Literal["watchlist", "nifty500", "all_equities"] = "nifty500"
-    # A second, independent liquidity floor applied within whichever universe is
-    # chosen (average daily traded value = close price x volume). Thin daily
-    # turnover, not nominal market cap, is what makes a stock cheap to move --
-    # a low-turnover stock is easy to manipulate even inside NIFTY 500.
+    # "watchlist" = the small built-in liquid names; "nifty500" = NSE's own
+    # published NIFTY 500 constituent list (index-vetted, but market-cap-tiered
+    # by construction); "all_equities" (default) = every listed symbol --
+    # deliberately not narrowed by market cap. The one thing this scan commits
+    # to as a quality bar is liquidity (min_avg_daily_turnover below), not cap.
+    universe: Literal["watchlist", "nifty500", "all_equities"] = "all_equities"
+    # The real, load-bearing quality bar: average daily traded value (close price
+    # x volume) over the lookback window. Thin daily turnover, not nominal market
+    # cap, is what makes a stock cheap to move with a small amount of money.
     min_avg_daily_turnover: Decimal = Field(default=Decimal("10000000"), ge=0)  # ~1 crore/day
+    # How far forward (in trading days) each pattern's historical hit-rate/return
+    # is measured -- a month-plus horizon, not a quick 5-day flip.
+    forward_days: int = Field(default=30, gt=0)
+    # A pattern with real, if modest, evidence for its own direction is still
+    # not worth acting on if the typical move is tiny. Compared against the
+    # *magnitude* of the average move, not its sign (see find_opportunities).
+    min_avg_forward_return_pct: float = Field(default=15.0, ge=0)
     scan_interval_hours: float = Field(default=6.0, gt=0)
     lookback_days: int = Field(default=400, gt=0)
 

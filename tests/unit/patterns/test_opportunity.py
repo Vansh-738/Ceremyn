@@ -150,3 +150,45 @@ class TestFindOpportunities:
         )
         assert len(opportunities) > 0
         assert all(o.asset_class is AssetClass.EQUITY for o in opportunities)
+
+    def test_min_avg_forward_return_pct_off_by_default(self) -> None:
+        """Real fixture: DOJISTAR clears min_hit_rate with a real average move of
+        ~0.496% -- a small move must still surface when no minimum is set."""
+        candles = _oscillating("TEST", 60, doji_every=5)
+        opportunities = find_opportunities(
+            {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
+        )
+        assert any(o.pattern_name == "DOJISTAR" for o in opportunities)
+
+    def test_min_avg_forward_return_pct_excludes_moves_too_small_to_act_on(self) -> None:
+        candles = _oscillating("TEST", 60, doji_every=5)
+        opportunities = find_opportunities(
+            {"TEST": candles},
+            {"TEST": AssetClass.EQUITY},
+            min_occurrences=10,
+            min_avg_forward_return_pct=1.0,  # DOJISTAR's real move here is ~0.496%
+        )
+        assert not any(o.pattern_name == "DOJISTAR" for o in opportunities)
+
+    def test_min_avg_forward_return_pct_keeps_moves_at_or_above_threshold(self) -> None:
+        candles = _oscillating("TEST", 60, doji_every=5)
+        opportunities = find_opportunities(
+            {"TEST": candles},
+            {"TEST": AssetClass.EQUITY},
+            min_occurrences=10,
+            min_avg_forward_return_pct=0.4,  # below DOJISTAR's real ~0.496% move
+        )
+        assert any(o.pattern_name == "DOJISTAR" for o in opportunities)
+
+    def test_min_avg_forward_return_pct_compares_magnitude_not_sign(self) -> None:
+        """DOJISTAR here is a BEARISH-direction pattern; the filter must still keep
+        it purely on the size of the move, not require a positive number."""
+        candles = _oscillating("TEST", 60, doji_every=5)
+        opportunities = find_opportunities(
+            {"TEST": candles},
+            {"TEST": AssetClass.EQUITY},
+            min_occurrences=10,
+            min_avg_forward_return_pct=0.4,
+        )
+        dojistar = next(o for o in opportunities if o.pattern_name == "DOJISTAR")
+        assert dojistar.direction is PatternDirection.BEARISH

@@ -24,6 +24,9 @@ DEFAULT_MIN_CANDLES = 20
 # cannot make up for a coin-flip-or-worse hit rate. Strictly greater than 0.5, not
 # >=: exactly 50% is no better than chance either.
 DEFAULT_MIN_HIT_RATE = 0.5
+# 0.0 = off by default: the reverse of DEFAULT_MIN_HIT_RATE's "no evidence" bar --
+# this is a "not worth acting on even with good evidence" bar, opt-in per caller.
+DEFAULT_MIN_AVG_FORWARD_RETURN_PCT = 0.0
 # A symbol's own "latest bar" can be stale relative to the rest of the market --
 # a thinly-traded or suspended stock that last appeared in bhavcopy weeks or
 # months ago must not be surfaced as a "live" opportunity just because that old
@@ -40,6 +43,7 @@ def find_opportunities(
     forward_days: int = 5,
     min_occurrences: int = DEFAULT_MIN_OCCURRENCES,
     min_hit_rate: float = DEFAULT_MIN_HIT_RATE,
+    min_avg_forward_return_pct: float = DEFAULT_MIN_AVG_FORWARD_RETURN_PCT,
     max_staleness_days: int = DEFAULT_MAX_STALENESS_DAYS,
 ) -> tuple[Opportunity, ...]:
     """Scan every symbol's candle history, detect patterns, and rank the ones that
@@ -49,8 +53,12 @@ def find_opportunities(
     a historical hit rate at or below `min_hit_rate`, is never surfaced as an
     Opportunity there. Not enough evidence, or evidence the pattern doesn't actually
     favor its own claimed direction, is excluded outright -- never ranked highly
-    just because the average move happens to be large. A symbol whose own latest
-    bar trails the scan's newest bar by more than `max_staleness_days` is skipped
+    just because the average move happens to be large. `min_avg_forward_return_pct`
+    is the opposite kind of bar: good evidence for a move too small to bother
+    with. Compared against the *magnitude* of the average move (`abs(...)`), not
+    its sign -- a strong bearish setup is exactly as real an opportunity as a
+    strong bullish one, just in the other direction. A symbol whose own latest bar
+    trails the scan's newest bar by more than `max_staleness_days` is skipped
     entirely -- its "opportunity" would really just be stale history.
     """
     bar_timestamps = [candles[-1].timestamp for candles in candles_by_symbol.values() if candles]
@@ -87,6 +95,7 @@ def find_opportunities(
                 or perf.hit_rate is None
                 or perf.occurrences < min_occurrences
                 or perf.hit_rate <= min_hit_rate
+                or abs(perf.average_forward_return_pct or 0.0) < min_avg_forward_return_pct
             ):
                 continue
             opportunities.append(

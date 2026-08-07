@@ -109,7 +109,11 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
         # find_opportunities is CPU-bound (no I/O) -- run it off the event loop so
         # a whole-universe scan doesn't freeze every other request for minutes.
         opportunities = await asyncio.to_thread(
-            find_opportunities, candles_by_symbol, asset_class_by_symbol
+            find_opportunities,
+            candles_by_symbol,
+            asset_class_by_symbol,
+            forward_days=settings.forward_days,
+            min_avg_forward_return_pct=settings.min_avg_forward_return_pct,
         )
         views = tuple(_to_view(o) for o in opportunities)
         _last_scan = (to_ist(now_utc()), views, len(candles_by_symbol))

@@ -77,19 +77,25 @@ repeated NSE bhavcopy fetch, so it shouldn't run implicitly. Turn it on in `.env
 
 ```bash
 CEREMYN_OPPORTUNITIES__SCAN_ENABLED=true
-# watchlist | nifty500 (default) | all_equities -- see .env.example for what each means
-CEREMYN_OPPORTUNITIES__UNIVERSE=nifty500
+# watchlist | nifty500 | all_equities (default) -- see .env.example for what each means
+CEREMYN_OPPORTUNITIES__UNIVERSE=all_equities
 ```
 
-**Universe defaults to NIFTY 500, not the raw full listing.** A plain "every listed
-symbol" scan surfaces thin, easily-manipulated micro-caps at the top of the ranking —
-a stock with a wild average move on 10-15 historical occurrences is often just an
-illiquid penny stock, not a real edge. `nifty500` restricts the scan to NSE's own
-published constituent list (established, index-vetted companies), and a second,
-independent liquidity floor (`CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER`, default
-₹1 crore/day average traded value) is applied on top of that — thin daily turnover,
-not nominal market cap, is what actually makes a stock cheap to move. `all_equities`
-is still available as an explicit opt-out for anyone who wants the unfiltered universe.
+**Universe defaults to the whole market, not a market-cap tier.** Quality is enforced by
+liquidity, not by restricting to an index: `CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER`
+(default ₹1 crore/day average traded value = close price × volume) is the load-bearing
+filter — thin daily turnover, not nominal market cap, is what actually makes a stock
+cheap to move with a small amount of money. `nifty500` (NSE's own published constituent
+list) and `watchlist` (a small built-in liquid set) are still available if you'd rather
+also restrict by index membership, but neither is the default.
+
+**Opportunities are a month-plus horizon, not a quick flip.** Each pattern's historical
+hit rate and average return are measured `CEREMYN_OPPORTUNITIES__FORWARD_DAYS` (default
+30 trading days, ~a month and a half) after it fires, and only surfaced at all if that
+average move clears `CEREMYN_OPPORTUNITIES__MIN_AVG_FORWARD_RETURN_PCT` (default 15%) —
+compared against the *size* of the move, not its direction, so a strong bearish setup
+qualifies exactly like a strong bullish one. Real evidence for a move too small to act
+on still doesn't clear this bar.
 
 It then runs as a background task (never blocking the dashboard/WebSocket), once at
 startup and every `CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS` (default 6) after that —

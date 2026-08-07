@@ -211,7 +211,11 @@ class TestTurnoverFilterIntegration:
 
         seen_symbols: list[object] = []
 
-        def capturing_find(candles_by_symbol: dict, asset_class_by_symbol: dict) -> tuple:  # type: ignore[type-arg]
+        def capturing_find(
+            candles_by_symbol: dict,  # type: ignore[type-arg]
+            asset_class_by_symbol: dict,  # type: ignore[type-arg]
+            **kwargs: object,
+        ) -> tuple:  # type: ignore[type-arg]
             seen_symbols.append(set(candles_by_symbol))
             return ()
 
@@ -222,3 +226,28 @@ class TestTurnoverFilterIntegration:
         )
 
         assert seen_symbols == [{"LIQUID"}]
+
+
+class TestForwardWindowAndReturnFloor:
+    async def test_settings_are_passed_through_to_find_opportunities(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", _fake_fetch)
+        seen_kwargs: list[dict[str, object]] = []
+
+        def capturing_find(
+            candles_by_symbol: dict,
+            asset_class_by_symbol: dict,
+            **kwargs: object,  # type: ignore[type-arg]
+        ) -> tuple:  # type: ignore[type-arg]
+            seen_kwargs.append(kwargs)
+            return ()
+
+        monkeypatch.setattr(opportunities_module, "find_opportunities", capturing_find)
+        await opportunities_module.run_scan_once(
+            OpportunitiesSettings(
+                universe="watchlist", forward_days=45, min_avg_forward_return_pct=20.0
+            )
+        )
+
+        assert seen_kwargs == [{"forward_days": 45, "min_avg_forward_return_pct": 20.0}]
