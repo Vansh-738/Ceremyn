@@ -23,6 +23,7 @@ from ceremyn.domain.enums import (
 from ceremyn.domain.errors import DomainError, OrderTransitionError
 from ceremyn.domain.greeks import Greeks
 from ceremyn.domain.instruments import (
+    CommodityContract,
     EquityInstrument,
     ETFInstrument,
     FutureContract,
@@ -30,6 +31,7 @@ from ceremyn.domain.instruments import (
     OptionContract,
 )
 from ceremyn.domain.market_data import Candle, Quote
+from ceremyn.domain.opportunity import Opportunity
 from ceremyn.domain.orders import VALID_TRANSITIONS, Fill, Order
 from ceremyn.domain.pattern import Pattern
 from ceremyn.domain.portfolio import PortfolioExposure, PortfolioGreeks, PortfolioSnapshot
@@ -44,6 +46,7 @@ __all__ = [
     "AssetClass",
     "Candle",
     "ChainEntry",
+    "CommodityContract",
     "CorporateAction",
     "CorporateActionType",
     "DomainError",
@@ -56,6 +59,7 @@ __all__ = [
     "Instrument",
     "KillSwitchState",
     "MarketSnapshot",
+    "Opportunity",
     "OptionChainSnapshot",
     "OptionContract",
     "OptionType",

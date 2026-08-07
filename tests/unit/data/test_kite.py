@@ -96,6 +96,33 @@ NSE_DUMP = [
     },
 ]
 
+MCX_DUMP = [
+    {
+        "instrument_token": 143610119,
+        "tradingsymbol": "CRUDEOIL26AUGFUT",
+        "name": "CRUDEOIL",
+        "expiry": date(2026, 8, 19),
+        "strike": 0.0,
+        "tick_size": 1.0,
+        "lot_size": 100,
+        "instrument_type": "FUT",
+        "segment": "MCX-FUT",
+        "exchange": "MCX",
+    },
+    {  # excluded: unwanted commodity
+        "instrument_token": 200200,
+        "tradingsymbol": "COTTON26AUGFUT",
+        "name": "COTTON",
+        "expiry": date(2026, 8, 19),
+        "strike": 0.0,
+        "tick_size": 1.0,
+        "lot_size": 25,
+        "instrument_type": "FUT",
+        "segment": "MCX-FUT",
+        "exchange": "MCX",
+    },
+]
+
 QUOTE_PAYLOAD = {
     "last_price": 180.5,
     "volume": 8956234,
@@ -118,6 +145,8 @@ class FakeKite:
             return NFO_DUMP
         if exchange == "NSE":
             return NSE_DUMP
+        if exchange == "MCX":
+            return MCX_DUMP
         raise AssertionError(f"unexpected exchange {exchange!r}")
 
     def quote(self, symbols: list[str]) -> dict[str, Any]:
@@ -192,6 +221,25 @@ class TestFutureContracts:
         assert contract.expiry == date(2025, 7, 31)
         assert contract.lot_size == 75
         assert contract.broker_token == 113
+
+
+class TestCommodityContracts:
+    async def test_filters_commodities_for_wanted_underlyings(self, provider: KiteProvider) -> None:
+        contracts = await provider.fetch_commodity_contracts(("CRUDEOIL",))
+        assert [c.tradingsymbol for c in contracts] == ["CRUDEOIL26AUGFUT"]
+
+    async def test_contract_mapping(self, provider: KiteProvider) -> None:
+        (contract,) = await provider.fetch_commodity_contracts(("CRUDEOIL",))
+        assert contract.asset_class is AssetClass.COMMODITY
+        assert contract.exchange.value == "MCX"
+        assert contract.underlying == "CRUDEOIL"
+        assert contract.expiry == date(2026, 8, 19)
+        assert contract.lot_size == 100
+        assert contract.broker_token == 143610119
+
+    async def test_unwanted_commodity_excluded(self, provider: KiteProvider) -> None:
+        contracts = await provider.fetch_commodity_contracts(("GOLD",))
+        assert contracts == []
 
 
 class TestCashInstruments:

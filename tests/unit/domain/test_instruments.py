@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from ceremyn.domain import (
     AssetClass,
+    CommodityContract,
     EquityInstrument,
     ETFInstrument,
     Exchange,
@@ -84,3 +85,22 @@ def test_equity_lot_size_defaults_but_can_be_overridden() -> None:
         tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE", lot_size=1
     )
     assert equity.lot_size == 1
+
+
+def test_commodity_contract_requires_expiry_and_lot_size() -> None:
+    commodity = CommodityContract(
+        tradingsymbol="CRUDEOIL26AUGFUT",
+        exchange=Exchange.MCX,
+        underlying="CRUDEOIL",
+        expiry=make_contract().expiry,
+        lot_size=100,
+    )
+    assert commodity.asset_class is AssetClass.COMMODITY
+    assert commodity.exchange is Exchange.MCX
+    with pytest.raises(ValidationError):
+        CommodityContract(
+            tradingsymbol="CRUDEOIL26AUGFUT",
+            exchange=Exchange.MCX,
+            underlying="CRUDEOIL",
+            lot_size=100,
+        )  # type: ignore[call-arg]  # missing required expiry

@@ -21,6 +21,7 @@ from ceremyn.core.exceptions import BrokerError
 from ceremyn.core.timeutils import IST, now_utc
 from ceremyn.domain import (
     Candle,
+    CommodityContract,
     EquityInstrument,
     ETFInstrument,
     Exchange,
@@ -110,6 +111,22 @@ class KiteProvider:
             if entry.get("name") in wanted and entry.get("instrument_type") == "FUT"
         ]
         logger.info("kite_future_contracts_fetched", count=len(contracts))
+        return contracts
+
+    async def fetch_commodity_contracts(
+        self, underlyings: Sequence[str]
+    ) -> list[CommodityContract]:
+        """All MCX commodity-future contracts for the given commodity names
+        (e.g. "CRUDEOIL", "GOLD", "SILVER", "COPPER") -- requires the Kite account
+        to have MCX segment access enabled."""
+        dump = await self._fetch_instrument_dump("MCX")
+        wanted = set(underlyings)
+        contracts = [
+            _instrument_to_commodity(entry)
+            for entry in dump
+            if entry.get("name") in wanted and entry.get("instrument_type") == "FUT"
+        ]
+        logger.info("kite_commodity_contracts_fetched", count=len(contracts))
         return contracts
 
     async def _fetch_cash_instrument_dump(
@@ -224,6 +241,18 @@ def _instrument_to_future(entry: dict[str, Any]) -> FutureContract:
     return FutureContract(
         tradingsymbol=str(entry["tradingsymbol"]),
         exchange=Exchange.NFO,
+        tick_size=Decimal(str(entry.get("tick_size", "0.05"))),
+        broker_token=int(entry["instrument_token"]),
+        underlying=str(entry["name"]),
+        expiry=_ensure_date(entry["expiry"]),
+        lot_size=int(entry["lot_size"]),
+    )
+
+
+def _instrument_to_commodity(entry: dict[str, Any]) -> CommodityContract:
+    return CommodityContract(
+        tradingsymbol=str(entry["tradingsymbol"]),
+        exchange=Exchange.MCX,
         tick_size=Decimal(str(entry.get("tick_size", "0.05"))),
         broker_token=int(entry["instrument_token"]),
         underlying=str(entry["name"]),

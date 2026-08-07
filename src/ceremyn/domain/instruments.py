@@ -79,3 +79,16 @@ class FutureContract(Instrument):
 
     expiry: date
     lot_size: int = Field(gt=0)
+
+
+class CommodityContract(Instrument):
+    """A futures contract on a commodity underlying (crude oil, gold, silver, ...),
+    traded on MCX. Same shape as `FutureContract` -- kept as a distinct asset class
+    (not reused as FUTURES) because commodity margin/lot conventions differ from
+    index/stock futures and the domain already reserves `AssetClass.COMMODITY`
+    for that distinction."""
+
+    asset_class: ClassVar[AssetClass] = AssetClass.COMMODITY
+
+    expiry: date
+    lot_size: int = Field(gt=0)

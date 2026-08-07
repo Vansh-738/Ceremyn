@@ -8,6 +8,7 @@ class Exchange(StrEnum):
     NFO = "NFO"  # NSE futures & options
     BSE = "BSE"
     BFO = "BFO"  # BSE futures & options
+    MCX = "MCX"  # commodity futures (crude oil, gold, silver, copper, ...)
 
 
 class OptionType(StrEnum):
