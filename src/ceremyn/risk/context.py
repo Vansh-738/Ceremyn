@@ -10,10 +10,12 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from ceremyn.config import RiskSettings, Settings
 from ceremyn.core.timeutils import to_ist
 from ceremyn.domain import (
+    Instrument,
     OptionContract,
     PortfolioExposure,
     PortfolioGreeks,
     PortfolioSnapshot,
+    Position,
     Signal,
 )
 from ceremyn.domain.enums import KillSwitchState, Side
@@ -74,6 +76,49 @@ class RiskContext(BaseModel):
     def metadata(self) -> Mapping[str, Any]:
         return self.signal.metadata
 
+    def _reference_price(self, contract: Instrument) -> Decimal:
+        """The price used to size notional/margin/exposure for one leg's contract.
+
+        An `OptionContract` prices off its own strike -- no external input needed.
+        Every other instrument (equity, future, commodity) carries no price of its
+        own (price is external market data, not part of the instrument's static
+        definition), so the signal producer must supply it explicitly via
+        `signal.metadata["reference_prices"][tradingsymbol]`. There is no safe
+        silent default: treating an unpriced equity leg as zero notional would
+        blind every exposure/margin/concentration limit to that leg's real risk,
+        which is exactly the gap this closes (see git history around the M16/M17
+        multi-asset migration, where this was `Decimal("0")`).
+        """
+        if isinstance(contract, OptionContract):
+            return contract.strike
+        reference_prices = self.metadata.get("reference_prices", {})
+        raw = reference_prices.get(contract.tradingsymbol)
+        if raw is None:
+            raise ValueError(
+                f"signal for non-option instrument {contract.tradingsymbol!r} is missing "
+                "metadata['reference_prices'][tradingsymbol] -- the risk engine cannot size "
+                "notional/margin/exposure for this leg without a real reference price"
+            )
+        return Decimal(str(raw))
+
+    def _margin_ratio_for(self, contract: Instrument, *, is_short: bool) -> Decimal:
+        """Fraction of notional required as margin for one net-position leg.
+
+        Options use the configured premium-based ratios. Every other instrument
+        defaults to full notional (ratio 1.0) -- e.g. equity delivery (CNC) is
+        paid for in full, not on margin. This is a deliberately conservative
+        placeholder for futures/commodities (real exchange SPAN margin is lower
+        than full notional): it never UNDER-counts required capital, only
+        potentially over-counts it, which is the safe direction to be wrong in.
+        """
+        if not isinstance(contract, OptionContract):
+            return Decimal("1")
+        return (
+            self.config.margin.short_option_margin_ratio
+            if is_short
+            else self.config.margin.long_option_margin_ratio
+        )
+
     @property
     def signal_lots_total(self) -> int:
         return sum(leg.lots for leg in self.signal.legs)
@@ -86,10 +131,7 @@ class RiskContext(BaseModel):
     def signal_notional(self) -> Decimal:
         total = Decimal("0")
         for leg in self.signal.legs:
-            if not isinstance(leg.contract, OptionContract):
-                continue
-            quantity = leg.quantity
-            total += leg.contract.strike * quantity
+            total += self._reference_price(leg.contract) * leg.quantity
         return total
 
     @property
@@ -126,28 +168,37 @@ class RiskContext(BaseModel):
         Computed from the net position per symbol, not the signal's legs in
         isolation -- a SELL leg that *closes* an existing long (e.g. an exit signal)
         must not be charged short-side margin just because the leg itself sells;
-        only a leg that leaves the symbol net short should be."""
-        strikes: dict[str, Decimal] = {
-            position.contract.tradingsymbol: position.contract.strike
-            for position in self.portfolio.positions
-            if isinstance(position.contract, OptionContract)
+        only a leg that leaves the symbol net short should be.
+
+        Non-option legs need `_reference_price`/`_margin_ratio_for` -- see those
+        for why there is no silent zero-margin default. That requirement only
+        applies to symbols THIS signal actually touches: an existing non-option
+        position this signal doesn't reference falls back to its own recorded
+        `avg_price` (a real, already-known value) rather than demanding this
+        unrelated signal's metadata price every position in the portfolio."""
+        signal_contracts: dict[str, Instrument] = {
+            leg.contract.tradingsymbol: leg.contract for leg in self.signal.legs
         }
-        for leg in self.signal.legs:
-            if isinstance(leg.contract, OptionContract):
-                strikes[leg.contract.tradingsymbol] = leg.contract.strike
+        existing: dict[str, Position] = {
+            position.contract.tradingsymbol: position for position in self.portfolio.positions
+        }
         total = Decimal("0")
         for symbol, quantity in self.projected_position_quantities.items():
             if quantity == 0:
                 continue
-            ratio = (
-                self.config.margin.short_option_margin_ratio
-                if quantity < 0
-                else self.config.margin.long_option_margin_ratio
-            )
-            # Non-option symbols contribute no margin here (asset-aware margin
-            # dispatch is out of scope for this widening); every symbol reachable
-            # today is an option, so `strikes` always has a real entry in practice.
-            total += strikes.get(symbol, Decimal("0")) * abs(quantity) * ratio
+            contract = signal_contracts.get(symbol)
+            if contract is not None:
+                reference_price = self._reference_price(contract)
+            else:
+                position = existing.get(symbol)
+                if position is None:
+                    continue
+                contract = position.contract
+                reference_price = (
+                    contract.strike if isinstance(contract, OptionContract) else position.avg_price
+                )
+            ratio = self._margin_ratio_for(contract, is_short=quantity < 0)
+            total += reference_price * abs(quantity) * ratio
         return total
 
     @property
@@ -206,11 +257,7 @@ class RiskContext(BaseModel):
 
         for leg in self.signal.legs:
             signed_quantity = leg.quantity if leg.side is Side.BUY else -leg.quantity
-            # Non-option notional contribution is 0 until asset-aware exposure
-            # dispatch lands; unreachable today (every leg is an option).
-            reference_price = (
-                leg.contract.strike if isinstance(leg.contract, OptionContract) else Decimal("0")
-            )
+            reference_price = self._reference_price(leg.contract)
             signed_notional = reference_price * signed_quantity
             signal_net_notional += signed_notional
             signal_gross_notional += reference_price * leg.quantity

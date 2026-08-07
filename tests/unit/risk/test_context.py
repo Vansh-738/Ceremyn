@@ -1,16 +1,45 @@
+from datetime import datetime
 from decimal import Decimal
 
+import pytest
+
 from ceremyn.domain import (
+    EquityInstrument,
+    Exchange,
     KillSwitchState,
     PortfolioExposure,
     PortfolioGreeks,
     PortfolioSnapshot,
     Position,
+    Side,
+    Signal,
+    SignalAction,
 )
-from ceremyn.domain.enums import Side
 from ceremyn.domain.signals import SignalLeg
 from ceremyn.risk.context import RiskContext
 from tests.unit.risk.conftest import make_contract, make_signal
+
+
+def make_equity(symbol: str = "RELIANCE") -> EquityInstrument:
+    return EquityInstrument(tradingsymbol=symbol, exchange=Exchange.NSE, underlying=symbol)
+
+
+def make_equity_signal(
+    *, created_at: datetime, legs: tuple[SignalLeg, ...], metadata: dict[str, object] | None = None
+) -> Signal:
+    """`make_signal` in conftest hardcodes a required option `expiry` -- an equity
+    signal has none, so this is a separate, narrow helper rather than widening
+    that shared one for every other (option-only) test in this file."""
+    return Signal(
+        strategy_id="strategy-1",
+        created_at=created_at,
+        market_timestamp=created_at,
+        signal_type=SignalAction.ENTER,
+        reason="test equity signal",
+        metadata=metadata or {},
+        legs=legs,
+        underlying=legs[0].contract.underlying,
+    )
 
 
 def test_context_projects_positions_exposure_margin_and_greeks(
@@ -190,3 +219,131 @@ def test_context_uses_projected_metadata_overrides(
         net_option_units=10,
         by_underlying={"NIFTY": Decimal("100000")},
     )
+
+
+def _empty_portfolio() -> PortfolioSnapshot:
+    return PortfolioSnapshot(
+        positions=(),
+        buying_power=Decimal("100000"),
+        margin_used=Decimal("0"),
+        realized_pnl=Decimal("0"),
+        unrealized_pnl=Decimal("0"),
+        daily_pnl=Decimal("0"),
+        portfolio_greeks=PortfolioGreeks(delta=0.0, gamma=0.0, theta=0.0, vega=0.0),
+        exposure=PortfolioExposure(gross_notional=Decimal("0"), net_notional=Decimal("0")),
+        drawdown=Decimal("0"),
+        kill_switch_state=KillSwitchState.DISARMED,
+    )
+
+
+class TestNonOptionReferencePrice:
+    """Regression suite: before this fix, every non-option leg silently priced at
+    Decimal("0") in signal_notional/signal_margin_required/projected_exposure --
+    an equity trade was invisible to every notional/margin/concentration limit."""
+
+    def test_equity_signal_notional_requires_reference_price(self, base_settings, ist_now) -> None:
+        equity = make_equity()
+        signal = make_equity_signal(
+            created_at=ist_now,
+            legs=(SignalLeg(contract=equity, side=Side.BUY, lots=10),),
+        )
+        context = RiskContext.from_inputs(
+            portfolio=_empty_portfolio(),
+            signal=signal,
+            configuration=base_settings,
+            evaluated_at=ist_now,
+        )
+        with pytest.raises(ValueError, match="reference_prices"):
+            _ = context.signal_notional
+
+    def test_equity_signal_notional_uses_supplied_reference_price(
+        self, base_settings, ist_now
+    ) -> None:
+        equity = make_equity()
+        signal = make_equity_signal(
+            created_at=ist_now,
+            legs=(SignalLeg(contract=equity, side=Side.BUY, lots=10),),
+            metadata={"reference_prices": {"RELIANCE": "1489.25"}},
+        )
+        context = RiskContext.from_inputs(
+            portfolio=_empty_portfolio(),
+            signal=signal,
+            configuration=base_settings,
+            evaluated_at=ist_now,
+        )
+        assert context.signal_notional == Decimal("14892.50")
+
+    def test_equity_margin_required_is_full_notional_not_an_option_ratio(
+        self, base_settings, ist_now
+    ) -> None:
+        """Equity delivery (CNC) is paid for in full -- it must not be discounted by
+        the option premium-based short/long margin ratios."""
+        equity = make_equity()
+        signal = make_equity_signal(
+            created_at=ist_now,
+            legs=(SignalLeg(contract=equity, side=Side.BUY, lots=10),),
+            metadata={"reference_prices": {"RELIANCE": "1489.25"}},
+        )
+        context = RiskContext.from_inputs(
+            portfolio=_empty_portfolio(),
+            signal=signal,
+            configuration=base_settings,
+            evaluated_at=ist_now,
+        )
+        assert context.signal_margin_required == Decimal("14892.50")
+
+    def test_equity_projected_exposure_uses_supplied_reference_price(
+        self, base_settings, ist_now
+    ) -> None:
+        equity = make_equity()
+        signal = make_equity_signal(
+            created_at=ist_now,
+            legs=(SignalLeg(contract=equity, side=Side.BUY, lots=10),),
+            metadata={"reference_prices": {"RELIANCE": "1489.25"}},
+        )
+        context = RiskContext.from_inputs(
+            portfolio=_empty_portfolio(),
+            signal=signal,
+            configuration=base_settings,
+            evaluated_at=ist_now,
+        )
+        assert context.projected_exposure.gross_notional == Decimal("14892.50")
+        assert context.projected_exposure.net_notional == Decimal("14892.50")
+
+    def test_existing_equity_position_not_touched_by_signal_uses_avg_price(
+        self, base_settings, ist_now
+    ) -> None:
+        """A pre-existing equity position this signal doesn't reference must not
+        force this unrelated signal's metadata to price it -- it falls back to its
+        own recorded avg_price instead."""
+        held = make_equity(symbol="TCS")
+        existing_position = Position(contract=held, quantity=5, avg_price=Decimal("3500"))
+        portfolio_snapshot = PortfolioSnapshot(
+            positions=(existing_position,),
+            buying_power=Decimal("100000"),
+            margin_used=Decimal("17500"),
+            realized_pnl=Decimal("0"),
+            unrealized_pnl=Decimal("0"),
+            daily_pnl=Decimal("0"),
+            portfolio_greeks=PortfolioGreeks(delta=0.0, gamma=0.0, theta=0.0, vega=0.0),
+            exposure=PortfolioExposure(
+                gross_notional=Decimal("17500"), net_notional=Decimal("17500")
+            ),
+            drawdown=Decimal("0"),
+            kill_switch_state=KillSwitchState.DISARMED,
+        )
+        new_equity = make_equity(symbol="RELIANCE")
+        signal = make_equity_signal(
+            created_at=ist_now,
+            legs=(SignalLeg(contract=new_equity, side=Side.BUY, lots=10),),
+            metadata={"reference_prices": {"RELIANCE": "1489.25"}},
+        )
+        context = RiskContext.from_inputs(
+            portfolio=portfolio_snapshot,
+            signal=signal,
+            configuration=base_settings,
+            evaluated_at=ist_now,
+        )
+        # TCS (existing, untouched): 5 * 3500 = 17500 via avg_price fallback.
+        # RELIANCE (this signal): 10 * 1489.25 = 14892.50 via metadata.
+        assert context.signal_margin_required == Decimal("32392.50")
