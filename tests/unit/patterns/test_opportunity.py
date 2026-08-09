@@ -152,9 +152,11 @@ class TestFindOpportunities:
         assert all(o.asset_class is AssetClass.EQUITY for o in opportunities)
 
     def test_min_avg_forward_return_pct_off_by_default(self) -> None:
-        """Real fixture: DOJISTAR clears min_hit_rate with a real average move of
-        ~0.496% -- a small move must still surface when no minimum is set."""
-        candles = _oscillating("TEST", 60, doji_every=5)
+        """Real fixture: DOJISTAR clears min_hit_rate (and the holdout check --
+        n=150 so it has enough occurrences in BOTH halves of history) with a
+        real average move of ~0.34% -- a small move must still surface when no
+        minimum is set."""
+        candles = _oscillating("TEST", 150, doji_every=5)
         opportunities = find_opportunities(
             {"TEST": candles}, {"TEST": AssetClass.EQUITY}, min_occurrences=10
         )
@@ -171,24 +173,24 @@ class TestFindOpportunities:
         assert not any(o.pattern_name == "DOJISTAR" for o in opportunities)
 
     def test_min_avg_forward_return_pct_keeps_moves_at_or_above_threshold(self) -> None:
-        candles = _oscillating("TEST", 60, doji_every=5)
+        candles = _oscillating("TEST", 150, doji_every=5)
         opportunities = find_opportunities(
             {"TEST": candles},
             {"TEST": AssetClass.EQUITY},
             min_occurrences=10,
-            min_avg_forward_return_pct=0.4,  # below DOJISTAR's real ~0.496% move
+            min_avg_forward_return_pct=0.1,  # below DOJISTAR's real ~0.34% move
         )
         assert any(o.pattern_name == "DOJISTAR" for o in opportunities)
 
     def test_min_avg_forward_return_pct_compares_magnitude_not_sign(self) -> None:
         """DOJISTAR here is a BEARISH-direction pattern; the filter must still keep
         it purely on the size of the move, not require a positive number."""
-        candles = _oscillating("TEST", 60, doji_every=5)
+        candles = _oscillating("TEST", 150, doji_every=5)
         opportunities = find_opportunities(
             {"TEST": candles},
             {"TEST": AssetClass.EQUITY},
             min_occurrences=10,
-            min_avg_forward_return_pct=0.4,
+            min_avg_forward_return_pct=0.1,
         )
         dojistar = next(o for o in opportunities if o.pattern_name == "DOJISTAR")
         assert dojistar.direction is PatternDirection.BEARISH
@@ -219,11 +221,12 @@ class TestAnalyzeSymbol:
         assert doji.is_opportunity_grade is False
 
     def test_opportunity_grade_pattern_is_flagged_true(self) -> None:
-        """DOJISTAR clears every find_opportunities bar in this fixture (~0.56 hit
-        rate, ~0.496% move) at a low enough min_avg_forward_return_pct."""
-        candles = _oscillating("TEST", 60, doji_every=5)
+        """DOJISTAR clears every find_opportunities bar in this fixture (~0.55 hit
+        rate, ~0.34% move) at a low enough min_avg_forward_return_pct -- n=150 so
+        it also clears the holdout check in both halves of history."""
+        candles = _oscillating("TEST", 150, doji_every=5)
         records = analyze_symbol(
-            candles, forward_days=5, min_occurrences=10, min_avg_forward_return_pct=0.4
+            candles, forward_days=5, min_occurrences=10, min_avg_forward_return_pct=0.1
         )
         dojistar = next(r for r in records if r.pattern_name == "DOJISTAR")
         assert dojistar.is_opportunity_grade is True

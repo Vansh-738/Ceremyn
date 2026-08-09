@@ -14,7 +14,12 @@ from ceremyn.patterns.candlestick import detect as detect_candlestick
 from ceremyn.patterns.chart_shape import detect as detect_chart_shapes
 from ceremyn.patterns.double_pattern import detect as detect_double_patterns
 from ceremyn.patterns.head_shoulders import detect as detect_head_shoulders
-from ceremyn.patterns.study import historical_performance
+from ceremyn.patterns.study import (
+    PatternPerformance,
+    PerformanceHalves,
+    historical_performance,
+    historical_performance_by_half,
+)
 from ceremyn.patterns.swing import detect as detect_swing
 
 DEFAULT_MIN_OCCURRENCES = 10
@@ -34,6 +39,52 @@ DEFAULT_MIN_AVG_FORWARD_RETURN_PCT = 0.0
 # across the whole scan, not today's wall-clock date, so this works identically
 # in a live scan and a historical backtest.
 DEFAULT_MAX_STALENESS_DAYS = 5
+
+
+def _clears_quality_bar(
+    perf: PatternPerformance | None,
+    *,
+    min_occurrences: int,
+    min_hit_rate: float,
+    min_avg_forward_return_pct: float,
+) -> bool:
+    return (
+        perf is not None
+        and perf.hit_rate is not None
+        and perf.occurrences >= min_occurrences
+        and perf.hit_rate > min_hit_rate
+        and abs(perf.average_forward_return_pct or 0.0) >= min_avg_forward_return_pct
+    )
+
+
+def _clears_holdout(
+    halves: PerformanceHalves | None,
+    *,
+    min_occurrences: int,
+    min_hit_rate: float,
+    min_avg_forward_return_pct: float,
+) -> bool:
+    """Both the earlier and later half of history must independently clear the
+    same bar applied to the whole window (see
+    `ceremyn.patterns.study.historical_performance_by_half` for why a single
+    whole-window average isn't enough evidence on its own -- a pattern that
+    only worked in one slice of history can still look good averaged across
+    everything).
+    """
+    if halves is None:
+        return False
+    early, late = halves
+    return _clears_quality_bar(
+        early,
+        min_occurrences=min_occurrences,
+        min_hit_rate=min_hit_rate,
+        min_avg_forward_return_pct=min_avg_forward_return_pct,
+    ) and _clears_quality_bar(
+        late,
+        min_occurrences=min_occurrences,
+        min_hit_rate=min_hit_rate,
+        min_avg_forward_return_pct=min_avg_forward_return_pct,
+    )
 
 
 def find_opportunities(
@@ -60,6 +111,15 @@ def find_opportunities(
     strong bullish one, just in the other direction. A symbol whose own latest bar
     trails the scan's newest bar by more than `max_staleness_days` is skipped
     entirely -- its "opportunity" would really just be stale history.
+
+    The same quality bar must ALSO clear independently in the earlier and later
+    half of the symbol's own history (see
+    `ceremyn.patterns.study.historical_performance_by_half`) -- a whole-window
+    average alone can't distinguish a real edge from one of the many
+    (symbol, pattern, direction) combinations this scan tests every run that
+    would clear a single hit-rate bar by chance. This roughly doubles the
+    effective evidence bar, and will exclude patterns that only worked in one
+    slice of history even if their blended average looks good.
     """
     bar_timestamps = [candles[-1].timestamp for candles in candles_by_symbol.values() if candles]
     if not bar_timestamps:
@@ -85,17 +145,26 @@ def find_opportunities(
             (p.pattern_name, p.direction): p
             for p in historical_performance(candles, patterns, forward_days=forward_days)
         }
+        holdout = historical_performance_by_half(candles, patterns, forward_days=forward_days)
         asset_class = asset_class_by_symbol.get(symbol, AssetClass.EQUITY)
         for pattern in patterns:
             if pattern.detected_at != latest_timestamp:
                 continue
-            perf = performance.get((pattern.name, pattern.direction))
+            key = (pattern.name, pattern.direction)
+            perf = performance.get(key)
             if (
                 perf is None
                 or perf.hit_rate is None
                 or perf.occurrences < min_occurrences
                 or perf.hit_rate <= min_hit_rate
                 or abs(perf.average_forward_return_pct or 0.0) < min_avg_forward_return_pct
+            ):
+                continue
+            if not _clears_holdout(
+                holdout.get(key),
+                min_occurrences=min_occurrences,
+                min_hit_rate=min_hit_rate,
+                min_avg_forward_return_pct=min_avg_forward_return_pct,
             ):
                 continue
             opportunities.append(
@@ -132,7 +201,10 @@ def analyze_symbol(
     bar (`min_occurrences`/`min_hit_rate`/`min_avg_forward_return_pct`) -- a
     single symbol's weaker patterns are still real information about it. Each
     record instead carries `is_opportunity_grade`, so a caller can see exactly
-    which ones would have made the cross-market cut and which wouldn't.
+    which ones would have made the cross-market cut and which wouldn't --
+    including `find_opportunities`' own holdout requirement (the same quality
+    bar clearing independently in the earlier and later half of this symbol's
+    history; see `ceremyn.patterns.study.historical_performance_by_half`).
     """
     if len(candles) < DEFAULT_MIN_CANDLES:
         return ()
@@ -149,6 +221,7 @@ def analyze_symbol(
     source_by_key = {(p.name, p.direction): p.source for p in patterns}
     active_keys = {(p.name, p.direction) for p in patterns if p.detected_at == latest_timestamp}
     performance = historical_performance(candles, patterns, forward_days=forward_days)
+    holdout = historical_performance_by_half(candles, patterns, forward_days=forward_days)
 
     records = [
         PatternTrackRecord(
@@ -165,6 +238,12 @@ def analyze_symbol(
                 and perf.occurrences >= min_occurrences
                 and perf.hit_rate > min_hit_rate
                 and abs(perf.average_forward_return_pct or 0.0) >= min_avg_forward_return_pct
+                and _clears_holdout(
+                    holdout.get((perf.pattern_name, perf.direction)),
+                    min_occurrences=min_occurrences,
+                    min_hit_rate=min_hit_rate,
+                    min_avg_forward_return_pct=min_avg_forward_return_pct,
+                )
             ),
         )
         for perf in performance

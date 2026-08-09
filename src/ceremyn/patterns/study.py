@@ -41,6 +41,9 @@ class PatternPerformance(BaseModel):
         return self.occurrences >= _MIN_OCCURRENCES_FOR_SIGNIFICANCE
 
 
+PerformanceHalves = tuple[PatternPerformance | None, PatternPerformance | None]
+
+
 def _forward_return_pct(candles: tuple[Candle, ...], index: int, forward_days: int) -> float | None:
     if index + forward_days >= len(candles):
         return None
@@ -95,3 +98,41 @@ def historical_performance(
             )
         )
     return tuple(results)
+
+
+def historical_performance_by_half(
+    candles: tuple[Candle, ...],
+    patterns: tuple[Pattern, ...],
+    *,
+    forward_days: int = 5,
+) -> dict[tuple[str, PatternDirection], PerformanceHalves]:
+    """Split `patterns` at the chronological midpoint of `candles` into an
+    earlier half and a later half -- never shuffled, this is time-series data
+    -- and compute each (name, direction) pair's `historical_performance`
+    independently within each half.
+
+    A single-pass, whole-window hit rate can't tell a genuine edge from a
+    pattern that only happened to work in one slice of history: with
+    thousands of (symbol, pattern, direction) combinations tested across a
+    real scan, some will clear a hit-rate bar by chance alone. Requiring the
+    SAME bar to hold twice, independently, in non-overlapping history is a
+    real (if crude) out-of-sample check that a single whole-window average
+    cannot provide. `None` for a half means the pattern never fired (with a
+    measurable forward return) in that half at all -- itself a reason not to
+    trust it, not a reason to fall back to the other half's number.
+    """
+    if not candles:
+        return {}
+    midpoint = candles[len(candles) // 2].timestamp
+    earlier = tuple(p for p in patterns if p.detected_at < midpoint)
+    later = tuple(p for p in patterns if p.detected_at >= midpoint)
+    earlier_by_key = {
+        (p.pattern_name, p.direction): p
+        for p in historical_performance(candles, earlier, forward_days=forward_days)
+    }
+    later_by_key = {
+        (p.pattern_name, p.direction): p
+        for p in historical_performance(candles, later, forward_days=forward_days)
+    }
+    keys = {(p.name, p.direction) for p in patterns}
+    return {key: (earlier_by_key.get(key), later_by_key.get(key)) for key in keys}
