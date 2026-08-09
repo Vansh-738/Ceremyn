@@ -102,9 +102,11 @@ class OpportunitiesSettings(BaseModel):
     scan_enabled: bool = False
     # "watchlist" = the small built-in liquid names; "nifty500" = NSE's own
     # published NIFTY 500 constituent list (index-vetted, but market-cap-tiered
-    # by construction); "all_equities" (default) = every listed symbol --
-    # deliberately not narrowed by market cap. The one thing this scan commits
-    # to as a quality bar is liquidity (min_avg_daily_turnover below), not cap.
+    # by construction, and only ever the CURRENT list -- applying it across a
+    # multi-year lookback embeds reconstitution/survivorship bias, see
+    # ceremyn.data.providers.nse_indices's docstring); "all_equities" (default)
+    # = every listed symbol, quality-screened point-in-time by
+    # min_avg_daily_turnover below instead of by index membership.
     universe: Literal["watchlist", "nifty500", "all_equities"] = "all_equities"
     # The real, load-bearing quality bar: average daily traded value (close price
     # x volume) over the lookback window. Thin daily turnover, not nominal market

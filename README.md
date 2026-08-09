@@ -85,9 +85,14 @@ CEREMYN_OPPORTUNITIES__UNIVERSE=all_equities
 liquidity, not by restricting to an index: `CEREMYN_OPPORTUNITIES__MIN_AVG_DAILY_TURNOVER`
 (default ₹1 crore/day average traded value = close price × volume) is the load-bearing
 filter — thin daily turnover, not nominal market cap, is what actually makes a stock
-cheap to move with a small amount of money. `nifty500` (NSE's own published constituent
-list) and `watchlist` (a small built-in liquid set) are still available if you'd rather
-also restrict by index membership, but neither is the default.
+cheap to move with a small amount of money, and it's judged bar-by-bar with a trailing
+20-day window per symbol, not a single average over the whole lookback, so a symbol
+that only recently became liquid has its earlier illiquid history trimmed away rather
+than folded into its stats. `nifty500` (NSE's own published constituent list) and
+`watchlist` (a small built-in liquid set) are still available if you'd rather also
+restrict by index membership, but neither is the default — `nifty500` in particular
+only reflects *today's* constituents applied across the whole lookback, which embeds
+reconstitution/survivorship bias into any backtest run against it.
 
 **Opportunities are a month-plus horizon, not a quick flip.** Each pattern's historical
 hit rate and average return are measured `CEREMYN_OPPORTUNITIES__FORWARD_DAYS` (default

@@ -1,11 +1,21 @@
 """NSE index constituent lists (e.g. NIFTY 500) -- a free, public list of NSE's
 established, index-vetted companies.
 
-Used as the default opportunity-scan universe: NSE's own inclusion criteria
-(minimum market cap, minimum trading frequency) already screen out the thin,
-easily-manipulated micro-caps/penny stocks that a raw "every listed symbol"
-scan would otherwise surface -- a real, defensible quality bar rather than an
-invented heuristic.
+NSE's own inclusion criteria (minimum market cap, minimum trading frequency)
+screen out the thinnest, easily-manipulated micro-caps/penny stocks -- a real,
+defensible quality bar rather than an invented heuristic. But this endpoint
+only ever returns the CURRENT constituent list, and `ceremyn.api.opportunities`
+applies that one list across a multi-year lookback. That embeds a real
+reconstitution/survivorship bias into any backtest run against it: a stock
+that grew into the index recently gets its pre-inclusion history scanned too,
+and a stock that fell out of the index (often after underperforming) is
+excluded even from periods when it genuinely was a member. There is no free
+historical NIFTY 500 membership feed to fix this properly, so treat the
+`nifty500` universe option as a today's-universe convenience filter, not an
+unbiased historical study -- prefer `all_equities` plus the turnover floor
+(`ceremyn.data.services.equity_history.filter_by_min_avg_turnover`) for
+backtesting integrity, since that filter is computed point-in-time per symbol
+rather than from a single current membership snapshot.
 """
 
 import csv

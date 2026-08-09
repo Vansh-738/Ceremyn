@@ -8,7 +8,7 @@ is exercised by calling `run_scan_once` directly, the same way
 `run_periodic_scan` would -- no real network I/O and no sleeping.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 import ceremyn.api.opportunities as opportunities_module
 from ceremyn.api.app import create_app
 from ceremyn.config import OpportunitiesSettings, Settings
+from ceremyn.data.services.equity_history import DEFAULT_TURNOVER_WINDOW
 from ceremyn.domain import Candle, Opportunity, TimeFrame
 from ceremyn.domain.enums import AssetClass, PatternDirection
 
@@ -40,25 +41,33 @@ def make_opportunity(tradingsymbol: str = "RELIANCE") -> Opportunity:
     )
 
 
-def _dummy_candle(
-    symbol: str = "RELIANCE", *, close: float = 1489.25, volume: int = 1_000_000
-) -> Candle:
-    return Candle(
-        tradingsymbol=symbol,
-        timeframe=TimeFrame.DAY,
-        timestamp=datetime(2026, 8, 7, tzinfo=UTC),
-        open=Decimal(str(close)),
-        high=Decimal(str(close)),
-        low=Decimal(str(close)),
-        close=Decimal(str(close)),
-        volume=volume,
+def _liquid_candles(
+    symbol: str, *, close: float = 1489.25, volume: int = 1_000_000
+) -> tuple[Candle, ...]:
+    """`DEFAULT_TURNOVER_WINDOW` uniformly-liquid daily candles -- enough history
+    for the point-in-time turnover filter to actually confirm the symbol
+    (a single candle, below, always gets dropped: there's no full trailing
+    window behind it yet)."""
+    start = datetime(2026, 8, 7, tzinfo=UTC) - timedelta(days=DEFAULT_TURNOVER_WINDOW - 1)
+    return tuple(
+        Candle(
+            tradingsymbol=symbol,
+            timeframe=TimeFrame.DAY,
+            timestamp=start + timedelta(days=i),
+            open=Decimal(str(close)),
+            high=Decimal(str(close)),
+            low=Decimal(str(close)),
+            close=Decimal(str(close)),
+            volume=volume,
+        )
+        for i in range(DEFAULT_TURNOVER_WINDOW)
     )
 
 
 async def _fake_fetch(
     start: object, end: object, symbols: object = None
 ) -> dict[str, tuple[Candle, ...]]:
-    return {"RELIANCE": (_dummy_candle(),)}
+    return {"RELIANCE": _liquid_candles("RELIANCE")}
 
 
 @pytest.fixture(autouse=True)
@@ -205,8 +214,8 @@ class TestTurnoverFilterIntegration:
             start: object, end: object, symbols: object = None
         ) -> dict[str, tuple[Candle, ...]]:
             return {
-                "LIQUID": (_dummy_candle("LIQUID", close=1000.0, volume=1_000_000),),  # 100cr
-                "THIN": (_dummy_candle("THIN", close=10.0, volume=10),),  # 100
+                "LIQUID": _liquid_candles("LIQUID", close=1000.0, volume=1_000_000),  # 100cr/day
+                "THIN": _liquid_candles("THIN", close=10.0, volume=10),  # 100/day, every day
             }
 
         seen_symbols: list[object] = []
