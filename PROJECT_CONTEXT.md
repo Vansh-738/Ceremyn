@@ -1,10 +1,11 @@
 # AlphaQuant — Project Context
 
 > Single source of truth for resuming work with minimal context loss. Last updated after
-> M14 (Institutional Options Strategy Library), which followed M12 (LLM Assistant), M13
-> (Broker Integration), and the runtime-wiring commit (`0528a27`) that preceded them —
-> milestones have landed out of numeric order all session (M13 → M12 → M14). Pair this with
-> `CLAUDE.md` (enforced conventions) and `README.md` (setup + roadmap).
+> M15 (Trading Runtime & Production Readiness), which followed M14 (Institutional Options
+> Strategy Library), M12 (LLM Assistant), M13 (Broker Integration), and the runtime-wiring
+> commit (`0528a27`) that preceded them — milestones have landed out of numeric order across
+> sessions (M13 → M12 → M14 → M15). Pair this with `CLAUDE.md` (enforced conventions) and
+> `README.md` (setup + roadmap).
 
 ---
 
@@ -45,12 +46,12 @@ extensive backtesting, paper-before-live, production-quality code.
 | M13 | Broker integration: real `KiteBroker`, `SimulatedBroker` fallback, triple-gate arming (`LiveTradingGate` + `GatedBrokerAdapter`), `/execution` admin API | ✅ |
 | M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, 12 capabilities, SSE streaming, `/llm` API, incapable of execution by construction | ✅ |
 | M14 | Institutional Options Strategy Library: shared declarative multi-leg engine + 6 new strategies (Iron Fly, Short Straddle, Vertical Spread + Bull Put/Bear Call presets, Calendar Spread) on top of the 3 existing (Iron Condor, Short Strangle, Expiry-Day Theta) — 9 total, adjustment rules, multi-expiry backtest support, dashboard + LLM catalog integration | ✅ |
+| M15 | Trading Runtime & Production Readiness: new `runtime/` package (`RuntimeOrchestrator` — owns startup/shutdown, drives live data → strategies → risk → OMS → broker → portfolio, polls fills/heartbeat/reconciliation), production Kite streaming callbacks wired to the real heartbeat/reconnect state machine, OMS order journaling + restore-on-restart, `KiteBroker` idempotency fixed to round-trip Kite's own `tag` field, and a multi-leg compensation mechanism that unwinds sibling legs when one leg of a correlated signal group is rejected/fails | ✅ |
 
-**Quality (all green):** 912 passed, 0 failed (unit suite; DB-gated integration tests skip
-locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict` (197 files), `lint-imports`
-(17 contracts, all KEPT — no new contracts needed for M14) all clean. Overall coverage ~96%
-(CI gate is 85%); every M14 file is at 100% individually — see §12 for the (pre-existing,
-unrelated) exceptions.
+**Quality (all green):** 936 passed, 0 failed (unit suite; DB-gated integration tests skip
+locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict`, `lint-imports`
+(17 contracts, all KEPT — no new contracts needed for M15) all clean. Overall coverage ~96%
+(CI gate is 85%) — see §12 for the pre-existing, unrelated exceptions.
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.
@@ -72,6 +73,7 @@ Clean architecture, `src/` layout. Dependencies point inward; enforced by **impo
 ```
 interface   →  api/, dashboard/, scripts/
 services    →  strategies/, risk/, backtest/, research/, features/, paper/, oms/, live/, data/services
+runtime     →  runtime/  (M15: RuntimeOrchestrator — sequences live/strategies/risk/oms, owned by api/app.py's lifespan)
 infrastructure → data/providers (Kite, bhavcopy), data/repositories (Postgres/SQLAlchemy)
 domain      →  domain/  (pure entities/value objects; imports nothing else in the project)
 kernel      →  core/    (logging, events, calendar, timeutils, exceptions, DI container), config/
@@ -81,11 +83,15 @@ kernel      →  core/    (logging, events, calendar, timeutils, exceptions, DI 
 lazily via `cached_property` — data services, and (since the runtime-wiring milestone) the
 live/OMS/paper/risk/feature/research engines, (since M13) the broker layer: `null_broker`,
 `simulated_broker`, `kite_broker`, `live_trading_gate`, `gated_broker`, and (since M12) the LLM
-layer: `llm_client`, `conversation_store`, `watchlist_store`. Every engine is a process-lifetime
-singleton, resolved on first use, never touching Postgres, Kite, or Anthropic unless that
-specific engine actually needs to (`kite_broker`/`kite_provider`/`llm_client` all raise without
-credentials — deliberately never touched by default; the same lazy-factory shape used for
-`GatedBrokerAdapter.live_factory` is reused for `Assistant`'s `client_factory`). `api/runtime.py`
+layer: `llm_client`, `conversation_store`, `watchlist_store`, and (since M15) `orchestrator`
+(`RuntimeOrchestrator`, wired with zero strategies by default — see §11.5). Every engine is a
+process-lifetime singleton, resolved on first use, never touching Postgres, Kite, or Anthropic
+unless that specific engine actually needs to (`kite_broker`/`kite_provider`/`llm_client` all
+raise without credentials — deliberately never touched by default; the same lazy-factory shape
+used for `GatedBrokerAdapter.live_factory` is reused for `Assistant`'s `client_factory`).
+`api/app.py`'s lifespan calls `container.orchestrator.start()`/`.stop()` around the existing
+dashboard broadcaster/event-bridge lifecycle, only when a real container is wired (the
+dashboard-service test bypass never touches it). `api/runtime.py`
 adapts the container's engines into the dashboard's read-only ports (plus, since M14, a
 `_StrategySourceAdapter` that needs no engine at all — a pure `strategies.catalog_entries()`
 read); `api/llm_runtime.py` adapts them (plus the already-built `DashboardService`) into the LLM
@@ -249,13 +255,21 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
   (`ReconnectState`), `metrics.py` (`LiveMetricsSnapshot`), `snapshot.py` (`MarketSnapshot`,
   `LiveTick`), `market_hours.py` (`MarketStatus`), `aggregator.py`, `cache.py`, `validator.py`,
   `stream.py`, `scheduler.py`, `events.py` (published on the core `EventBus`).
-- **`oms/`** (2098) — Order Management System: `engine.py` (`OrderManagementEngine` /
+- **`oms/`** (2098+) — Order Management System: `engine.py` (`OrderManagementEngine` /
   `OMSEngine`; `.orders`, `.portfolio`, `.kill_switch`, `metrics_snapshot()`, `submit_signal`,
-  `arm/disarm_kill_switch`), `orders.py` (`OMSOrder`, `OMSExecutionState`, planner), `broker.py`
-  (`BrokerAdapter` protocol + snapshots), `executor.py`, `router.py`, `fills.py`, `retry.py`,
-  `idempotency.py`, `journal.py`, `ledger.py`, `metrics.py` (`OMSMetricsSnapshot`),
-  `positions.py` (`OMSPortfolio`), `reconciliation.py` (`ReconciliationReport`), `state_machine.py`,
-  `validators.py`, `events.py`.
+  `submit_correlated_signals` (M15 — a correlated group of signals, e.g. Calendar Spread's
+  paired legs, submitted and tracked together), `arm/disarm_kill_switch`), `orders.py`
+  (`OMSOrder`, `OMSExecutionState`, planner), `broker.py` (`BrokerAdapter` protocol + snapshots),
+  `executor.py`, `router.py`, `fills.py`, `retry.py`, `idempotency.py`, `journal.py`
+  (M15: every order state change is now journaled, not just written), `ledger.py`,
+  `metrics.py` (`OMSMetricsSnapshot`), `positions.py` (`OMSPortfolio`), `reconciliation.py`
+  (`ReconciliationReport`), `state_machine.py`, `validators.py`, `events.py`,
+  **`compensation.py`** (M15, new — unwinds sibling legs of a correlated signal group when one
+  leg is rejected/fails: cancels unfilled legs, closes filled ones with an offsetting order,
+  deliberately bypassing the kill switch for that flatten only), **`restore.py`** (M15, new —
+  rebuilds `.orders`/`external_index`/`children`/idempotency state from the journal at startup,
+  so a process restart doesn't forget in-flight orders). Split out of `engine.py` to stay under
+  the 500-line convention.
 - **`dashboard/`** — read-only observability (see §9), including the M13 `execution` channel
   (gate #3 status only, read-only), (M12) `permissions.py`'s `Permission.USE_LLM` (granted
   to both `Role.VIEWER` and `Role.ADMIN` — reused as-is by `/llm`'s auth, no new auth surface),
@@ -278,8 +292,20 @@ holds the real Kite integration and the triple-gate: `KiteBroker` (real Kite Con
 - **`broker/`** — `NullBrokerAdapter` (raises on submit; used as a placeholder/test double),
   `SimulatedBroker` (the real safe-fallback broker OMS actually uses whenever ungated — reuses
   `paper.broker.PaperBroker` + `oms.positions.OMSPortfolio`).
-- **`execution/`** — `kite_broker.py` (`KiteBroker`, real Kite Connect order placement), `gate.py`
-  (`LiveTradingGate`, `GateEvent`), `gated_broker.py` (`GatedBrokerAdapter`). See §5.
+- **`execution/`** — `kite_broker.py` (`KiteBroker`, real Kite Connect order placement; M15:
+  order lookup now round-trips through Kite's own `tag` field — the real idempotency key —
+  instead of local bookkeeping that was never populated for a submission whose response was
+  lost), `gate.py` (`LiveTradingGate`, `GateEvent`), `gated_broker.py` (`GatedBrokerAdapter`).
+  See §5.
+- **`runtime/`** (M15, new) — `orchestrator.py` (`RuntimeOrchestrator`: owns the trading
+  lifecycle — `start()`/`stop()`, binds a streaming client's ticks to an `AsyncTickStream`,
+  drives live snapshots through strategies → `OMSEngine.submit_correlated_signals`, and runs a
+  maintenance loop polling fills/heartbeat/reconciliation on a fixed interval). Sequences
+  existing engines exactly the way `paper/engine.py::PaperTradingEngine` sequences its own
+  components, but against the M13 `OrderManagementEngine` + `GatedBrokerAdapter` stack so paper
+  and live share one runner. Ships wired with **zero strategies by default** — enabling real
+  strategies or a real Kite streaming session is a separate configuration decision, not a side
+  effect of the orchestrator existing. See §11.5.
 - **`llm/`** (M12) — `client.py` (`ClaudeClient`, thin Anthropic SDK wrapper, `from_settings()`),
   `providers.py` (structural Protocols: `DashboardReader` — duck-typed by the real
   `DashboardService`, `llm` never imports `alphaquant.dashboard`; `ExperimentDetailReader`,
@@ -541,6 +567,57 @@ populated at import time.
 
 ---
 
+## 11.5. Trading Runtime & Production Readiness (M15) — how it works
+
+Closed the five gaps a post-M14 review found before AlphaQuant could place a real or paper
+trade in real time end-to-end (previously the live/strategy/risk/OMS pipeline was only ever
+exercised by tests, one component at a time).
+
+- **`RuntimeOrchestrator` (new `runtime/` package)** is the missing wiring: live market data →
+  strategies → risk engine → OMS → broker → portfolio, plus a maintenance loop polling
+  fills/heartbeat/reconciliation on a fixed interval (`RuntimeSettings.poll_interval_seconds`,
+  default 2s). It sequences the *same* existing engines `paper/engine.py::PaperTradingEngine`
+  sequences, but against the M13 `OrderManagementEngine` + `GatedBrokerAdapter` stack, so paper
+  and live execution share one runner instead of forking a second one (safety invariant 4, §5).
+  Owned by `api/app.py`'s lifespan (`container.orchestrator.start()`/`.stop()`, only when a real
+  container is wired), started/stopped alongside the existing dashboard broadcaster and event
+  bridge. **Ships wired with zero strategies by default** — a fresh clone with real Kite/DB
+  credentials still places no orders until strategies are explicitly configured; enabling them
+  is a deliberate, separate step, matching the platform's "never trade by accident" posture.
+- **Production Kite streaming callbacks are now live**, not test-only: `KiteTicker`'s
+  `on_connect`/`on_close`/`on_error`/`on_reconnect`/`on_noreconnect` drive the live engine's real
+  `HeartbeatState`/`ReconnectState` machine (previously only unit tests exercised those state
+  transitions). Graceful shutdown flows through `RuntimeOrchestrator.stop()`.
+  `RuntimeOrchestrator.stream` is the tick-data seam a real streaming client binds ticks onto.
+- **OMS orders are durably journaled and restored.** Every order state change is now written to
+  the existing `JSONJournalStore` (previously journaling existed but wasn't wired to every
+  transition); at startup, `oms/restore.py` rebuilds `.orders`, `external_index`, `children`, and
+  idempotency state from that journal, so a process restart no longer forgets what it had already
+  submitted — the single biggest correctness gap for anything meant to run unattended.
+- **`KiteBroker` idempotency fixed**: order lookup now round-trips through Kite's own `tag`
+  field — the actual idempotency key Kite exposes — instead of local bookkeeping that was never
+  populated in exactly the case it needed to cover (a submission whose HTTP response was lost,
+  e.g. a network blip after Kite accepted the order). Also fixed a latent `BrokerRouter` bug that
+  would have rejected any non-`ENTRY` order — including the new compensation role below — on
+  brokers without bracket-order support.
+- **Multi-leg compensation (`oms/compensation.py`, new)**: when one leg of a correlated signal
+  group (a single multi-leg `Signal`, or Calendar Spread's separately-submitted-but-correlated
+  pair, §11) is rejected or fails, the sibling leg(s) are automatically unwound — unfilled legs
+  cancelled, filled legs closed with an offsetting order — via `OMSEngine.submit_correlated_
+  signals`. This deliberately **bypasses the kill switch for that flatten only** (a kill-switch
+  trip must never prevent unwinding an already-partially-filled position it didn't cause).
+- Reuses existing subsystems throughout (`JSONJournalStore`, `PaperScheduler`,
+  `GatedBrokerAdapter`) — no new import-linter contracts needed (still 17/17). `oms/engine.py`'s
+  compensation/restore logic was split into `oms/compensation.py` and `oms/restore.py` to stay
+  under the 500-line file convention.
+
+Run: same single app (`.venv/bin/uvicorn alphaquant.api.main:app --reload`) — the orchestrator
+starts/stops automatically with it. With no strategies configured and no streaming client wired
+it is a well-tested no-op; wiring a real `KiteStreamingClient` and at least one strategy into
+`container.orchestrator` is the remaining step to actually trade (paper or live) unattended.
+
+---
+
 ## 12. Outstanding issues / known gaps
 
 1. **Logs source is a stub** — `LogSource` returns injected `LogRow`s; there is no structlog→ring-
@@ -569,8 +646,9 @@ populated at import time.
    a persistent record of arm/disarm/routing events across restarts is wanted.
 8. **`KiteBroker` is unit-tested against an injected fake client only** — there is no live/sandbox
    Kite account to test against in this environment. The request/response mapping (`place_order`/
-   `modify_order`/`cancel_order`/`orders`/`trades`/`positions`/`margins`) is believed correct
-   against the Kite Connect v3 docs but has never round-tripped a real API call.
+   `modify_order`/`cancel_order`/`orders`/`trades`/`positions`/`margins`), including M15's `tag`-
+   based idempotency lookup, is believed correct against the Kite Connect v3 docs but has never
+   round-tripped a real API call.
 9. **No dedicated dashboard UI for the M13 execution/gate status** — the JSON channel and
    WebSocket push both work (`/dashboard/api/execution`), but `dashboard/shell.py` has no visual
    panel for it yet (explicit scope decision, not an oversight).
@@ -607,6 +685,20 @@ populated at import time.
     roll-target resolution, opt-in/disabled paths) but has never been exercised through a
     multi-tick backtest showing a roll actually happening mid-trade over time; the current tests
     construct the breach condition directly rather than letting the underlying move into it.
+16. **No manual/UI order entry exists anywhere** — the dashboard is 100% read-only by
+    construction (enforced by an import-linter contract and a route-scan test), and the M15
+    `RuntimeOrchestrator` only submits orders on behalf of *registered strategies*. There is no
+    "pick a symbol, see the live price, choose qty, hit buy/sell" path today — the only way an
+    order is ever created is a `Strategy.on_chain()` emitting a `Signal`, or the M13
+    `/execution/arm` gate toggling which broker those signals route to. Building one is a genuine
+    new capability, not a bug fix — see the go-live/next-tasks note below on how it must be
+    shaped to preserve the safety invariants in §5.
+17. **`RuntimeOrchestrator` (M15) ships inert** — zero strategies wired, no streaming client
+    bound, by default (§11.5). Even with real Kite/DB/Anthropic credentials configured, a fresh
+    deployment places no orders until strategies and a streaming client are explicitly
+    configured into `container.orchestrator` — a deliberate "never trade by accident" default,
+    but also means M15 alone does not make the platform trade anything end-to-end without one
+    more wiring step.
 
 ---
 
@@ -621,13 +713,22 @@ populated at import time.
   currently-out-of-scope LLM capabilities CLAUDE.md mentions); paper/live Calendar Spread
   support (needs the M2/M8/M9 multi-expiry data-pipeline work from §12 item 13); fix
   `make_contract`'s tradingsymbol format to encode expiry (§12 item 14).
+- **Manual order ticket (personal-use priority, not yet designed):** a UI (auto-filled symbol +
+  live LTP, qty, buy/sell) that still flows through the existing safety pipeline exactly like a
+  strategy does — build a `Signal` from the form input, `RiskEngine.validate()`, `OMSEngine
+  .submit_signal()`, `GatedBrokerAdapter` — as a structurally separate router (mirroring how
+  `/execution` is kept separate from the read-only `/dashboard`), never a direct broker call from
+  the UI layer. Needs an actual design pass (plan-mode) before implementation per §15's workflow
+  convention, since it touches the safety-critical order-creation path (§12 item 16).
+- Wire at least one real strategy + a `KiteStreamingClient` into `container.orchestrator` — M15
+  built the runtime pipeline, but by design nothing flows through it until this is done (§12
+  item 17).
 - **Live trading go-live checklist (before ever setting `ALPHAQUANT_TRADING_MODE=live` for
   real):** paper burn-in per the roadmap's own note, real Kite credentials configured, a real
   `execution.arming_secret` configured (not the empty default), and a deliberate, out-of-band
   decision to call `POST /execution/arm` — never automate that call.
-- No milestone is currently in progress. Every milestone through M13, plus M12 and M14 (both
-  landed after M13 in this session), is ✅ (see §2); the roadmap has no further numbered
-  milestone defined yet — next steps are user-directed.
+- No milestone is currently in progress. Every milestone through M15 (see §2) is ✅; the roadmap
+  has no further numbered milestone defined yet — next steps are user-directed.
 
 ---
 
@@ -692,10 +793,12 @@ ALPHAQUANT_EXECUTION__ARMING_SECRET=... .venv/bin/uvicorn alphaquant.api.main:ap
 
 ## 16. Git history (recent)
 
-`M14 Options Strategy Library` is this commit, immediately following `f67a2ac` (`M12 LLM
-Assistant`) below — milestones landed out of numeric order this session (M13 → M12 → M14).
+`M15 Trading Runtime & Production Readiness` is the current tip, landed in a later session than
+M14 below — milestones have landed out of numeric order across sessions (M13 → M12 → M14 → M15).
 
 ```
+ef46d78 M15 Trading Runtime & Production Readiness
+947a655 M14 Options Strategy Library
 f67a2ac M12 LLM Assistant
 7f63e25 M13 Broker Integration
 0528a27 feat(api): wire live/OMS/paper/risk/feature/research engines into the composition root

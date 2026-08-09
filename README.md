@@ -87,6 +87,7 @@ src/alphaquant/
 ├── journal/     trade journal and performance analytics
 ├── llm/         Claude-powered analysis (reports, reviews, explanations only)
 ├── api/         FastAPI routers and schemas
+├── runtime/     Runtime orchestrator (live data → strategies → risk → OMS → broker)
 └── dashboard/   FastAPI-served Plotly dashboards
 ```
 
@@ -106,8 +107,15 @@ src/alphaquant/
 | M9 | Live Market Data Engine (streaming, heartbeat, reconnect, snapshots) | ✅ |
 | M10 | Order Management System (state machine, broker adapters, retries, idempotency, reconciliation) | ✅ |
 | M11 | Dashboard & Observability: read-only API + WebSocket, views, metrics, alerts, system health | ✅ |
-| M12 | LLM assistant (reports, reviews, explanations) | — |
-| M13 | Live trading (triple-gated) | — |
+| M13 | Broker integration: real `KiteBroker`, triple-gated live trading, `/execution` admin API | ✅ |
+| M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, `/llm` API | ✅ |
+| M14 | Institutional Options Strategy Library: 9 multi-leg strategies, shared declarative engine | ✅ |
+| M15 | Trading Runtime & Production Readiness: orchestrator, order journaling + restart-restore, multi-leg compensation | ✅ |
+
+No numbered milestone is in progress; see [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for full
+detail, known gaps, and next steps. Notably: the dashboard is still **read-only** — there is no
+manual order-entry UI yet, and the M15 runtime orchestrator ships with zero strategies wired by
+default (safe-by-default, not yet trading anything out of the box).
 
 ## Disclaimer
 
