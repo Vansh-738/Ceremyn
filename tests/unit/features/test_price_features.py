@@ -1,3 +1,5 @@
+import pytest
+
 from ceremyn.features.context import FeatureContext
 from ceremyn.features.models import FeatureScalar
 from ceremyn.features.price_features import MarketRegime
@@ -24,6 +26,13 @@ class TestComputability:
             "historical_volatility_20",
             "realized_volatility_20",
             "market_regime",
+            "macd_line",
+            "macd_signal",
+            "macd_histogram",
+            "bollinger_percent_b",
+            "bollinger_bandwidth",
+            "stochastic_k",
+            "stochastic_d",
         ):
             assert value(name, ctx) is None
 
@@ -57,6 +66,32 @@ class TestValues:
         rv = value("realized_volatility_20", ctx)
         assert isinstance(hv, float) and hv >= 0.0
         assert isinstance(rv, float) and rv >= 0.0
+
+    def test_macd_positive_on_sustained_uptrend(self) -> None:
+        ctx = ctx_with(trending_closes(60))
+        line = value("macd_line", ctx)
+        signal = value("macd_signal", ctx)
+        histogram = value("macd_histogram", ctx)
+        assert isinstance(line, float) and line > 0.0  # fast EMA pulls ahead of slow EMA
+        assert isinstance(signal, float)
+        assert isinstance(histogram, float)
+        assert histogram == pytest.approx(line - signal)
+
+    def test_bollinger_percent_b_and_bandwidth_on_uptrend(self) -> None:
+        ctx = ctx_with(trending_closes(40))
+        pct_b = value("bollinger_percent_b", ctx)
+        bandwidth = value("bollinger_bandwidth", ctx)
+        assert isinstance(pct_b, float) and pct_b > 0.5  # price sits above the rolling mean
+        assert isinstance(bandwidth, float) and bandwidth > 0.0
+
+    def test_stochastic_k_and_d_near_period_high_on_pure_uptrend(self) -> None:
+        ctx = ctx_with(trending_closes(40))
+        k = value("stochastic_k", ctx)
+        d = value("stochastic_d", ctx)
+        # Strictly rising closes with a fixed +/-1 high/low band around each bar: close
+        # sits near (not exactly at) the period high, since the band adds slack.
+        assert isinstance(k, float) and 80.0 < k <= 100.0
+        assert isinstance(d, float) and 80.0 < d <= 100.0
 
 
 class TestMarketRegime:

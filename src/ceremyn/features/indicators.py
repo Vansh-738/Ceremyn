@@ -122,6 +122,117 @@ def _wilder_smooth(values: FloatArray, period: int) -> FloatArray:
     return out
 
 
+def _ema_series(values: FloatArray, period: int) -> FloatArray:
+    """Full EMA series (not just the final value, unlike `ema()`), seeded with the
+    SMA of the first `period` values -- the same seeding convention `ema()` uses.
+    Output length is `len(values) - period + 1`."""
+    alpha = 2.0 / (period + 1.0)
+    out = np.empty(len(values) - period + 1)
+    out[0] = values[:period].mean()
+    for i, value in enumerate(values[period:], start=1):
+        out[i] = alpha * float(value) + (1.0 - alpha) * out[i - 1]
+    return out
+
+
+def macd(
+    closes: list[float],
+    *,
+    fast_period: int = 12,
+    slow_period: int = 26,
+    signal_period: int = 9,
+) -> tuple[float, float, float] | None:
+    """MACD line, signal line, and histogram (line - signal); final values only.
+
+    MACD line = fast EMA - slow EMA of closes; signal line = EMA of the MACD line
+    itself. None if there isn't enough history for the slow EMA and the signal
+    EMA on top of it to both be seeded.
+    """
+    if fast_period <= 0 or slow_period <= 0 or signal_period <= 0:
+        raise ValueError("periods must be positive")
+    if slow_period <= fast_period:
+        raise ValueError("slow_period must exceed fast_period")
+    arr = np.asarray(closes, dtype=float)
+    if len(arr) < slow_period + signal_period:
+        return None
+    fast_ema = _ema_series(arr, fast_period)
+    slow_ema = _ema_series(arr, slow_period)
+    # fast_ema starts earlier (shorter period) than slow_ema; align them to the
+    # same time index before subtracting.
+    aligned_fast = fast_ema[slow_period - fast_period :]
+    macd_line_series = aligned_fast - slow_ema
+    signal_series = _ema_series(macd_line_series, signal_period)
+    macd_line = float(macd_line_series[-1])
+    signal_line = float(signal_series[-1])
+    return macd_line, signal_line, macd_line - signal_line
+
+
+def bollinger_percent_b(
+    closes: list[float], *, period: int = 20, num_std: float = 2.0
+) -> float | None:
+    """%B: where the latest close sits relative to the Bollinger Bands,
+    (close - lower) / (upper - lower). 0 = at the lower band, 1 = at the upper
+    band; deliberately allowed outside [0, 1] when price breaks through a band
+    -- that overextension is a real signal, not an error. None if fewer than
+    `period` closes."""
+    if period <= 1:
+        raise ValueError("period must be > 1")
+    if len(closes) < period:
+        return None
+    window = np.asarray(closes[-period:], dtype=float)
+    middle = float(window.mean())
+    std = float(window.std(ddof=0))
+    upper, lower = middle + num_std * std, middle - num_std * std
+    if upper == lower:
+        return 0.5  # zero-volatility window: price is exactly at the flat bands
+    return float((closes[-1] - lower) / (upper - lower))
+
+
+def bollinger_bandwidth(
+    closes: list[float], *, period: int = 20, num_std: float = 2.0
+) -> float | None:
+    """Normalized band width: (upper - lower) / middle. A falling bandwidth
+    signals a developing "squeeze" -- tightening volatility that often precedes
+    a breakout. None if fewer than `period` closes or a zero-price window."""
+    if period <= 1:
+        raise ValueError("period must be > 1")
+    if len(closes) < period:
+        return None
+    window = np.asarray(closes[-period:], dtype=float)
+    middle = float(window.mean())
+    if middle == 0.0:
+        return None
+    std = float(window.std(ddof=0))
+    return float((2.0 * num_std * std) / middle)
+
+
+def stochastic(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    *,
+    k_period: int = 14,
+    d_period: int = 3,
+) -> tuple[float, float] | None:
+    """%K and %D (a `d_period`-bar SMA of %K), both in [0, 100]. None if fewer
+    than `k_period + d_period - 1` bars."""
+    if k_period <= 0 or d_period <= 0:
+        raise ValueError("periods must be positive")
+    if len(closes) < k_period + d_period - 1:
+        return None
+    high = np.asarray(highs, dtype=float)
+    low = np.asarray(lows, dtype=float)
+    close = np.asarray(closes, dtype=float)
+    k_values: list[float] = []
+    for i in range(k_period - 1, len(close)):
+        window_high = float(high[i - k_period + 1 : i + 1].max())
+        window_low = float(low[i - k_period + 1 : i + 1].min())
+        span = window_high - window_low
+        k_values.append(50.0 if span == 0.0 else float((close[i] - window_low) / span * 100.0))
+    percent_k = k_values[-1]
+    percent_d = float(np.mean(k_values[-d_period:]))
+    return percent_k, percent_d
+
+
 def vwap(
     highs: list[float], lows: list[float], closes: list[float], volumes: list[float]
 ) -> float | None:

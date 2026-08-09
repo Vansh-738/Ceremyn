@@ -18,6 +18,13 @@ RSI_PERIOD = 14
 ATR_PERIOD = 14
 ADX_PERIOD = 14
 VOL_WINDOW = 20
+MACD_FAST = 12
+MACD_SLOW = 26
+MACD_SIGNAL = 9
+BOLLINGER_PERIOD = 20
+BOLLINGER_NUM_STD = 2.0
+STOCHASTIC_K_PERIOD = 14
+STOCHASTIC_D_PERIOD = 3
 
 
 class MarketRegime(StrEnum):
@@ -69,6 +76,117 @@ class ADXFeature(Feature):
 
     def compute(self, ctx: FeatureContext) -> FeatureScalar:
         return indicators.adx(ctx.highs, ctx.lows, ctx.closes, period=ADX_PERIOD)
+
+
+@register
+class MACDLineFeature(Feature):
+    """MACD line = fast EMA - slow EMA of closes. A cross above 0 (the
+    centerline) signals a longer-term regime change to bullish momentum."""
+
+    name = "macd_line"
+    min_candles = MACD_SLOW + MACD_SIGNAL
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        result = indicators.macd(
+            ctx.closes, fast_period=MACD_FAST, slow_period=MACD_SLOW, signal_period=MACD_SIGNAL
+        )
+        return result[0] if result is not None else None
+
+
+@register
+class MACDSignalFeature(Feature):
+    """Signal line = EMA of the MACD line itself."""
+
+    name = "macd_signal"
+    min_candles = MACD_SLOW + MACD_SIGNAL
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        result = indicators.macd(
+            ctx.closes, fast_period=MACD_FAST, slow_period=MACD_SLOW, signal_period=MACD_SIGNAL
+        )
+        return result[1] if result is not None else None
+
+
+@register
+class MACDHistogramFeature(Feature):
+    """Histogram = MACD line - signal line. A sign flip is the classic
+    signal-line-crossover momentum trigger (faster than the centerline cross)."""
+
+    name = "macd_histogram"
+    min_candles = MACD_SLOW + MACD_SIGNAL
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        result = indicators.macd(
+            ctx.closes, fast_period=MACD_FAST, slow_period=MACD_SLOW, signal_period=MACD_SIGNAL
+        )
+        return result[2] if result is not None else None
+
+
+@register
+class BollingerPercentBFeature(Feature):
+    """%B: where price sits relative to the Bollinger Bands, normalized so 0 =
+    the lower band, 1 = the upper band -- a single-float input for downstream
+    models. Deliberately allowed outside [0, 1] on a real band breakout."""
+
+    name = "bollinger_percent_b"
+    min_candles = BOLLINGER_PERIOD
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        return indicators.bollinger_percent_b(
+            ctx.closes, period=BOLLINGER_PERIOD, num_std=BOLLINGER_NUM_STD
+        )
+
+
+@register
+class BollingerBandwidthFeature(Feature):
+    """Normalized Bollinger band width. A falling bandwidth is the classic
+    volatility "squeeze" that often precedes an explosive breakout."""
+
+    name = "bollinger_bandwidth"
+    min_candles = BOLLINGER_PERIOD
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        return indicators.bollinger_bandwidth(
+            ctx.closes, period=BOLLINGER_PERIOD, num_std=BOLLINGER_NUM_STD
+        )
+
+
+@register
+class StochasticKFeature(Feature):
+    """%K: today's close positioned within the recent high/low range, in
+    [0, 100]. Reacts faster to swings than RSI; most reliable in a ranging
+    market (pair with a low ADX reading)."""
+
+    name = "stochastic_k"
+    min_candles = STOCHASTIC_K_PERIOD + STOCHASTIC_D_PERIOD - 1
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        result = indicators.stochastic(
+            ctx.highs,
+            ctx.lows,
+            ctx.closes,
+            k_period=STOCHASTIC_K_PERIOD,
+            d_period=STOCHASTIC_D_PERIOD,
+        )
+        return result[0] if result is not None else None
+
+
+@register
+class StochasticDFeature(Feature):
+    """%D: a smoothed (SMA) version of %K, in [0, 100]."""
+
+    name = "stochastic_d"
+    min_candles = STOCHASTIC_K_PERIOD + STOCHASTIC_D_PERIOD - 1
+
+    def compute(self, ctx: FeatureContext) -> FeatureScalar:
+        result = indicators.stochastic(
+            ctx.highs,
+            ctx.lows,
+            ctx.closes,
+            k_period=STOCHASTIC_K_PERIOD,
+            d_period=STOCHASTIC_D_PERIOD,
+        )
+        return result[1] if result is not None else None
 
 
 @register

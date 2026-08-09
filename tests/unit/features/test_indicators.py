@@ -144,3 +144,109 @@ class TestLinReg:
     def test_log_returns_guard_on_non_positive(self) -> None:
         assert len(indicators.log_returns([100, 0, 100])) == 0
         assert len(indicators.log_returns([100.0])) == 0
+
+
+class TestMACD:
+    def test_matches_independent_ema_recomputation(self) -> None:
+        closes = [100 + 10 * math.sin(i / 5) + 0.1 * i for i in range(80)]
+        result = indicators.macd(closes, fast_period=12, slow_period=26, signal_period=9)
+        assert result is not None
+        macd_line, signal_line, histogram = result
+
+        def ema_full(values: list[float], period: int) -> list[float]:
+            alpha = 2.0 / (period + 1)
+            out = [sum(values[:period]) / period]
+            for v in values[period:]:
+                out.append(alpha * v + (1 - alpha) * out[-1])
+            return out
+
+        fast = ema_full(closes, 12)
+        slow = ema_full(closes, 26)
+        aligned_fast = fast[26 - 12 :]
+        macd_series = [f - s for f, s in zip(aligned_fast, slow, strict=True)]
+        signal = ema_full(macd_series, 9)
+        assert macd_line == pytest.approx(macd_series[-1])
+        assert signal_line == pytest.approx(signal[-1])
+        assert histogram == pytest.approx(macd_series[-1] - signal[-1])
+
+    def test_flat_series_is_zero(self) -> None:
+        result = indicators.macd([100.0] * 40)
+        assert result is not None
+        macd_line, signal_line, histogram = result
+        assert macd_line == pytest.approx(0.0)
+        assert signal_line == pytest.approx(0.0)
+        assert histogram == pytest.approx(0.0)
+
+    def test_none_when_insufficient(self) -> None:
+        result = indicators.macd([100.0] * 30, fast_period=12, slow_period=26, signal_period=9)
+        assert result is None
+
+    def test_rejects_non_positive_period(self) -> None:
+        with pytest.raises(ValueError):
+            indicators.macd([100.0] * 40, fast_period=0)
+
+    def test_rejects_slow_not_exceeding_fast(self) -> None:
+        with pytest.raises(ValueError):
+            indicators.macd([100.0] * 40, fast_period=26, slow_period=12)
+
+
+class TestBollingerBands:
+    def test_percent_b_at_middle_for_flat_series(self) -> None:
+        assert indicators.bollinger_percent_b([100.0] * 20, period=20) == pytest.approx(0.5)
+
+    def test_percent_b_one_at_the_upper_band(self) -> None:
+        closes = [100.0] * 19 + [200.0]  # a huge final spike pushes close to/past the upper band
+        pct_b = indicators.bollinger_percent_b(closes, period=20)
+        assert pct_b is not None and pct_b > 1.0  # allowed to exceed 1 -- a real overextension
+
+    def test_bandwidth_zero_for_flat_series(self) -> None:
+        assert indicators.bollinger_bandwidth([100.0] * 20, period=20) == pytest.approx(0.0)
+
+    def test_bandwidth_positive_for_varying_series(self) -> None:
+        closes = [100 + (i % 3) for i in range(20)]
+        bw = indicators.bollinger_bandwidth(closes, period=20)
+        assert bw is not None and bw > 0.0
+
+    def test_none_when_insufficient(self) -> None:
+        assert indicators.bollinger_percent_b([100.0] * 5, period=20) is None
+        assert indicators.bollinger_bandwidth([100.0] * 5, period=20) is None
+
+    def test_rejects_bad_period(self) -> None:
+        with pytest.raises(ValueError):
+            indicators.bollinger_percent_b([100.0] * 5, period=1)
+        with pytest.raises(ValueError):
+            indicators.bollinger_bandwidth([100.0] * 5, period=1)
+
+
+class TestStochastic:
+    def test_bounded_for_varying_series(self) -> None:
+        closes = [100 + 5 * ((i % 7) - 3) for i in range(30)]
+        highs = [c + 1 for c in closes]
+        lows = [c - 1 for c in closes]
+        result = indicators.stochastic(highs, lows, closes, k_period=14, d_period=3)
+        assert result is not None
+        percent_k, percent_d = result
+        assert isinstance(percent_k, float) and isinstance(percent_d, float)
+        assert 0.0 <= percent_k <= 100.0
+        assert 0.0 <= percent_d <= 100.0
+
+    def test_close_at_period_high_is_100(self) -> None:
+        closes = [float(i) for i in range(1, 20)]  # strictly rising: close is always the high
+        result = indicators.stochastic(closes, closes, closes, k_period=14, d_period=3)
+        assert result is not None
+        assert result[0] == pytest.approx(100.0)
+
+    def test_flat_range_is_50(self) -> None:
+        closes = [100.0] * 20
+        result = indicators.stochastic(closes, closes, closes, k_period=14, d_period=3)
+        assert result is not None
+        assert result[0] == pytest.approx(50.0)
+
+    def test_none_when_insufficient(self) -> None:
+        closes = [100.0] * 5
+        assert indicators.stochastic(closes, closes, closes, k_period=14, d_period=3) is None
+
+    def test_rejects_non_positive_period(self) -> None:
+        closes = [100.0] * 20
+        with pytest.raises(ValueError):
+            indicators.stochastic(closes, closes, closes, k_period=0)

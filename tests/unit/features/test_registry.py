@@ -22,6 +22,13 @@ EXPECTED_FEATURES = {
     "ema_21",
     "rsi_14",
     "adx_14",
+    "macd_line",
+    "macd_signal",
+    "macd_histogram",
+    "bollinger_percent_b",
+    "bollinger_bandwidth",
+    "stochastic_k",
+    "stochastic_d",
     "historical_volatility_20",
     "realized_volatility_20",
     "trend_strength",
@@ -37,9 +44,9 @@ class _Dummy(Feature):
 
 
 class TestDefaultRegistry:
-    def test_all_nineteen_features_registered(self) -> None:
+    def test_all_expected_features_registered(self) -> None:
         assert set(default_registry.available()) == EXPECTED_FEATURES
-        assert len(EXPECTED_FEATURES) == 19
+        assert len(EXPECTED_FEATURES) == 26
 
     def test_get_returns_feature(self) -> None:
         assert default_registry.get("pcr").name == "pcr"

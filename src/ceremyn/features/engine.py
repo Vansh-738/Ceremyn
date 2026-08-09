@@ -34,6 +34,8 @@ def default_validator() -> FeatureValidator:
         "adx_14",
         "liquidity_score",
         "trend_strength",
+        "stochastic_k",
+        "stochastic_d",
     ):
         validator.set_constraint(name, percent)
     for name in (
@@ -47,8 +49,14 @@ def default_validator() -> FeatureValidator:
         "historical_volatility_20",
         "realized_volatility_20",
         "time_to_expiry",
+        "bollinger_bandwidth",
     ):
         validator.set_constraint(name, non_negative)
+    # %B is normally ~[0, 1] but a real band breakout legitimately pushes it
+    # outside that range -- this generous bound only catches genuine bugs.
+    validator.set_constraint("bollinger_percent_b", Bounds(-5.0, 5.0))
+    # macd_line/macd_signal/macd_histogram have no natural bound (a price-scale
+    # -dependent EMA difference), so deliberately no constraint is set for them.
     validator.set_constraint("market_regime", Categorical(m.value for m in MarketRegime))
     return validator
 

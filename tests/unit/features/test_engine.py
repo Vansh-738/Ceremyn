@@ -32,7 +32,7 @@ class BadFeature(Feature):
 class TestComputeAll:
     def test_bundles_all_registry_features(self, full_context: FeatureContext) -> None:
         fs = FeatureEngine().compute_all(full_context)
-        assert len(fs.values) == 19
+        assert len(fs.values) == 26
         assert fs.context_fingerprint == full_context.fingerprint
         assert fs.numeric("pcr") is not None
         assert fs.get("market_regime") is not None
