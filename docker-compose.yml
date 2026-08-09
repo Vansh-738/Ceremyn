@@ -1,12 +1,15 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${ALPHAQUANT_DB__USER:-alphaquant}
       POSTGRES_PASSWORD: ${ALPHAQUANT_DB__PASSWORD:-change-me}
       POSTGRES_DB: ${ALPHAQUANT_DB__NAME:-alphaquant}
     ports:
-      - "5432:5432"
+      # Host-only bind: pg is reachable from this machine (e.g. for psql/backups)
+      # but never exposed to the LAN or beyond, even if the host's firewall is open.
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,8 +20,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -29,6 +33,7 @@ services:
 
   app:
     build: .
+    restart: unless-stopped
     env_file: .env
     environment:
       ALPHAQUANT_DB__HOST: postgres

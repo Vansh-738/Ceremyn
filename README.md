@@ -57,6 +57,34 @@ python3.12 -m venv .venv
 
 Or run everything in Docker: `docker compose up --build`.
 
+## Personal deployment (your own machine)
+
+The stack is designed to run unattended on a home machine — `docker-compose.yml`'s
+`postgres`/`redis`/`app` services all use `restart: unless-stopped`, so as long as the Docker
+daemon starts on boot (its default on Linux/macOS/Windows installs), the whole thing comes back
+up after a reboot with no manual step. `docker compose up -d --build` starts it as a background
+daemon.
+
+1. **Secrets** — fill in `.env` from `.env.example` before first run: real (non-`change-me`)
+   `ALPHAQUANT_DB__PASSWORD`, `ALPHAQUANT_KITE__API_KEY`/`API_SECRET` (market data; only needed
+   for `paper`/`live` modes), `ALPHAQUANT_ANTHROPIC__API_KEY` (only needed for `/llm`), and — if
+   you ever intend to arm live trading — `ALPHAQUANT_EXECUTION__ARMING_SECRET`. Leaving any of
+   these empty is safe; the corresponding feature just refuses cleanly instead of running.
+2. **Data durability** — `postgres`'s `pgdata` volume holds the OMS order journal, trade
+   journal, and instrument/candle history introduced across M8–M15. Back it up periodically
+   (`docker compose exec postgres pg_dump -U alphaquant alphaquant > backup.sql`) if you'd mind
+   losing trade history on a disk failure.
+3. **Reaching it from your phone** — `postgres`/`redis` are bound to `127.0.0.1` only (not
+   exposed to your LAN), but `app` publishes `8000` on all interfaces. For personal use, prefer
+   [Tailscale](https://tailscale.com) over port-forwarding your router: install it on this
+   machine and your phone, then browse to `http://<this-machine's-tailscale-name>:8000/dashboard/`
+   from anywhere — encrypted, no public exposure, no domain/TLS cert to manage. Port-forwarding
+   8000 directly to the public internet is **not recommended** for an app that can hold real
+   broker credentials and (once armed) place real orders.
+4. **Before exposing beyond `localhost`** (including over Tailscale), set
+   `ALPHAQUANT_DASHBOARD__AUTH_ENABLED=true` and real `ADMIN_TOKEN`/`VIEWER_TOKEN` values —
+   unset, every request is silently granted the VIEWER role.
+
 ## Development
 
 ```bash
