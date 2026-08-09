@@ -6,6 +6,7 @@ ARCHITECTURE_DECISIONS.md / ROADMAP_V2.md.
 from ceremyn.patterns.candlestick import available_patterns, detect
 from ceremyn.patterns.chart_shape import detect as detect_chart_shapes
 from ceremyn.patterns.double_pattern import detect as detect_double_patterns
+from ceremyn.patterns.fibonacci import compute_levels as compute_fibonacci_levels
 from ceremyn.patterns.head_shoulders import detect as detect_head_shoulders
 from ceremyn.patterns.opportunity import analyze_symbol, find_opportunities
 from ceremyn.patterns.study import PatternPerformance, historical_performance
@@ -15,6 +16,7 @@ __all__ = [
     "PatternPerformance",
     "analyze_symbol",
     "available_patterns",
+    "compute_fibonacci_levels",
     "detect",
     "detect_chart_shapes",
     "detect_double_patterns",

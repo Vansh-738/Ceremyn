@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ceremyn.api import opportunities
-from ceremyn.patterns import analyze_symbol
+from ceremyn.patterns import analyze_symbol, compute_fibonacci_levels
 
 router = APIRouter()
 
@@ -32,6 +32,21 @@ class PatternTrackRecordView(BaseModel):
     is_opportunity_grade: bool
 
 
+class FibonacciLevelsView(BaseModel):
+    direction: str
+    swing_start: float
+    swing_start_at: str
+    swing_end: float
+    swing_end_at: str
+    level_23_6: float
+    level_38_2: float
+    level_50_0: float
+    level_61_8: float
+    level_78_6: float
+    golden_pocket_low: float
+    golden_pocket_high: float
+
+
 class SymbolAnalysis(BaseModel):
     tradingsymbol: str
     as_of: str
@@ -40,6 +55,7 @@ class SymbolAnalysis(BaseModel):
     bars_analyzed: int
     last_scanned_at: str
     patterns: list[PatternTrackRecordView]
+    fibonacci: FibonacciLevelsView | None
 
 
 @router.get("/equity/{symbol}", response_model=SymbolAnalysis)
@@ -71,6 +87,7 @@ def analyze_equity(symbol: str) -> SymbolAnalysis:
         forward_days=settings.forward_days,
         min_avg_forward_return_pct=settings.min_avg_forward_return_pct,
     )
+    fib = compute_fibonacci_levels(candles, tradingsymbol=symbol)
     latest = candles[-1]
     return SymbolAnalysis(
         tradingsymbol=symbol,
@@ -93,4 +110,22 @@ def analyze_equity(symbol: str) -> SymbolAnalysis:
             )
             for r in records
         ],
+        fibonacci=(
+            FibonacciLevelsView(
+                direction=fib.direction.value,
+                swing_start=float(fib.swing_start),
+                swing_start_at=fib.swing_start_at.isoformat(),
+                swing_end=float(fib.swing_end),
+                swing_end_at=fib.swing_end_at.isoformat(),
+                level_23_6=float(fib.level_23_6),
+                level_38_2=float(fib.level_38_2),
+                level_50_0=float(fib.level_50_0),
+                level_61_8=float(fib.level_61_8),
+                level_78_6=float(fib.level_78_6),
+                golden_pocket_low=float(fib.golden_pocket_low),
+                golden_pocket_high=float(fib.golden_pocket_high),
+            )
+            if fib is not None
+            else None
+        ),
     )

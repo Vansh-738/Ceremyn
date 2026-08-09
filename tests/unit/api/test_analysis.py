@@ -36,6 +36,25 @@ def _candle(symbol: str, i: int, o: float, h: float, low: float, c: float) -> Ca
     )
 
 
+def _monotonic(symbol: str, n: int) -> tuple[Candle, ...]:
+    """Strictly rising, flat bars -- no turning points, so no swing pivots at all."""
+    return tuple(_candle(symbol, i, 100.0 + i, 100.0 + i, 100.0 + i, 100.0 + i) for i in range(n))
+
+
+def _smooth_swing(symbol: str, n: int) -> tuple[Candle, ...]:
+    """A single wide sine swing (period ~31 bars) -- clean, well-separated peaks
+    and troughs the 5-bar Fibonacci pivot window can actually confirm (unlike
+    `_oscillating_with_doji`, whose every-5-bar doji spikes tie with each other
+    and never become strict pivots)."""
+    candles = []
+    for i in range(n):
+        base = 100 + math.sin(i / 5.0) * 10
+        o, c = base, base + 0.2
+        h, low = max(o, c) + 1.0, min(o, c) - 1.0
+        candles.append(_candle(symbol, i, o, h, low, c))
+    return tuple(candles)
+
+
 def _oscillating_with_doji(symbol: str, n: int, *, doji_every: int = 5) -> tuple[Candle, ...]:
     """Same deterministic fixture as tests/unit/patterns/test_opportunity.py --
     forces a real DOJI (weak, ~0.42 hit rate) and DOJISTAR (~0.56 hit rate)."""
@@ -125,6 +144,29 @@ class TestAnalyzeEquity:
             response = client.get("/analysis/equity/test")
         assert response.status_code == 200
         assert response.json()["tradingsymbol"] == "TEST"
+
+    def test_includes_fibonacci_levels_when_swing_structure_exists(self) -> None:
+        candles = _smooth_swing("TEST", 60)
+        _seed_cache(
+            {"TEST": candles},
+            OpportunitiesSettings(forward_days=5, min_avg_forward_return_pct=0.0),
+        )
+        with TestClient(create_app(make_settings())) as client:
+            response = client.get("/analysis/equity/TEST")
+        fib = response.json()["fibonacci"]
+        assert fib is not None
+        assert fib["direction"] in {"bullish", "bearish"}
+        assert fib["golden_pocket_low"] <= fib["golden_pocket_high"]
+
+    def test_fibonacci_is_none_without_swing_structure(self) -> None:
+        candles = _monotonic("TEST", 60)
+        _seed_cache(
+            {"TEST": candles},
+            OpportunitiesSettings(forward_days=5, min_avg_forward_return_pct=0.0),
+        )
+        with TestClient(create_app(make_settings())) as client:
+            response = client.get("/analysis/equity/TEST")
+        assert response.json()["fibonacci"] is None
 
     def test_uses_the_last_scans_own_thresholds(self) -> None:
         """The endpoint must reuse the cached scan's forward_days/min_avg_forward_

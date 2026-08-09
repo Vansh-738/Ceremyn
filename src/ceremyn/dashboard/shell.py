@@ -369,6 +369,22 @@ function wireAnalysisForm(){
  }
  const btn=$("analysisBtn");
  if(btn)btn.onclick=()=>runAnalysis(($("analysisInput")||{}).value||analysisSymbol);}
+function fibonacciCard(r){
+ const f=r.fibonacci;
+ if(!f)return card('Fibonacci Retracement',empty('No clear confirmed swing high/low pair yet to anchor retracement levels.'));
+ const bullish=f.direction==='bullish';
+ const levels=[['23.6%',f.level_23_6,false],['38.2%',f.level_38_2,false],['50.0%',f.level_50_0,true],
+  ['61.8%',f.level_61_8,true],['78.6%',f.level_78_6,false]];
+ const rows=levels.map(([label,val,pocket])=>
+  `<div class="row"><span class="k">${label}${pocket?' <span class="badge gold" style="margin-left:6px">golden pocket</span>':''}</span><span class="v">${money(val)}</span></div>`
+ ).join('');
+ return card('Fibonacci Retracement',`
+  <div class="sub" style="margin-bottom:8px">
+   <span class="badge ${bullish?'green':'red'}">${f.direction}</span> leg ·
+   ${money(f.swing_start)} (${new Date(f.swing_start_at).toLocaleDateString('en-IN')}) →
+   ${money(f.swing_end)} (${new Date(f.swing_end_at).toLocaleDateString('en-IN')})
+  </div>
+  <div class="kv">${rows}</div>`);}
 function analysisResultBody(){
  if(!analysisResult)return '';
  const r=analysisResult;
@@ -388,6 +404,7 @@ function analysisResultBody(){
    ${kpi('Latest Volume',fmtNum(r.latest_volume,0))}
    ${kpi('Bars Analyzed',r.bars_analyzed)}
   </div>
+  ${fibonacciCard(r)}
   ${card(r.tradingsymbol+' — Pattern Track Record',
     rows?tbl([['Pattern'],['Direction'],['Source'],['Now'],['Hit Rate','r'],['Avg Move','r'],['N','r'],['Opp. Grade']],rows)
     :empty("No patterns detected across this stock's history."))}

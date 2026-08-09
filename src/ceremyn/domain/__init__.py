@@ -21,6 +21,7 @@ from ceremyn.domain.enums import (
     TimeFrame,
 )
 from ceremyn.domain.errors import DomainError, OrderTransitionError
+from ceremyn.domain.fibonacci import FibonacciLevels
 from ceremyn.domain.greeks import Greeks
 from ceremyn.domain.instruments import (
     CommodityContract,
@@ -53,6 +54,7 @@ __all__ = [
     "ETFInstrument",
     "EquityInstrument",
     "Exchange",
+    "FibonacciLevels",
     "Fill",
     "FutureContract",
     "Greeks",
