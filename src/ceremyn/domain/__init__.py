@@ -33,7 +33,7 @@ from ceremyn.domain.instruments import (
 from ceremyn.domain.market_data import Candle, Quote
 from ceremyn.domain.opportunity import Opportunity
 from ceremyn.domain.orders import VALID_TRANSITIONS, Fill, Order
-from ceremyn.domain.pattern import Pattern
+from ceremyn.domain.pattern import Pattern, PatternTrackRecord
 from ceremyn.domain.portfolio import PortfolioExposure, PortfolioGreeks, PortfolioSnapshot
 from ceremyn.domain.positions import Position, Trade
 from ceremyn.domain.signals import Signal, SignalLeg
@@ -69,6 +69,7 @@ __all__ = [
     "OrderType",
     "Pattern",
     "PatternDirection",
+    "PatternTrackRecord",
     "PortfolioExposure",
     "PortfolioGreeks",
     "PortfolioSnapshot",

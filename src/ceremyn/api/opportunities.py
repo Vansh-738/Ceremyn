@@ -24,7 +24,7 @@ from ceremyn.data.services.equity_history import (
     fetch_all_equity_candles,
     filter_by_min_avg_turnover,
 )
-from ceremyn.domain import Opportunity
+from ceremyn.domain import Candle, Opportunity
 from ceremyn.domain.enums import AssetClass
 from ceremyn.patterns import find_opportunities
 
@@ -61,6 +61,13 @@ class ScanState(BaseModel):
 
 _last_scan: tuple[datetime, tuple[OpportunityView, ...], int] | None = None
 _scanning = False
+# The last scan's raw, post-liquidity-filter candle history and the settings it
+# ran with -- reused by api/analysis.py so a one-symbol lookup is instant (no
+# new network fetch) and uses the exact same quality-bar thresholds as the
+# cross-market scan. Deliberately in-memory, not persisted: bounded to one
+# scan's worth at a time, replaced wholesale on every new cycle, never accumulated.
+_last_candles: dict[str, tuple[Candle, ...]] | None = None
+_last_settings: OpportunitiesSettings | None = None
 
 
 def _to_view(o: Opportunity) -> OpportunityView:
@@ -93,7 +100,7 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
     logged and swallowed -- a failed scan must not crash the background loop or
     the app; the endpoint just keeps serving the previous result until the next
     attempt succeeds."""
-    global _last_scan, _scanning
+    global _last_scan, _scanning, _last_candles, _last_settings
     _scanning = True
     try:
         end = to_ist(now_utc()).date()
@@ -117,6 +124,8 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
         )
         views = tuple(_to_view(o) for o in opportunities)
         _last_scan = (to_ist(now_utc()), views, len(candles_by_symbol))
+        _last_candles = candles_by_symbol
+        _last_settings = settings
         logger.info("opportunity_scan_completed", symbols=len(candles_by_symbol), found=len(views))
     except Exception:
         logger.exception("opportunity_scan_failed")
@@ -132,6 +141,26 @@ async def run_periodic_scan(settings: OpportunitiesSettings) -> None:
     while True:
         await run_scan_once(settings)
         await asyncio.sleep(interval_seconds)
+
+
+def get_cached_candles(symbol: str) -> tuple[Candle, ...] | None:
+    """The last completed scan's candle history for `symbol`, if it was part of
+    that scan's (liquidity-filtered) universe -- reused by api/analysis.py for
+    an instant one-symbol lookup. None if no scan has completed yet, or the
+    symbol wasn't part of it."""
+    if _last_candles is None:
+        return None
+    return _last_candles.get(symbol)
+
+
+def get_last_scan_settings() -> OpportunitiesSettings | None:
+    """The settings the last completed scan ran with, so a one-symbol lookup can
+    apply the exact same quality-bar thresholds the cross-market scan did."""
+    return _last_settings
+
+
+def get_last_scanned_at() -> datetime | None:
+    return _last_scan[0] if _last_scan is not None else None
 
 
 @router.get("/equity", response_model=ScanState)

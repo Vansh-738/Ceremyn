@@ -106,6 +106,21 @@ bhavcopy only updates once per trading day, so scanning more often wouldn't find
 anything new. For a one-off scan from the command line instead, see
 `scripts/find_opportunities.py --all-equities`.
 
+## Analyzing one stock
+
+`GET /analysis/equity/{symbol}` (and the dashboard's Analysis page) is a deliberate
+one-symbol "tell me everything you know" lookup — every pattern ever detected across
+that stock's full history, not just what's currently ranked in the market-wide scan.
+Each one is labelled `active_now` (fired on the latest bar) and `is_opportunity_grade`
+(would it have cleared `find_opportunities`' own quality bar), so a weaker or inactive
+pattern is still shown, just honestly flagged rather than hidden.
+
+It reuses the opportunity scan's own already-fetched, already-liquidity-filtered candle
+cache, so a lookup is instant — no new network fetch. That means it needs a completed
+scan first (`CEREMYN_OPPORTUNITIES__SCAN_ENABLED=true`); until one finishes, or for a
+symbol outside the scanned universe, it returns an honest 503/404 rather than fabricated
+data.
+
 ## Quickstart
 
 ```bash

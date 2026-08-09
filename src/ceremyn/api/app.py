@@ -4,9 +4,10 @@ This is the only production entry point (`uvicorn ceremyn.api.main:app`). It ser
 health/system endpoints, the Swagger docs (`/docs`), and mounts several independent
 routers: the read-only observability dashboard (`/dashboard`), the triple-gated
 live-trading admin surface (`/execution`, M13), the read-only LLM assistant (`/llm`,
-M12), manual trade submission (`/trading`), and read-only pattern-based opportunity
-discovery (`/opportunities`). There is no second FastAPI application, and each router
-is structurally separate from the others.
+M12), manual trade submission (`/trading`), read-only pattern-based opportunity
+discovery (`/opportunities`), and read-only per-symbol deep-dive analysis
+(`/analysis`). There is no second FastAPI application, and each router is
+structurally separate from the others.
 
 The dashboard is presentation only: it is wired with read-only sources and can never place an
 order. By default everything reads from a `Container` (the composition root,
@@ -24,6 +25,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 import ceremyn
+from ceremyn.api.analysis import router as analysis_router
 from ceremyn.api.execution import build_execution_router
 from ceremyn.api.llm import build_llm_router
 from ceremyn.api.llm_runtime import build_assistant
@@ -46,6 +48,7 @@ EXECUTION_PREFIX = "/execution"
 LLM_PREFIX = "/llm"
 TRADING_PREFIX = "/trading"
 OPPORTUNITIES_PREFIX = "/opportunities"
+ANALYSIS_PREFIX = "/analysis"
 
 
 class _FrameSink:
@@ -173,6 +176,8 @@ def create_app(
     # Needs no container -- a self-contained bhavcopy scan, same as ceremyn.patterns
     # itself -- so it's mounted unconditionally, like the dashboard router above.
     app.include_router(opportunities_router, prefix=OPPORTUNITIES_PREFIX)
+    # Reads the opportunities router's own cache, so it needs no container either.
+    app.include_router(analysis_router, prefix=ANALYSIS_PREFIX)
     if container is not None:
         # Separate from /dashboard by construction: the dashboard router is built above
         # from read-only sources alone and never sees the gate or a broker.

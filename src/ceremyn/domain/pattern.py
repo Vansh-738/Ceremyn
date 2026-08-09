@@ -29,3 +29,28 @@ class Pattern(BaseModel):
     source: str = Field(min_length=1)
 
     _aware = field_validator("detected_at")(_require_aware)
+
+
+class PatternTrackRecord(BaseModel):
+    """One (pattern, direction) pair's full historical track record for a single
+    symbol -- every pattern ever detected across its history, not just ones that
+    fired on the latest bar (that narrower, cross-market view is `Opportunity`).
+    Used for a deliberate, one-symbol "tell me everything you know" lookup."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pattern_name: str = Field(min_length=1)
+    direction: PatternDirection
+    source: str = Field(min_length=1)
+    # Whether this pattern fired on the symbol's own latest bar -- actionable
+    # right now, as opposed to a historical occurrence with no current signal.
+    active_now: bool
+    occurrences: int = Field(ge=0)
+    hit_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    average_forward_return_pct: float | None = None
+    forward_days: int = Field(gt=0)
+    # Whether this specific track record would clear find_opportunities' own
+    # quality bar (min_occurrences/min_hit_rate/min_avg_forward_return_pct) --
+    # lets a one-symbol lookup show its weaker patterns too, honestly labelled,
+    # rather than silently hiding everything that isn't scan-grade.
+    is_opportunity_grade: bool

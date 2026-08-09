@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from ceremyn.domain import Candle, TimeFrame
 from ceremyn.domain.enums import AssetClass, PatternDirection
-from ceremyn.patterns import find_opportunities
+from ceremyn.patterns import analyze_symbol, find_opportunities
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -192,3 +192,58 @@ class TestFindOpportunities:
         )
         dojistar = next(o for o in opportunities if o.pattern_name == "DOJISTAR")
         assert dojistar.direction is PatternDirection.BEARISH
+
+
+class TestAnalyzeSymbol:
+    def test_too_few_candles_returns_empty(self) -> None:
+        candles = _oscillating("SHORT", 10, doji_every=5)
+        assert analyze_symbol(candles) == ()
+
+    def test_plain_series_low_evidence_patterns_are_not_opportunity_grade(self) -> None:
+        """A plain series can still incidentally trigger a pattern with a single
+        occurrence -- unlike find_opportunities, analyze_symbol doesn't hide that,
+        it just correctly labels it as not opportunity-grade (too little evidence)."""
+        candles = _oscillating("PLAIN", 30)
+        records = analyze_symbol(candles)
+        assert all(r.is_opportunity_grade is False for r in records)
+
+    def test_includes_patterns_that_would_not_clear_the_opportunity_bar(self) -> None:
+        """DOJI has a real hit rate here of ~0.42 (below chance) -- find_opportunities
+        would never surface it, but a one-symbol lookup should still report it,
+        honestly labelled as not opportunity-grade."""
+        candles = _oscillating("TEST", 60, doji_every=5)
+        records = analyze_symbol(candles, forward_days=5, min_occurrences=10)
+        doji = next(r for r in records if r.pattern_name == "DOJI")
+        assert doji.hit_rate is not None
+        assert doji.hit_rate < 0.5
+        assert doji.is_opportunity_grade is False
+
+    def test_opportunity_grade_pattern_is_flagged_true(self) -> None:
+        """DOJISTAR clears every find_opportunities bar in this fixture (~0.56 hit
+        rate, ~0.496% move) at a low enough min_avg_forward_return_pct."""
+        candles = _oscillating("TEST", 60, doji_every=5)
+        records = analyze_symbol(
+            candles, forward_days=5, min_occurrences=10, min_avg_forward_return_pct=0.4
+        )
+        dojistar = next(r for r in records if r.pattern_name == "DOJISTAR")
+        assert dojistar.is_opportunity_grade is True
+
+    def test_active_now_reflects_the_latest_bar(self) -> None:
+        candles = _oscillating("TEST", 60, doji_every=5)
+        records = analyze_symbol(candles, forward_days=5, min_occurrences=10)
+        doji = next(r for r in records if r.pattern_name == "DOJI")
+        assert doji.active_now is True
+
+    def test_carries_the_detector_source(self) -> None:
+        candles = _oscillating("TEST", 60, doji_every=5)
+        records = analyze_symbol(candles, forward_days=5, min_occurrences=10)
+        doji = next(r for r in records if r.pattern_name == "DOJI")
+        assert doji.source == "candlestick"
+
+    def test_sorted_active_and_opportunity_grade_first(self) -> None:
+        candles = _oscillating("TEST", 60, doji_every=5)
+        records = analyze_symbol(
+            candles, forward_days=5, min_occurrences=10, min_avg_forward_return_pct=0.4
+        )
+        flags = [(r.active_now, r.is_opportunity_grade) for r in records]
+        assert flags == sorted(flags, reverse=True)

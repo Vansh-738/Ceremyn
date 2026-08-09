@@ -8,7 +8,7 @@ scored by its own backtested hit rate and average forward return, then ranked.
 
 from datetime import timedelta
 
-from ceremyn.domain import Candle, Opportunity, Pattern
+from ceremyn.domain import Candle, Opportunity, Pattern, PatternTrackRecord
 from ceremyn.domain.enums import AssetClass
 from ceremyn.patterns.candlestick import detect as detect_candlestick
 from ceremyn.patterns.chart_shape import detect as detect_chart_shapes
@@ -113,3 +113,62 @@ def find_opportunities(
                 )
             )
     return tuple(sorted(opportunities, key=lambda o: o.edge_score, reverse=True))
+
+
+def analyze_symbol(
+    candles: tuple[Candle, ...],
+    *,
+    forward_days: int = 5,
+    min_occurrences: int = DEFAULT_MIN_OCCURRENCES,
+    min_hit_rate: float = DEFAULT_MIN_HIT_RATE,
+    min_avg_forward_return_pct: float = DEFAULT_MIN_AVG_FORWARD_RETURN_PCT,
+) -> tuple[PatternTrackRecord, ...]:
+    """Every pattern ever detected across one symbol's full history, each with its
+    own historical track record -- a deliberate, one-symbol "tell me everything
+    you know" lookup, not the narrower cross-market "what fired today and clears
+    the quality bar" view `find_opportunities` gives.
+
+    Unlike `find_opportunities`, nothing here is excluded for failing the quality
+    bar (`min_occurrences`/`min_hit_rate`/`min_avg_forward_return_pct`) -- a
+    single symbol's weaker patterns are still real information about it. Each
+    record instead carries `is_opportunity_grade`, so a caller can see exactly
+    which ones would have made the cross-market cut and which wouldn't.
+    """
+    if len(candles) < DEFAULT_MIN_CANDLES:
+        return ()
+    latest_timestamp = candles[-1].timestamp
+    patterns: tuple[Pattern, ...] = (
+        detect_candlestick(candles)
+        + detect_swing(candles)
+        + detect_chart_shapes(candles)
+        + detect_double_patterns(candles)
+        + detect_head_shoulders(candles)
+    )
+    if not patterns:
+        return ()
+    source_by_key = {(p.name, p.direction): p.source for p in patterns}
+    active_keys = {(p.name, p.direction) for p in patterns if p.detected_at == latest_timestamp}
+    performance = historical_performance(candles, patterns, forward_days=forward_days)
+
+    records = [
+        PatternTrackRecord(
+            pattern_name=perf.pattern_name,
+            direction=perf.direction,
+            source=source_by_key[(perf.pattern_name, perf.direction)],
+            active_now=(perf.pattern_name, perf.direction) in active_keys,
+            occurrences=perf.occurrences,
+            hit_rate=perf.hit_rate,
+            average_forward_return_pct=perf.average_forward_return_pct,
+            forward_days=forward_days,
+            is_opportunity_grade=(
+                perf.hit_rate is not None
+                and perf.occurrences >= min_occurrences
+                and perf.hit_rate > min_hit_rate
+                and abs(perf.average_forward_return_pct or 0.0) >= min_avg_forward_return_pct
+            ),
+        )
+        for perf in performance
+    ]
+    return tuple(
+        sorted(records, key=lambda r: (r.active_now, r.is_opportunity_grade), reverse=True)
+    )

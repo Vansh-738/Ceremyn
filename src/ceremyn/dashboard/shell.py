@@ -59,6 +59,7 @@ SHELL_HTML = r"""<!doctype html>
 const PAGES=[
  ["overview","Overview","M3 12h4l3 8 4-16 3 8h4"],
  ["markets","Markets","M3 17l6-6 4 4 8-8"],
+ ["analysis","Analysis","M12 2a10 10 0 100 20 10 10 0 000-20z M12 7a5 5 0 100 10 5 5 0 000-10z M12 11a1 1 0 100 2 1 1 0 000-2z"],
  ["portfolio","Portfolio","M3 3v18h18 M7 15l4-4 3 3 5-6"],
  ["orders","Orders","M4 6h16 M4 12h16 M4 18h10"],
  ["risk","Risk","M12 3l9 16H3z M12 10v4 M12 17h.01"],
@@ -74,6 +75,7 @@ let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",product:"CNC"};
 let tradeBusy=false; let tradeMsg=null;
 let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set();
 let scanState={scanning:false,last_scanned_at:null,symbols_scanned:0};
+let analysisSymbol=""; let analysisResult=null; let analysisError=null; let analysisLoading=false;
 
 const $=(id)=>document.getElementById(id);
 const fmtNum=(v,d=2)=>Number(v??0).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -174,6 +176,16 @@ function loadOpportunities(){
  fetch('/opportunities/equity').then(r=>r.ok?r.json():null).then(payload=>{
   if(payload){opportunities=payload.opportunities||[];scanState=payload;if(active==='markets')render();}
  }).catch(()=>{});}
+function runAnalysis(symbol){
+ symbol=(symbol||'').trim().toUpperCase();
+ if(!symbol)return;
+ analysisSymbol=symbol;analysisLoading=true;analysisError=null;analysisResult=null;render();
+ fetch('/analysis/equity/'+encodeURIComponent(symbol)).then(async(r)=>{
+  const body=await r.json().catch(()=>null);
+  if(r.ok){analysisResult=body;}
+  else{analysisError=(body&&body.detail)||`Request failed (${r.status})`;}
+ }).catch(()=>{analysisError='Network error — could not reach the analysis API.';})
+ .finally(()=>{analysisLoading=false;render();});}
 function statusChips(){
  const h=state.health,l=state.live,s=state.sys;
  if(s)setChip("runChip",s.runtime_ready?"ok":"warn",s.runtime_ready?"Runtime ready":"Runtime off");
@@ -220,6 +232,7 @@ function render(){
  const c=$("content");
  if(active==='overview')return renderOverview(c);
  if(active==='markets')return renderMarkets(c);
+ if(active==='analysis')return renderAnalysis(c);
  if(active==='portfolio')return renderPortfolio(c);
  if(active==='orders')return renderOrders(c);
  if(active==='risk')return renderRisk(c);
@@ -341,6 +354,47 @@ function renderMarkets(c){const l=state.live||{};const u=l.underlyings||[];
     kvrow('Heartbeat delay',fmtNum(l.heartbeat_delay_seconds,2)+'s')))}
   ${opportunityCards()}`;
  wireOpportunityButtons();}
+function analysisSearchCard(){
+ return `<div class="card">${CORNERS}<h3>Analyze a Stock</h3>
+  <div style="display:flex;gap:8px">
+   <input class="input" id="analysisInput" placeholder="e.g. RELIANCE" value="${analysisSymbol}" style="flex:1"/>
+   <button class="btn btn-primary" id="analysisBtn"${analysisLoading?' disabled':''}>${analysisLoading?'Analyzing…':'Analyze'}</button>
+  </div>
+  ${analysisError?`<div class="sub neg" style="margin-top:10px">${analysisError}</div>`:''}</div>`;}
+function wireAnalysisForm(){
+ const inp=$("analysisInput");
+ if(inp){
+  inp.oninput=(e)=>{analysisSymbol=e.target.value;};
+  inp.onkeydown=(e)=>{if(e.key==='Enter')runAnalysis(inp.value);};
+ }
+ const btn=$("analysisBtn");
+ if(btn)btn.onclick=()=>runAnalysis(($("analysisInput")||{}).value||analysisSymbol);}
+function analysisResultBody(){
+ if(!analysisResult)return '';
+ const r=analysisResult;
+ const rows=(r.patterns||[]).map(p=>`<tr>
+   <td>${humanize(p.pattern_name)}</td>
+   <td><span class="badge ${p.direction==='bullish'?'green':'red'}">${p.direction}</span></td>
+   <td>${humanize(p.source)}</td>
+   <td>${p.active_now?'<span class="badge gold">active</span>':''}</td>
+   <td class="r">${p.hit_rate!=null?pct(p.hit_rate*100):'—'}</td>
+   <td class="r">${p.average_forward_return_pct!=null?(p.average_forward_return_pct>=0?'+':'')+fmtNum(p.average_forward_return_pct,1)+'%':'—'}</td>
+   <td class="r">${p.occurrences}</td>
+   <td>${p.is_opportunity_grade?'<span class="badge green">yes</span>':'<span class="badge gray">no</span>'}</td>
+  </tr>`).join('');
+ return `
+  <div class="grid kpis">
+   ${kpi('Latest Close',money(r.latest_close))}
+   ${kpi('Latest Volume',fmtNum(r.latest_volume,0))}
+   ${kpi('Bars Analyzed',r.bars_analyzed)}
+  </div>
+  ${card(r.tradingsymbol+' — Pattern Track Record',
+    rows?tbl([['Pattern'],['Direction'],['Source'],['Now'],['Hit Rate','r'],['Avg Move','r'],['N','r'],['Opp. Grade']],rows)
+    :empty("No patterns detected across this stock's history."))}
+  <div class="sub" style="margin-top:-6px">As of ${new Date(r.as_of).toLocaleDateString('en-IN')} · scan data from ${new Date(r.last_scanned_at).toLocaleString('en-IN')}</div>`;}
+function renderAnalysis(c){
+ c.innerHTML=`${analysisSearchCard()}${analysisResultBody()}`;
+ wireAnalysisForm();}
 function renderPortfolio(c){const pf=state.portfolio||{};const g=pf.greeks||{};const e=pf.exposure||{};
  const p=state.positions||{};const rows=p.positions||[];
  const val=(pf.buying_power||0)+(pf.margin_used||0);
