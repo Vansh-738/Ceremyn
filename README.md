@@ -95,7 +95,10 @@ hit rate and average return are measured `CEREMYN_OPPORTUNITIES__FORWARD_DAYS` (
 average move clears `CEREMYN_OPPORTUNITIES__MIN_AVG_FORWARD_RETURN_PCT` (default 15%) —
 compared against the *size* of the move, not its direction, so a strong bearish setup
 qualifies exactly like a strong bullish one. Real evidence for a move too small to act
-on still doesn't clear this bar.
+on still doesn't clear this bar. Each pattern's statistics are drawn from
+`CEREMYN_OPPORTUNITIES__LOOKBACK_DAYS` (default 750, ~3 years) of history — verified
+live at that size: a full whole-market scan (~500 real trading days) completes in
+well under 5 minutes.
 
 It then runs as a background task (never blocking the dashboard/WebSocket), once at
 startup and every `CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS` (default 6) after that —

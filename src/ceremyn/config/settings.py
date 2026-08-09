@@ -118,7 +118,13 @@ class OpportunitiesSettings(BaseModel):
     # *magnitude* of the average move, not its sign (see find_opportunities).
     min_avg_forward_return_pct: float = Field(default=15.0, ge=0)
     scan_interval_hours: float = Field(default=6.0, gt=0)
-    lookback_days: int = Field(default=400, gt=0)
+    # ~3 years of history: with a 30-day forward window, the trailing 30 days of
+    # any lookback can't contribute a completed occurrence, so more history
+    # means more (and steadier) samples per pattern, not just a bigger number
+    # for its own sake. Verified live at this size: ~500 real trading days
+    # fetched, full whole-market scan completes in well under 5 minutes --
+    # comfortably inside the default 6-hour rescan interval.
+    lookback_days: int = Field(default=750, gt=0)
 
 
 class RiskPositionSettings(BaseModel):
