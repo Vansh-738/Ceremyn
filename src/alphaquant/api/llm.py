@@ -9,21 +9,15 @@ Auth reuses the dashboard's existing bearer-token mechanism (`dashboard.permissi
 """
 
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from alphaquant.api.auth import require_permission
 from alphaquant.dashboard.config import DashboardSettings
-from alphaquant.dashboard.permissions import (
-    AuthError,
-    ForbiddenError,
-    Permission,
-    Role,
-    authorize,
-    bearer_token,
-)
+from alphaquant.dashboard.permissions import Permission
 from alphaquant.llm.assistant import Assistant, StreamEvent
 from alphaquant.llm.watchlist import WatchlistStore
 
@@ -72,26 +66,11 @@ async def _sse_stream(events: AsyncIterator[StreamEvent]) -> AsyncIterator[str]:
         yield _sse_encode(event)
 
 
-def _auth_dependency(
-    permission: Permission, settings: DashboardSettings
-) -> Callable[[str | None], Role]:
-    def dependency(authorization: str | None = Header(default=None)) -> Role:
-        token = bearer_token(authorization)
-        try:
-            return authorize(token, permission, settings)
-        except AuthError as exc:
-            raise HTTPException(status_code=401, detail=str(exc)) from exc
-        except ForbiddenError as exc:
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
-
-    return dependency
-
-
 def build_llm_router(
     assistant: Assistant, watchlist: WatchlistStore, settings: DashboardSettings
 ) -> APIRouter:
     router = APIRouter()
-    use_llm = Depends(_auth_dependency(Permission.USE_LLM, settings))
+    use_llm = Depends(require_permission(Permission.USE_LLM, settings))
 
     @router.post("/chat", dependencies=[use_llm])
     def chat(request: ChatRequest) -> StreamingResponse:

@@ -1,9 +1,11 @@
 """FastAPI application factory — the single production application.
 
 This is the only production entry point (`uvicorn alphaquant.api.main:app`). It serves the
-health/system endpoints, the Swagger docs (`/docs`), and mounts three independent routers:
+health/system endpoints, the Swagger docs (`/docs`), and mounts four independent routers:
 the read-only observability dashboard (`/dashboard`), the triple-gated live-trading admin
-surface (`/execution`, M13), and the read-only LLM assistant (`/llm`, M12). There is no
+surface (`/execution`, M13), the read-only LLM assistant (`/llm`, M12), and the manual order
+ticket (`/manual-orders`) — an operator-facing write path that still flows through the same
+`Signal -> RiskEngine -> OMS -> GatedBrokerAdapter` pipeline every strategy uses. There is no
 second FastAPI application, and each router is structurally separate from the others.
 
 The dashboard is presentation only: it is wired with read-only sources and can never place an
@@ -25,6 +27,7 @@ import alphaquant
 from alphaquant.api.execution import build_execution_router
 from alphaquant.api.llm import build_llm_router
 from alphaquant.api.llm_runtime import build_assistant
+from alphaquant.api.manual_order import build_manual_order_router
 from alphaquant.api.runtime import build_dashboard_sources
 from alphaquant.config import Settings, get_settings
 from alphaquant.core.container import Container
@@ -39,6 +42,7 @@ from alphaquant.dashboard.websocket import ConnectionManager
 DASHBOARD_PREFIX = "/dashboard"
 EXECUTION_PREFIX = "/execution"
 LLM_PREFIX = "/llm"
+MANUAL_ORDER_PREFIX = "/manual-orders"
 
 
 class _FrameSink:
@@ -142,6 +146,23 @@ def create_app(
                 build_assistant(container, service), container.watchlist_store, dashboard_settings
             ),
             prefix=LLM_PREFIX,
+        )
+        # Also separate from /dashboard, /execution, and /llm: the manual order ticket is
+        # the one write path an operator drives directly, but it's still just another
+        # caller of the same submit_signal() every strategy uses — see manual_order.py's
+        # docstring for the full invariant.
+        app.include_router(
+            build_manual_order_router(
+                # Lazy: chain_service transitively raises BrokerError without Kite
+                # credentials — see manual_order.py's docstring for why this must stay
+                # a factory rather than `container.chain_service` resolved here.
+                chain_service_factory=lambda: container.chain_service,
+                instruments=container.instrument_repository,
+                oms_engine=container.oms_engine,
+                underlyings=settings.data.underlyings,
+                settings=dashboard_settings,
+            ),
+            prefix=MANUAL_ORDER_PREFIX,
         )
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ

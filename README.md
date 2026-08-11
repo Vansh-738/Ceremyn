@@ -139,11 +139,12 @@ src/alphaquant/
 | M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, `/llm` API | ✅ |
 | M14 | Institutional Options Strategy Library: 9 multi-leg strategies, shared declarative engine | ✅ |
 | M15 | Trading Runtime & Production Readiness: orchestrator, order journaling + restart-restore, multi-leg compensation | ✅ |
+| — | Manual Order Ticket: `/manual-orders` API + dashboard "Order Ticket" page for personal, non-algorithmic trading — same `Signal → RiskEngine → OMS → GatedBrokerAdapter` path every strategy uses | ✅ |
 
 No numbered milestone is in progress; see [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for full
-detail, known gaps, and next steps. Notably: the dashboard is still **read-only** — there is no
-manual order-entry UI yet, and the M15 runtime orchestrator ships with zero strategies wired by
-default (safe-by-default, not yet trading anything out of the box).
+detail, known gaps, and next steps. Notably: the M15 runtime orchestrator still ships with zero
+strategies wired by default (safe-by-default, not yet trading anything algorithmic out of the
+box) — the Manual Order Ticket is a separate, always-available path that doesn't depend on it.
 
 ## Disclaimer
 

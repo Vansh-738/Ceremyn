@@ -174,3 +174,26 @@ class TestLLMRouterSeparation:
         )
         paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
         assert not any(path.startswith("/llm") for path in paths)
+
+
+class TestManualOrderRouterSeparation:
+    """`/manual-orders` (the manual order ticket, a write path) is a deliberately separate
+    router, same shape as `/execution`/`/llm` — never reachable under `/dashboard`, and
+    mounting it never pulls execution/OMS write surfaces into the dashboard's own routes."""
+
+    def test_manual_order_routes_are_not_reachable_under_dashboard(self) -> None:
+        app = make_app()
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert "/manual-orders/submit" in paths
+        assert "/manual-orders/underlyings" in paths
+        assert not any(path.startswith("/dashboard") and "manual-order" in path for path in paths)
+
+    def test_manual_order_router_absent_when_dashboard_service_is_explicit(self) -> None:
+        # No container -> no chain_service/instrument_repository/oms_engine to wire ->
+        # no /manual-orders routes at all, same as /execution and /llm.
+        app = create_app(
+            Settings(_env_file=None),  # type: ignore[call-arg]
+            dashboard_service=DashboardService(DashboardSources()),
+        )
+        paths = {getattr(route, "path", "") for route in app.routes}  # type: ignore[attr-defined]
+        assert not any(path.startswith("/manual-orders") for path in paths)

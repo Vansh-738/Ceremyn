@@ -19,11 +19,25 @@ class Permission(StrEnum):
     VIEW_DASHBOARD = "view_dashboard"
     VIEW_LOGS = "view_logs"
     USE_LLM = "use_llm"
+    # The one write permission: submitting a manual order (api/manual_order.py). Granted
+    # only to ADMIN, unlike the read-oriented permissions above which VIEWER also holds —
+    # in dev mode (auth_enabled=False), resolve_role always returns VIEWER, so this
+    # permission is unreachable until the operator deliberately turns auth on and
+    # configures a real admin_token. That's intentional: placing an order (even a
+    # simulated one) should never be possible on an unconfigured, out-of-the-box instance.
+    SUBMIT_ORDER = "submit_order"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.VIEWER: frozenset({Permission.VIEW_DASHBOARD, Permission.USE_LLM}),
-    Role.ADMIN: frozenset({Permission.VIEW_DASHBOARD, Permission.VIEW_LOGS, Permission.USE_LLM}),
+    Role.ADMIN: frozenset(
+        {
+            Permission.VIEW_DASHBOARD,
+            Permission.VIEW_LOGS,
+            Permission.USE_LLM,
+            Permission.SUBMIT_ORDER,
+        }
+    ),
 }
 
 

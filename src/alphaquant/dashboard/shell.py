@@ -5,9 +5,22 @@ professional dark-theme trading dashboard. It is pure presentation: it opens the
 WebSocket, subscribes to every channel, and renders each page from the pushed snapshot
 frames — no polling, no business logic, no duplicated backend code. Time-series charts are
 accumulated client-side from successive snapshot frames.
+
+The Order Ticket page (`shell_pages.py`) is the one exception to "pure presentation, no
+business logic reachable" — it's the shell's first write action, calling the sibling
+`/manual-orders/*` router directly. It lives in a separate source file, spliced into this
+document at import time via the `/*..._INSERT*/` markers below, purely to keep this file
+under the project's 500-line convention rather than growing it past that with inline markup.
 """
 
-SHELL_HTML = r"""<!doctype html>
+from alphaquant.dashboard.shell_pages import (
+    TICKET_PAGE_ICON,
+    TICKET_PAGE_ID,
+    TICKET_PAGE_JS,
+    TICKET_PAGE_LABEL,
+)
+
+_SHELL_HTML_TEMPLATE = r"""<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8"/>
@@ -61,6 +74,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
 .icon-btn{background:var(--panel);border:1px solid var(--border);color:var(--text);width:36px;height:36px;
   border-radius:10px;cursor:pointer;display:grid;place-items:center;font-size:15px}
 .icon-btn:hover{background:var(--panel-2)}
+.icon-btn.warn-confirm{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red)}
 .clock{font-family:var(--mono);color:var(--muted);font-size:13px;min-width:96px;text-align:right}
 /* Chips / badges */
 .chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;font-size:12px;
@@ -161,6 +175,7 @@ const PAGES=[
  ["paper","Paper Trading","M6 3h9l3 3v15H6z M9 8h6 M9 12h6 M9 16h4"],
  ["logs","Logs","M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5"],
  ["settings","Settings","M12 8a4 4 0 100 8 4 4 0 000-8z M19 12l2-1-2-4-2 1-2-2 0-2-4 0 0 2-2 2-2-1-2 4 2 1v2l-2 1 2 4 2-1 2 2 0 2 4 0 0-2 2-2z"],
+ /*PAGES_INSERT*/
 ];
 const state={}; const series={equity:[],pnl:[],exposure:[]}; const MAXP=120;
 let active="overview"; let logFilter="all"; let logSearch="";
@@ -267,6 +282,7 @@ function render(){
  if(active==='paper')return renderPaper(c,p);
  if(active==='logs')return renderLogs(c,p);
  if(active==='settings')return renderSettings(c,p);
+ /*RENDER_INSERT*/
 }
 function riskLevel(){const m=state.metrics||{};const a=(state.alerts&&state.alerts.alerts||[]).length;
  const crit=(state.alerts&&state.alerts.alerts||[]).some(x=>x.severity==='critical');
@@ -445,7 +461,17 @@ function renderSettings(c){const h=state.health||{};const comps=h.components||[]
     <div class="sub">Use the ☾ button in the top bar to toggle light / dark.</div></div>`)}
  </div>`;}
 
+/*SCRIPT_INSERT*/
 connect();
 </script>
 </body></html>
 """
+
+SHELL_HTML = (
+    _SHELL_HTML_TEMPLATE.replace(
+        "/*PAGES_INSERT*/",
+        f'["{TICKET_PAGE_ID}","{TICKET_PAGE_LABEL}","{TICKET_PAGE_ICON}"],',
+    )
+    .replace("/*RENDER_INSERT*/", f"if(active==='{TICKET_PAGE_ID}')return renderTicket(c);")
+    .replace("/*SCRIPT_INSERT*/", TICKET_PAGE_JS)
+)

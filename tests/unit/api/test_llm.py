@@ -9,7 +9,8 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from alphaquant.api.llm import _auth_dependency, build_llm_router
+from alphaquant.api.auth import require_permission
+from alphaquant.api.llm import build_llm_router
 from alphaquant.dashboard.backend import DashboardService, DashboardSources
 from alphaquant.dashboard.config import DashboardSettings
 from alphaquant.dashboard.permissions import Permission
@@ -243,8 +244,10 @@ def test_chat_streams_an_error_frame_on_provider_failure() -> None:
 def test_auth_dependency_maps_forbidden_error_to_403() -> None:
     # USE_LLM is granted to every role today, so a real request can never reach this
     # branch; exercise the mapping directly so it's still verified if that ever changes.
+    # (require_permission itself is the shared api/auth.py dependency factory, also used
+    # by api/manual_order.py — see tests/unit/api/test_auth.py for its own direct coverage.)
     settings = DashboardSettings(auth_enabled=True, admin_token="ADMIN", viewer_token=SECRET)
-    dependency = _auth_dependency(Permission.VIEW_LOGS, settings)
+    dependency = require_permission(Permission.VIEW_LOGS, settings)
     with pytest.raises(HTTPException) as exc_info:
         dependency(f"Bearer {SECRET}")
     assert exc_info.value.status_code == 403

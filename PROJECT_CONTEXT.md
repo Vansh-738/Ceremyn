@@ -1,11 +1,11 @@
 # AlphaQuant — Project Context
 
-> Single source of truth for resuming work with minimal context loss. Last updated after
-> M15 (Trading Runtime & Production Readiness), which followed M14 (Institutional Options
-> Strategy Library), M12 (LLM Assistant), M13 (Broker Integration), and the runtime-wiring
-> commit (`0528a27`) that preceded them — milestones have landed out of numeric order across
-> sessions (M13 → M12 → M14 → M15). Pair this with `CLAUDE.md` (enforced conventions) and
-> `README.md` (setup + roadmap).
+> Single source of truth for resuming work with minimal context loss. Last updated after the
+> Manual Order Ticket (§11.6), which followed M15 (Trading Runtime & Production Readiness),
+> M14 (Institutional Options Strategy Library), M12 (LLM Assistant), M13 (Broker Integration),
+> and the runtime-wiring commit (`0528a27`) that preceded them — milestones have landed out of
+> numeric order across sessions (M13 → M12 → M14 → M15 → Manual Order Ticket). Pair this with
+> `CLAUDE.md` (enforced conventions) and `README.md` (setup + roadmap).
 
 ---
 
@@ -47,11 +47,13 @@ extensive backtesting, paper-before-live, production-quality code.
 | M12 | LLM assistant: analysis-only Claude tool-calling loop, 16 read-only tools, 12 capabilities, SSE streaming, `/llm` API, incapable of execution by construction | ✅ |
 | M14 | Institutional Options Strategy Library: shared declarative multi-leg engine + 6 new strategies (Iron Fly, Short Straddle, Vertical Spread + Bull Put/Bear Call presets, Calendar Spread) on top of the 3 existing (Iron Condor, Short Strangle, Expiry-Day Theta) — 9 total, adjustment rules, multi-expiry backtest support, dashboard + LLM catalog integration | ✅ |
 | M15 | Trading Runtime & Production Readiness: new `runtime/` package (`RuntimeOrchestrator` — owns startup/shutdown, drives live data → strategies → risk → OMS → broker → portfolio, polls fills/heartbeat/reconciliation), production Kite streaming callbacks wired to the real heartbeat/reconnect state machine, OMS order journaling + restore-on-restart, `KiteBroker` idempotency fixed to round-trip Kite's own `tag` field, and a multi-leg compensation mechanism that unwinds sibling legs when one leg of a correlated signal group is rejected/fails | ✅ |
+| — | Manual Order Ticket: `POST /manual-orders/submit` — an operator-facing write path for personal (non-algorithmic) trading, structurally separate from `/dashboard`/`/execution`/`/llm`, routing through the identical `Signal → RiskEngine → OMSEngine.submit_signal → GatedBrokerAdapter` pipeline every strategy uses. New dashboard "Order Ticket" UI page. See §11.6 | ✅ |
 
-**Quality (all green):** 936 passed, 0 failed (unit suite; DB-gated integration tests skip
+**Quality (all green):** 958 passed, 0 failed (unit suite; DB-gated integration tests skip
 locally, run in CI). `ruff`, `ruff format --check`, `mypy --strict`, `lint-imports`
-(17 contracts, all KEPT — no new contracts needed for M15) all clean. Overall coverage ~96%
-(CI gate is 85%) — see §12 for the pre-existing, unrelated exceptions.
+(17 contracts, all KEPT — the Manual Order Ticket needed zero new contracts, same as M13/M12)
+all clean. Overall coverage stays ~96% (CI gate is 85%) — see §12 for the pre-existing,
+unrelated exceptions.
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.
@@ -618,6 +620,71 @@ it is a well-tested no-op; wiring a real `KiteStreamingClient` and at least one 
 
 ---
 
+## 11.6. Manual Order Ticket — how it works
+
+Closes outstanding-issue #16 (below): until now, the only way an order was ever created was a
+registered `Strategy` emitting a `Signal`. For personal, non-algorithmic use, an operator needs
+to place an order by hand — pick a contract, see its live premium, choose quantity and
+buy/sell, submit. Since the platform only trades index options (confirmed with the user before
+designing this — no equity/stock concept exists anywhere in the domain layer), "auto-filled name
+and price" means underlying + expiry + strike + CE/PE, with that contract's live premium shown.
+
+- **New router, fourth sibling to `/dashboard`/`/execution`/`/llm`**: `api/manual_order.py`
+  (`build_manual_order_router`), mounted at `/manual-orders`, mirroring `execution.py`'s shape —
+  lives under `api/`, never `dashboard/`, so the "Dashboard cannot place orders or bypass the
+  OMS" import-linter contract is untouched by construction (confirmed: still 17/17 contracts,
+  zero new ones needed). `GET /underlyings`, `GET /expiries`, `GET /chain` (auto-fill data —
+  spot, ATM strike, per-contract live premium) are read-only lookups; `POST /submit` is the one
+  write endpoint.
+- **Hard invariant, held by construction**: a manual order is built into the *same* `Signal`
+  shape a strategy emits (`strategy_id="manual"`, `SignalAction.ENTER`, one `SignalLeg`) and
+  flows through the identical `OMSEngine.submit_signal()` → `RiskEngine.validate()` →
+  `GatedBrokerAdapter` path — there is no second, shortcut path to a broker. Every risk rule and
+  all three live-trading gates apply exactly as they do to an algorithmic signal; `OMSRiskRejectedError`
+  surfaces as a 422 with the actual violation text, never swallowed.
+- **v1 scope, deliberately narrow**: opening positions only (no EXIT/close-position flow yet),
+  market orders only (`Signal.metadata` stays empty, which is what makes `OrderPlanner.
+  intent_from_signal` default to `ExecutionStyle.MARKET` — no limit-price support yet). Both are
+  natural fast-follows, not built here.
+- **`chain_service` is a lazy factory, not a resolved instance** — a real bug caught during
+  implementation review: `ChainService` transitively constructs a `KiteProvider`, which raises
+  `BrokerError` without `ALPHAQUANT_KITE__API_KEY` configured. Wiring `container.chain_service`
+  directly at `create_app()` mount time (as the other three routers' dependencies are wired)
+  would have crashed app construction on every credential-less dev/CI instance. Fixed by passing
+  `chain_service_factory=lambda: container.chain_service` and only calling it inside the `/chain`
+  handler's existing `try/except BrokerError` — same lazy-construction shape as `kite_broker`/
+  `llm_client` elsewhere in `core/container.py`. `instrument_repository` and `oms_engine` stay
+  eager params (confirmed safe: neither touches Postgres/Kite at construction time, only at
+  first query/submit).
+- **Auth: a new `Permission.SUBMIT_ORDER`**, granted only to `Role.ADMIN` (unlike the
+  read-oriented permissions VIEWER also holds). Since `resolve_role` always returns VIEWER when
+  `auth_enabled` is False (the out-of-the-box default), submitting an order — even a simulated
+  one — is unreachable until the operator deliberately enables auth and configures a real admin
+  token, mirroring `/execution/arm`'s "empty secret always refuses" precedent through the
+  existing permission system rather than a bespoke check. Read endpoints stay on the existing
+  `Permission.VIEW_DASHBOARD`. `api/llm.py`'s private `_auth_dependency` was factored out into a
+  new shared `api/auth.py::require_permission` once `manual_order.py` needed the identical
+  FastAPI-dependency-factory shape — one implementation, two callers now.
+- **Dashboard UI**: a 13th sidebar page, "Order Ticket" — the shell's first *write* action and
+  first page to send an `Authorization` header (stored in `localStorage`, same pattern as the
+  existing theme toggle; the shell had never needed to send one before this). Shows the current
+  live/simulated gate status prominently (reusing the existing `/dashboard/api/execution`
+  read channel — no new backend code), requires a second explicit "Confirm" click before
+  `POST /submit` fires. Lives in a new `dashboard/shell_pages.py` file, spliced into `shell.py`'s
+  served HTML at import time via string markers — kept `shell.py` itself under the 500-line
+  convention (it was already at 451/500) rather than growing it past that with inline markup.
+- Reuses existing subsystems throughout (`RiskEngine`, `OMSEngine`, `ChainService`,
+  `InstrumentRepository`, the dashboard's bearer-token auth) — no new domain concepts, no new
+  container providers beyond the existing `chain_service`/`instrument_repository`/`oms_engine`.
+
+Run: same single app; open `/dashboard/` → Order Ticket page. Needs `scripts/seed_instruments.py`
+run and real Kite credentials for the chain/premium lookups to return real data (same
+"needs credentials, refuses cleanly without them" posture as every other Kite-touching path);
+submission itself works end-to-end against the paper/simulated broker with zero external
+credentials, once `ALPHAQUANT_DASHBOARD__AUTH_ENABLED=true` and a real `ADMIN_TOKEN` are set.
+
+---
+
 ## 12. Outstanding issues / known gaps
 
 1. **Logs source is a stub** — `LogSource` returns injected `LogRow`s; there is no structlog→ring-
@@ -685,20 +752,23 @@ it is a well-tested no-op; wiring a real `KiteStreamingClient` and at least one 
     roll-target resolution, opt-in/disabled paths) but has never been exercised through a
     multi-tick backtest showing a roll actually happening mid-trade over time; the current tests
     construct the breach condition directly rather than letting the underlying move into it.
-16. **No manual/UI order entry exists anywhere** — the dashboard is 100% read-only by
-    construction (enforced by an import-linter contract and a route-scan test), and the M15
-    `RuntimeOrchestrator` only submits orders on behalf of *registered strategies*. There is no
-    "pick a symbol, see the live price, choose qty, hit buy/sell" path today — the only way an
-    order is ever created is a `Strategy.on_chain()` emitting a `Signal`, or the M13
-    `/execution/arm` gate toggling which broker those signals route to. Building one is a genuine
-    new capability, not a bug fix — see the go-live/next-tasks note below on how it must be
-    shaped to preserve the safety invariants in §5.
+16. ~~No manual/UI order entry exists anywhere~~ — **resolved**: the Manual Order Ticket
+    (`POST /manual-orders/submit` + the dashboard's "Order Ticket" page, §11.6) closes this.
+    Remaining fast-follows, deliberately out of v1 scope: closing/exiting an existing position
+    via the ticket (opening positions only today), and limit-price orders (market orders only —
+    leaving `Signal.metadata` empty defaults to `ExecutionStyle.MARKET`).
 17. **`RuntimeOrchestrator` (M15) ships inert** — zero strategies wired, no streaming client
     bound, by default (§11.5). Even with real Kite/DB/Anthropic credentials configured, a fresh
     deployment places no orders until strategies and a streaming client are explicitly
     configured into `container.orchestrator` — a deliberate "never trade by accident" default,
     but also means M15 alone does not make the platform trade anything end-to-end without one
-    more wiring step.
+    more wiring step. The Manual Order Ticket (§11.6) is unaffected by this — it's a separate,
+    always-available path that doesn't depend on the orchestrator or any registered strategy.
+18. **Manual Order Ticket has no per-operator attribution** — every manual order is journaled
+    with a fixed `strategy_id="manual"`; the auth layer has no individual-operator identity
+    (shared admin token, not per-user accounts), so "who placed this" beyond "a human, via the
+    ticket" isn't recoverable from the journal today. Fine for a single personal operator; would
+    need a real auth model to matter for more than one.
 
 ---
 
@@ -713,13 +783,8 @@ it is a well-tested no-op; wiring a real `KiteStreamingClient` and at least one 
   currently-out-of-scope LLM capabilities CLAUDE.md mentions); paper/live Calendar Spread
   support (needs the M2/M8/M9 multi-expiry data-pipeline work from §12 item 13); fix
   `make_contract`'s tradingsymbol format to encode expiry (§12 item 14).
-- **Manual order ticket (personal-use priority, not yet designed):** a UI (auto-filled symbol +
-  live LTP, qty, buy/sell) that still flows through the existing safety pipeline exactly like a
-  strategy does — build a `Signal` from the form input, `RiskEngine.validate()`, `OMSEngine
-  .submit_signal()`, `GatedBrokerAdapter` — as a structurally separate router (mirroring how
-  `/execution` is kept separate from the read-only `/dashboard`), never a direct broker call from
-  the UI layer. Needs an actual design pass (plan-mode) before implementation per §15's workflow
-  convention, since it touches the safety-critical order-creation path (§12 item 16).
+- **Manual Order Ticket fast-follows** (§11.6, §12 item 16): closing/exiting an existing
+  position via the ticket (v1 only opens positions); limit-price orders (v1 is market-only).
 - Wire at least one real strategy + a `KiteStreamingClient` into `container.orchestrator` — M15
   built the runtime pipeline, but by design nothing flows through it until this is done (§12
   item 17).

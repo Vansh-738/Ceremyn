@@ -61,6 +61,17 @@ class TestPermissions:
     def test_admin_can_use_llm(self) -> None:
         assert role_has(Role.ADMIN, Permission.USE_LLM)
 
+    def test_only_admin_can_submit_order(self) -> None:
+        assert role_has(Role.ADMIN, Permission.SUBMIT_ORDER)
+        assert not role_has(Role.VIEWER, Permission.SUBMIT_ORDER)
+
+    def test_dev_mode_cannot_submit_order(self) -> None:
+        # auth_enabled=False always resolves VIEWER (see TestResolveRole), which lacks
+        # SUBMIT_ORDER — an unconfigured, out-of-the-box instance can never place a
+        # manual order, not even a simulated one.
+        role = resolve_role(None, DashboardSettings(auth_enabled=False))
+        assert not role_has(role, Permission.SUBMIT_ORDER)
+
 
 class TestBearerToken:
     def test_extracts_token(self) -> None:
