@@ -23,6 +23,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from ceremyn.config.modes import TradingMode
 from ceremyn.core.container import Container
 from ceremyn.dashboard.config import DashboardSettings
 from ceremyn.dashboard.permissions import (
@@ -113,6 +114,11 @@ def build_trading_router(container: Container, settings: DashboardSettings) -> A
         dependencies=[place_trades],
     )
     async def place_equity_trade(request: PlaceEquityTradeRequest) -> list[PlacedOrderView]:
+        if not settings.auth_enabled and container.settings.effective_mode is TradingMode.LIVE:
+            raise HTTPException(
+                status_code=403,
+                detail="manual equity orders require dashboard authentication in live mode",
+            )
         await _cache_current_equity_quote(container, request.tradingsymbol)
         risk_reference_price = _risk_reference_price(
             supplied_price=request.reference_price,

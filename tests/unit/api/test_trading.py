@@ -37,7 +37,7 @@ def make_permissive_settings(**overrides: object) -> Settings:
 
 
 def test_place_equity_trade_succeeds_in_paper_mode() -> None:
-    with TestClient(create_app(make_permissive_settings())) as client:
+    with TestClient(create_app(make_permissive_settings(trading_mode="paper"))) as client:
         response = client.post(
             "/trading/equity",
             json={
@@ -54,6 +54,23 @@ def test_place_equity_trade_succeeds_in_paper_mode() -> None:
         assert order["quantity"] == 10
         assert order["product"] == "CNC"
         assert order["execution_state"] != "REJECTED"
+
+
+def test_place_equity_trade_rejects_unauthenticated_live_mode() -> None:
+    with TestClient(
+        create_app(make_permissive_settings(trading_mode="live", live_trading_enabled=True))
+    ) as client:
+        response = client.post(
+            "/trading/equity",
+            json={
+                "tradingsymbol": "RELIANCE",
+                "side": "BUY",
+                "quantity": 10,
+                "reference_price": "1489.25",
+            },
+        )
+    assert response.status_code == 403
+    assert "authentication" in response.json()["detail"]
 
 
 def test_place_equity_trade_defaults_to_cnc_product() -> None:
