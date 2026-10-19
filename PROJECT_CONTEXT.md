@@ -63,13 +63,9 @@ architectural direction beyond v1.
 | M15 | Trading Runtime & Production Readiness: new `runtime/` package (`Orchestrator` — live data → strategies → risk → OMS → broker → portfolio, fills/heartbeat/reconciliation polling loop; ships inert with zero strategies by default); `KiteTicker` callbacks drive the real heartbeat/reconnect state machine; OMS orders journaled and restored from `JSONJournalStore` at startup; `KiteBroker` order lookup round-trips Kite's own `tag` field; a shared compensation mechanism unwinds sibling legs of a multi-leg/correlated signal group when one leg is rejected. 936 tests passing at the time. | ✅ |
 | M16 | **Multi-asset migration begins** — Domain & Instrument Generalization: `AssetClass` enum + `EquityInstrument`/`FutureContract`/`ETFInstrument` alongside the existing `OptionContract`; `Position`/`Order`/`SignalLeg`/`Trade`/`ClosedTrade` widened from `OptionContract` to the generic `Instrument` base. Zero behavior change for any of the 9 option strategies. See §17. | ✅ |
 
-**Quality (all green, M16):** 947 passed, 0 failed, 4 skipped. `ruff`, `ruff format --check`,
-`mypy --strict` (201 files), `lint-imports` (17 contracts, all KEPT — no new contracts needed
-for M16) all clean. **Verified in true isolation** — `git stash`-ed every pre-existing
-uncommitted file (see the note above and §12) before running the gate, so this reflects HEAD +
-M16's own 16 changed files only, not the combined tree. (936 tests passed at M15; the combined
-working tree including the pre-existing uncommitted WIP currently passes 1045 — a stale/inflated
-number if read as "M16's own scope," since most of the delta belongs to that other WIP.)
+**Quality (historical M16 snapshot):** 947 passed, 0 failed, 4 skipped. The current project
+quality gates are tracked in CI; `ruff`, `ruff format --check`, `mypy --strict`, and
+`lint-imports` (20 contracts) are required on every change.
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.
@@ -111,7 +107,7 @@ read); `api/llm_runtime.py` adapts them (plus the already-built `DashboardServic
 assistant's read-only ports; `api/app.py::create_app()` wires all three and mounts `/execution`
 and `/llm` alongside `/dashboard`, each a structurally separate router.
 
-**Import-linter contracts (17, all KEPT — unchanged by M14, none needed)** — the load-bearing
+**Import-linter contracts (20, all KEPT)** — the load-bearing
 ones:
 - `domain` is independent and cannot import infrastructure.
 - **`strategies` cannot import `execution`/`broker`** — held throughout M14: all 6 new strategy

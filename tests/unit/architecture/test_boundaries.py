@@ -65,7 +65,7 @@ def test_import_linter_contracts_hold() -> None:
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "Domain cannot import infrastructure" in result.stdout
+    assert "Domain cannot import any other Ceremyn layer" in result.stdout
     assert "Strategies cannot import execution" in result.stdout
     assert "Strategies cannot import broker" in result.stdout
     assert "LLM cannot import execution" in result.stdout

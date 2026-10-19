@@ -30,8 +30,8 @@ foundation (see `ARCHITECTURE_DECISIONS.md`).
 - **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
   reviews; architecture tests prevent it from reaching risk or execution code.
 
-> **Interview snapshot:** 1,241 unit tests, 94.92% test coverage, strict type checking,
-> linting, and 21 import-boundary contracts enforced in CI.
+> **Interview snapshot:** 1,250 unit tests, 95% coverage, strict type checking, linting,
+> and 20 import-boundary contracts enforced in CI.
 
 ## Safety model
 
@@ -77,11 +77,9 @@ curl -X POST localhost:8000/trading/equity -H 'Content-Type: application/json' -
 }'
 ```
 
-**Known gap:** in paper/simulated mode, fills are currently only simulated against the
-live *option-chain* cache (`broker.simulated.SimulatedBroker._build_context`) — an
-equity order is risk-validated and submitted correctly, but may sit open rather than
-auto-filling until a live equity quote feed is wired into the simulator. Live orders
-(once armed) go straight to Kite and fill for real, unaffected by this.
+In paper mode, an equity order fills only from a recent exchange-timestamped quote in
+the live cache. Missing or stale data leaves it open; the caller-supplied risk reference
+is never used to fabricate a fill.
 
 ## Finding opportunities
 
@@ -160,7 +158,8 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pip install --no-deps -e .
 
-# 4. Pick your active runtime strategy roster in .env
+# 4. Review the explicit active runtime roster in .env before enabling a runtime.
+# The default is ["long_contrarian"]; add only strategies that have completed paper burn-in.
 # CEREMYN_RUNTIME__ACTIVE_STRATEGY_TYPES=["long_contrarian"]
 
 # 5. Daily-use checks
