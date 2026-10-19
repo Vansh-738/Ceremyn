@@ -95,6 +95,16 @@ class DataSettings(BaseModel):
     snapshot_interval_minutes: int = 5
 
 
+class EquityQuoteSettings(BaseModel):
+    """Opt-in snapshots for the most liquid NSE equities; one request per cycle."""
+
+    enabled: bool = False
+    interval_seconds: int = Field(default=180, ge=60)
+    universe_size: int = Field(default=400, gt=0, le=400)
+    turnover_sessions: int = Field(default=20, gt=0, le=60)
+    max_quote_age_seconds: int = Field(default=300, gt=0)
+
+
 class OpportunitiesSettings(BaseModel):
     """Background pattern-opportunity scan (dashboard Markets page). Off by
     default -- a real scan is a real, repeated NSE bhavcopy fetch across
@@ -245,6 +255,7 @@ class Settings(BaseSettings):
     kite: KiteSettings = Field(default_factory=KiteSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     data: DataSettings = Field(default_factory=DataSettings)
+    equity_quotes: EquityQuoteSettings = Field(default_factory=EquityQuoteSettings)
     opportunities: OpportunitiesSettings = Field(default_factory=OpportunitiesSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)
     execution: ExecutionSettings = Field(default_factory=ExecutionSettings)

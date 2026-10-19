@@ -18,7 +18,7 @@ import structlog
 
 from ceremyn.config import Settings
 from ceremyn.core.exceptions import BrokerError
-from ceremyn.core.timeutils import IST, now_utc
+from ceremyn.core.timeutils import IST
 from ceremyn.domain import (
     Candle,
     CommodityContract,
@@ -172,6 +172,11 @@ class KiteProvider:
             except Exception as exc:
                 raise BrokerError(f"Kite quote fetch failed: {exc}") from exc
             for key, payload in raw.items():
+                if not isinstance(
+                    payload.get("timestamp") or payload.get("last_trade_time"), datetime
+                ):
+                    logger.warning("kite_quote_missing_timestamp", symbol=key)
+                    continue
                 result[key] = _payload_to_quote(key, payload)
         return result
 
@@ -290,7 +295,9 @@ def _payload_to_quote(key: str, payload: dict[str, Any]) -> Quote:
     bid = Decimal(str(bids[0]["price"])) if bids and bids[0]["price"] else None
     ask = Decimal(str(asks[0]["price"])) if asks and asks[0]["price"] else None
     raw_ts = payload.get("timestamp") or payload.get("last_trade_time")
-    timestamp = _ensure_ist(raw_ts) if isinstance(raw_ts, datetime) else now_utc()
+    if not isinstance(raw_ts, datetime):
+        raise BrokerError(f"quote {key} has no exchange timestamp")
+    timestamp = _ensure_ist(raw_ts)
     return Quote(
         tradingsymbol=tradingsymbol,
         timestamp=timestamp,

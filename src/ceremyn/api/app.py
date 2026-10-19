@@ -113,11 +113,19 @@ def create_app(
         # no database) only starts when a Kite API key is actually configured — same
         # lazy-credential discipline as every other Kite-touching engine here.
         poller_started = container is not None and bool(container.settings.kite.api_key)
+        equity_quotes_started = (
+            container is not None
+            and settings.equity_quotes.enabled
+            and bool(container.settings.kite.api_key)
+            and bool(container.settings.kite.access_token.get_secret_value())
+        )
         if container is not None:
             EventBridge().register(container.event_bus, _FrameSink(manager))
             await container.orchestrator.start()
             if poller_started:
                 await container.rest_poller.start()
+            if equity_quotes_started:
+                await container.equity_quote_job.start()
         task = asyncio.create_task(run_broadcaster(service, differ, manager, dashboard_settings))
         # Off by default (see OpportunitiesSettings) -- a real scan means real,
         # repeated NSE network calls, which must never happen implicitly just
@@ -138,6 +146,8 @@ def create_app(
                 with contextlib.suppress(asyncio.CancelledError):
                     await opportunities_task
             if container is not None:
+                if equity_quotes_started:
+                    await container.equity_quote_job.stop()
                 await container.orchestrator.stop()
                 if poller_started:
                     await container.rest_poller.stop()

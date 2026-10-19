@@ -77,8 +77,19 @@ intraday history."*
 — interval, process model) or remove the container property until it's
 actually needed?
 
-Not actioned: this is already-documented, intentionally-deferred future work,
-not a defect.
+**E2 scheduling decision (2026-10-20):** equity quote snapshots use one opt-in
+async task owned by the FastAPI lifespan, every 180 seconds during market hours.
+Run a single API worker when enabled; each process has its own cache and scheduler.
+The universe refreshes once per trading day from the previous 20 completed trading
+sessions of raw NSE bhavcopy history, ranked by close times volume. Missing sessions
+exclude a symbol; unavailable history is retried on the next cycle. A snapshot
+requests up to 400 NSE symbols through the existing Kite provider and accepts only
+positive, fresh, correctly identified quotes with exchange timestamps. Partial
+responses leave old cache entries untouched; their original timestamps still expire.
+Failures are logged and retried without terminating the task.
+
+This resolves scheduling for the in-memory equity feed only. `ChainSnapshotJob`
+still needs a separate opt-in persistence decision and database availability.
 
 ---
 
@@ -98,20 +109,12 @@ Not actioned: this is a trading/risk decision, not a code cleanup.
 
 ---
 
-## 5. `SimulatedBroker` only simulates fills against the option-chain cache
+## 5. Equity paper quotes — resolved in E1/E2
 
-`broker.simulated.SimulatedBroker._build_context` builds its fill quotes purely
-from `LiveDataCache.latest_chain(underlying)` — an option-chain snapshot. Since
-`api/trading.py`'s manual-trade endpoint (see git history around
-`feat(api): manual equity trade submission`) now lets a plain equity `Signal`
-reach the OMS, a paper-mode equity order is risk-validated and submitted
-correctly but has no quote to fill against, so it sits open indefinitely
-instead of auto-filling the way an option order does.
-
-**Open question:** wire a live equity quote source (e.g. `KiteProvider.quotes()`,
-already generic) into `SimulatedBroker`'s fill context, or accept that equity
-paper trades only resolve once live trading is armed?
-
-Not actioned: extending the fill simulator is more invasive than the trade-
-submission path itself, and reasonable people could want either answer
-depending on how much paper-trading fidelity equities need before going live.
+`SimulatedBroker` now reads exact-symbol equity quotes from `LiveDataCache`.
+E2's opt-in `EquityQuoteJob` supplies that same cache for the top 400 liquid NSE
+stocks. Missing or stale quotes leave paper orders open; no price is fabricated.
+Both the quote job and paper broker measure age from the exchange timestamp.
+The Kite adapter skips quotes without a usable timestamp instead of stamping
+receipt time onto them. Stocks outside the selected universe are not auto-quoted.
+The quote job has no strategy, risk, OMS, or broker-execution dependency.

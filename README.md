@@ -30,7 +30,7 @@ foundation (see `ARCHITECTURE_DECISIONS.md`).
 - **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
   reviews; architecture tests prevent it from reaching risk or execution code.
 
-> **Interview snapshot:** 1,264 unit tests, 96.62% line coverage, strict type checking, linting,
+> **Interview snapshot:** 1,286 unit tests, 96.68% line coverage, strict type checking, linting,
 > and 20 import-boundary contracts enforced in CI.
 
 ## Safety model
@@ -284,3 +284,20 @@ src/ceremyn/
 
 This software is a research tool. Nothing it produces is investment advice.
 Equity and options trading involve substantial risk of loss.
+
+### Live equity quote snapshots (E2)
+
+Set `CEREMYN_EQUITY_QUOTES__ENABLED=true` with a configured Kite API key and current
+access token, then run the API with one worker. The job is disabled by default.
+Every three minutes during market hours it requests quotes for the top 400 NSE
+stocks by trailing 20-session average traded value (raw close times volume).
+The universe refreshes daily from completed bhavcopy sessions; incomplete histories
+are excluded. It feeds the same cache used by equity paper fills. It does not emit
+signals or submit orders. The existing maintenance loop continues to apply fills.
+
+Missing, stale, future-dated, zero-priced, or mismatched quotes are not cached.
+Provider failures are logged and retried at the configured interval. Refresh an
+expired daily Kite token and restart the API to load it. Existing cached prices
+retain their exchange timestamps, so a failed refresh cannot make them fresh.
+Startup history loading may take time; symbols outside this universe are not fed.
+See `.env.example` for cadence, universe-size, and freshness settings.

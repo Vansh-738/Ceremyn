@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from ceremyn.data.repositories.instruments import InstrumentRepository
     from ceremyn.data.services.candle_ingest import CandleIngestService
     from ceremyn.data.services.chain_analytics import ChainAnalyticsService
+    from ceremyn.data.services.equity_quotes import EquityQuoteJob
     from ceremyn.data.services.ingest import BhavcopyIngestService
     from ceremyn.data.services.snapshots import ChainService, ChainSnapshotJob
     from ceremyn.execution.gate import LiveTradingGate
@@ -378,6 +379,19 @@ class Container:
             oms_engine=self.oms_engine,
             strategies=self.active_runtime_strategies,
             poll_interval_seconds=self.settings.runtime.poll_interval_seconds,
+        )
+
+    @cached_property
+    def equity_quote_job(self) -> "EquityQuoteJob":
+        from ceremyn.data.services.equity_history import fetch_all_equity_candles
+        from ceremyn.data.services.equity_quotes import EquityQuoteJob
+
+        return EquityQuoteJob(
+            provider=self.kite_provider,
+            cache=self.live_engine.cache,
+            history_loader=fetch_all_equity_candles,
+            settings=self.settings.equity_quotes,
+            calendar=self.calendar,
         )
 
     @cached_property

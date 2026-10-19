@@ -313,3 +313,24 @@ class TestAuth:
     async def test_bad_request_token_raises_broker_error(self, provider: KiteProvider) -> None:
         with pytest.raises(BrokerError, match="session exchange failed"):
             await provider.authenticate("bad-token", api_secret="secret")
+
+
+@pytest.mark.parametrize("raw_timestamp", [None, "invalid"])
+async def test_quotes_without_exchange_time_are_skipped(
+    provider: KiteProvider, monkeypatch: pytest.MonkeyPatch, raw_timestamp: object
+) -> None:
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(
+        provider._kite,
+        "quote",
+        Mock(
+            return_value={
+                "NSE:BAD": {"last_price": 100, "timestamp": raw_timestamp},
+                "NSE:GOOD": {"last_price": 200, "timestamp": datetime(2026, 7, 15, 10)},
+            }
+        ),
+    )
+    quotes = await provider.quotes(["NSE:BAD", "NSE:GOOD"])
+    assert tuple(quotes) == ("NSE:GOOD",)
+    assert quotes["NSE:GOOD"].timestamp == datetime(2026, 7, 15, 10, tzinfo=IST)
