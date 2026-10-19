@@ -40,8 +40,8 @@ three independent gates all pass:
 
 | Gate | What | Where |
 |------|------|-------|
-| 1 | `CEREMYN_TRADING_MODE=live` | environment / `.env` |
-| 2 | `CEREMYN_LIVE_TRADING_ENABLED=true` | environment / `.env` |
+| 1 | `CEREMYN TRADING MODE=live` | environment / `.env` |
+| 2 | `CEREMYN LIVE TRADING ENABLED=true` | environment / `.env` |
 | 3 | Runtime arming token submitted via the API after startup | never stored in config |
 
 If any gate is missing, the platform degrades to **paper** mode. Additional invariants:
