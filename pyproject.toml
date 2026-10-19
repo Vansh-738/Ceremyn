@@ -85,22 +85,29 @@ skip_covered = true
 [tool.importlinter]
 root_package = "ceremyn"
 
-# Architectural invariant: the domain layer is pure — it may not import any
-# other ceremyn package (infrastructure, services, or interfaces).
 [[tool.importlinter.contracts]]
-name = "Domain layer is independent"
-type = "independence"
-modules = ["ceremyn.domain"]
-
-[[tool.importlinter.contracts]]
-name = "Domain cannot import infrastructure"
+name = "Domain cannot import any other Ceremyn layer"
 type = "forbidden"
 source_modules = ["ceremyn.domain"]
 forbidden_modules = [
     "ceremyn.api",
+    "ceremyn.backtest",
     "ceremyn.broker",
+    "ceremyn.config",
+    "ceremyn.core",
+    "ceremyn.dashboard",
     "ceremyn.data",
     "ceremyn.execution",
+    "ceremyn.features",
+    "ceremyn.live",
+    "ceremyn.llm",
+    "ceremyn.oms",
+    "ceremyn.paper",
+    "ceremyn.patterns",
+    "ceremyn.research",
+    "ceremyn.risk",
+    "ceremyn.runtime",
+    "ceremyn.strategies",
 ]
 
 # The dashboard is read-only observability: it may read value/metric snapshots but must
