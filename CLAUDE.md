@@ -47,7 +47,8 @@ Clean architecture, src layout (`src/ceremyn/`):
 - Logging via `structlog.get_logger(__name__)`; never `print`.
 - Config only via `ceremyn.config.get_settings()`; never read `os.environ`
   elsewhere.
-- Files ≤ 800 lines; split before you exceed it.
+- Files ≤ 500 lines; split before you exceed it. `src/ceremyn/dashboard/shell.py` is the
+  named presentation-layer exemption; keep it cohesive and split other files first.
 - Every module lands with tests. Unit tests in `tests/unit` (mirror src);
   integration tests in `tests/integration`, marked `@pytest.mark.integration`.
 
@@ -61,6 +62,6 @@ Clean architecture, src layout (`src/ceremyn/`):
 
 ## Workflow
 
-One module per milestone (M0–M10, see README roadmap). After each: tests green,
+One module per milestone (see README roadmap). After each: tests green,
 lint/type/contract checks clean, commit, then STOP and wait for user approval
 before the next module.

@@ -24,6 +24,8 @@ jobs:
         run: mypy
       - name: Architecture contracts (import-linter)
         run: lint-imports
+      - name: Agent instruction consistency
+        run: cmp CLAUDE.md AGENTS.md
       - name: Unit tests
         run: pytest tests/unit -q --cov --cov-report=xml --cov-fail-under=85
 
@@ -58,3 +60,11 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://ceremyn:change-me@localhost:5432/ceremyn
         run: pytest tests/integration -q -m integration
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose config -q
+      - run: docker build -t ceremyn:ci .
