@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -69,7 +69,7 @@ def test_submit_with_market_data_fills_realistically() -> None:
     cache.set_chain(
         make_chain(timestamp=T0, last_price="120", bid="119", ask="121", contract=CONTRACT)
     )
-    broker = SimulatedBroker(market_data=cache)
+    broker = SimulatedBroker(market_data=cache, clock=lambda: T0 + timedelta(seconds=1))
 
     order = make_order(quantity=25)
     broker.submit(make_command(order))
@@ -106,7 +106,7 @@ def test_equity_fills_only_from_an_explicit_cached_quote() -> None:
         created_at=T0,
     )
     cache = LiveDataCache()
-    broker = SimulatedBroker(market_data=cache)
+    broker = SimulatedBroker(market_data=cache, clock=lambda: T0 + timedelta(seconds=1))
 
     broker.submit(make_command(order))
     assert broker.fetch_orders()[0].status is BrokerOrderStatus.OPEN
@@ -124,6 +124,37 @@ def test_equity_fills_only_from_an_explicit_cached_quote() -> None:
 
     assert orders[0].status is BrokerOrderStatus.FILLED
     assert orders[0].average_price is not None
+
+
+def test_equity_stale_exchange_quote_leaves_order_open() -> None:
+    equity = EquityInstrument(
+        tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+    )
+    cache = LiveDataCache()
+    cache.set_quote(
+        Quote(
+            tradingsymbol="RELIANCE",
+            timestamp=T0 - timedelta(minutes=6),
+            last_price=Decimal("1489.25"),
+        )
+    )
+    broker = SimulatedBroker(
+        market_data=cache,
+        max_quote_age=timedelta(minutes=5),
+        clock=lambda: T0,
+    )
+    order = Order(
+        contract=equity,
+        side=Side.BUY,
+        quantity=10,
+        product=ProductType.CNC,
+        order_type=OrderType.MARKET,
+        created_at=T0,
+    )
+
+    broker.submit(make_command(order))
+
+    assert broker.fetch_orders()[0].status is BrokerOrderStatus.OPEN
 
 
 def test_lookup_order_matches_correlation_and_hash() -> None:

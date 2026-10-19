@@ -5,6 +5,7 @@ never instantiate each other's collaborators; they receive them from here
 (directly, or via FastAPI dependencies that delegate to the container).
 """
 
+from datetime import timedelta
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
@@ -245,6 +246,7 @@ class Container:
         return SimulatedBroker(
             market_data=self.live_engine.cache,
             portfolio_config=self._portfolio_config(),
+            max_quote_age=timedelta(seconds=self.settings.execution.max_paper_quote_age_seconds),
         )
 
     @cached_property

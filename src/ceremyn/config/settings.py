@@ -59,6 +59,8 @@ class ExecutionSettings(BaseModel):
     # only the shared secret required to set it. Empty by default: arming is refused
     # (no secret can match) until this is explicitly configured.
     arming_secret: SecretStr = SecretStr("")
+    # A paper fill must use a recent exchange quote, not merely a recently refreshed cache entry.
+    max_paper_quote_age_seconds: int = Field(default=300, gt=0)
 
 
 class RuntimeSettings(BaseModel):

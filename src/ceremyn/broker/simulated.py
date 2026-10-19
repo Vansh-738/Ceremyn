@@ -7,14 +7,16 @@ bookkeeping (`oms.positions.OMSPortfolio`, order/fill snapshots) needed to satis
 `BrokerAdapter` protocol OMS expects. No live order ever leaves this process.
 """
 
-from collections.abc import Sequence
-from datetime import datetime
+from collections.abc import Callable, Sequence
+from datetime import datetime, timedelta
 from uuid import UUID
+
+import structlog
 
 from ceremyn.backtest.fills import ExecutionContext, VirtualFill
 from ceremyn.backtest.portfolio import PortfolioConfig
 from ceremyn.core.timeutils import now_utc
-from ceremyn.domain import Quote
+from ceremyn.domain import EquityInstrument, Quote
 from ceremyn.domain.enums import OrderStatus
 from ceremyn.live.cache import LiveDataCache
 from ceremyn.oms.broker import (
@@ -40,6 +42,8 @@ _STATUS_FROM_ORDER: dict[OrderStatus, BrokerOrderStatus] = {
     OrderStatus.REJECTED: BrokerOrderStatus.REJECTED,
 }
 
+logger = structlog.get_logger(__name__)
+
 
 class SimulatedBroker:
     """Fills orders through the reused simulator; never reaches a real exchange."""
@@ -50,12 +54,16 @@ class SimulatedBroker:
         config: PaperBrokerConfig | None = None,
         portfolio_config: PortfolioConfig | None = None,
         market_data: LiveDataCache | None = None,
+        max_quote_age: timedelta = timedelta(minutes=5),
+        clock: Callable[[], datetime] = now_utc,
         name: str = "simulated",
     ) -> None:
         self._name = name
         self._broker = PaperBroker(config)
         self._portfolio = OMSPortfolio(portfolio_config)
         self._market_data = market_data
+        self._max_quote_age = max_quote_age
+        self._clock = clock
         self._order_id_by_external: dict[str, UUID] = {}
         self._external_by_order: dict[UUID, str] = {}
         self._correlation_by_order: dict[UUID, UUID | None] = {}
@@ -119,11 +127,11 @@ class SimulatedBroker:
         return None
 
     def fetch_orders(self) -> Sequence[BrokerOrderSnapshot]:
-        self._advance(now=now_utc())
+        self._advance(now=self._clock())
         return tuple(self._snapshots.values())
 
     def fetch_fills(self) -> Sequence[BrokerExecutionReport]:
-        self._advance(now=now_utc())
+        self._advance(now=self._clock())
         return tuple(self._reports)
 
     def fetch_positions(self) -> Sequence[BrokerPositionSnapshot]:
@@ -167,8 +175,17 @@ class SimulatedBroker:
                     if entry.quote is not None:
                         quotes[entry.contract.tradingsymbol] = entry.quote
             quote = self._market_data.latest_quote(contract.tradingsymbol)
-            if quote is not None:
+            if quote is not None and now - quote.timestamp <= self._max_quote_age:
                 quotes[contract.tradingsymbol] = quote
+            elif isinstance(contract, EquityInstrument):
+                reason = "missing" if quote is None else "stale"
+                logger.info(
+                    "simulated_equity_order_unfilled",
+                    tradingsymbol=contract.tradingsymbol,
+                    reason=reason,
+                    quote_timestamp=quote.timestamp.isoformat() if quote is not None else None,
+                    max_quote_age_seconds=self._max_quote_age.total_seconds(),
+                )
         return ExecutionContext(timestamp=now, quotes=quotes)
 
     def _apply_fill(self, virtual_fill: VirtualFill) -> None:
