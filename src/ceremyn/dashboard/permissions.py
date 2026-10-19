@@ -19,11 +19,19 @@ class Permission(StrEnum):
     VIEW_DASHBOARD = "view_dashboard"
     VIEW_LOGS = "view_logs"
     USE_LLM = "use_llm"
+    PLACE_TRADES = "place_trades"
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.VIEWER: frozenset({Permission.VIEW_DASHBOARD, Permission.USE_LLM}),
-    Role.ADMIN: frozenset({Permission.VIEW_DASHBOARD, Permission.VIEW_LOGS, Permission.USE_LLM}),
+    Role.ADMIN: frozenset(
+        {
+            Permission.VIEW_DASHBOARD,
+            Permission.VIEW_LOGS,
+            Permission.USE_LLM,
+            Permission.PLACE_TRADES,
+        }
+    ),
 }
 
 

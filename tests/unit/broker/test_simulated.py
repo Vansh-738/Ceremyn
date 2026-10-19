@@ -6,8 +6,8 @@ import pytest
 
 from ceremyn.backtest.portfolio import PortfolioConfig
 from ceremyn.broker import SimulatedBroker
-from ceremyn.domain import Order, Side
-from ceremyn.domain.enums import OrderType
+from ceremyn.domain import EquityInstrument, Exchange, Order, Quote, Side
+from ceremyn.domain.enums import OrderType, ProductType
 from ceremyn.live.cache import LiveDataCache
 from ceremyn.oms.broker import BrokerAdapter, BrokerOrderStatus
 from ceremyn.oms.orders import CancelOrderCommand, ReplaceOrderCommand, SubmitOrderCommand
@@ -91,6 +91,39 @@ def test_submit_with_market_data_fills_realistically() -> None:
 
     cash = broker.fetch_cash()
     assert cash.available_cash < Decimal("1000000")
+
+
+def test_equity_fills_only_from_an_explicit_cached_quote() -> None:
+    equity = EquityInstrument(
+        tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+    )
+    order = Order(
+        contract=equity,
+        side=Side.BUY,
+        quantity=10,
+        product=ProductType.CNC,
+        order_type=OrderType.MARKET,
+        created_at=T0,
+    )
+    cache = LiveDataCache()
+    broker = SimulatedBroker(market_data=cache)
+
+    broker.submit(make_command(order))
+    assert broker.fetch_orders()[0].status is BrokerOrderStatus.OPEN
+
+    cache.set_quote(
+        Quote(
+            tradingsymbol="RELIANCE",
+            timestamp=T0,
+            last_price=Decimal("1489.25"),
+            bid=Decimal("1489.00"),
+            ask=Decimal("1489.50"),
+        )
+    )
+    orders = broker.fetch_orders()
+
+    assert orders[0].status is BrokerOrderStatus.FILLED
+    assert orders[0].average_price is not None
 
 
 def test_lookup_order_matches_correlation_and_hash() -> None:

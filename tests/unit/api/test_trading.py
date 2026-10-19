@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from ceremyn.api.app import create_app
 from ceremyn.config import Settings
+from ceremyn.dashboard.config import DashboardSettings
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -105,6 +106,41 @@ def test_place_equity_trade_exit_signal_type_accepted() -> None:
             },
         )
         assert response.status_code == 201
+
+
+def test_place_equity_trade_accepts_only_cash_delivery_product() -> None:
+    with TestClient(create_app(make_permissive_settings())) as client:
+        response = client.post(
+            "/trading/equity",
+            json={
+                "tradingsymbol": "RELIANCE",
+                "side": "BUY",
+                "quantity": 10,
+                "reference_price": "1489.25",
+                "product": "MIS",
+            },
+        )
+        assert response.status_code == 422
+
+
+def test_place_equity_trade_requires_admin_token_when_auth_is_enabled() -> None:
+    settings = DashboardSettings(auth_enabled=True, admin_token="ADMIN", viewer_token="VIEW")
+    request = {
+        "tradingsymbol": "RELIANCE",
+        "side": "BUY",
+        "quantity": 10,
+        "reference_price": "1489.25",
+    }
+    with TestClient(create_app(make_permissive_settings(), dashboard_settings=settings)) as client:
+        assert client.post("/trading/equity", json=request).status_code == 401
+        viewer = client.post(
+            "/trading/equity", json=request, headers={"Authorization": "Bearer VIEW"}
+        )
+        assert viewer.status_code == 403
+        admin = client.post(
+            "/trading/equity", json=request, headers={"Authorization": "Bearer ADMIN"}
+        )
+        assert admin.status_code == 201
 
 
 def test_only_get_and_post_are_exposed_under_trading() -> None:

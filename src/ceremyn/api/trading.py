@@ -10,23 +10,34 @@ good idea; it only submits the one the caller explicitly asked for.
 
 Equities have no static price of their own (unlike an option's strike), so the caller
 must supply `reference_price` -- the risk engine has no safe silent default for it
-(see `risk.context.RiskContext._reference_price`). In paper/simulated mode, note that
-fills are currently only simulated against the live option-chain cache (see
-`broker.simulated.SimulatedBroker._build_context`): an equity order will be risk-
-validated and submitted correctly, but may sit open rather than auto-filling until a
-live equity quote feed is wired into the simulator -- a known, documented gap, not a
-silent failure.
+(see `risk.context.RiskContext._reference_price`). In paper/simulated mode, an equity
+can fill only from a real quote in `LiveDataCache`; an unavailable quote leaves the
+order open rather than turning the caller's risk reference into fabricated market data.
 """
 
+from collections.abc import Callable
 from decimal import Decimal
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+import structlog
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from ceremyn.core.container import Container
+from ceremyn.dashboard.config import DashboardSettings
+from ceremyn.dashboard.permissions import (
+    AuthError,
+    ForbiddenError,
+    Permission,
+    Role,
+    authorize,
+    bearer_token,
+)
 from ceremyn.domain import EquityInstrument, Exchange, Signal, SignalAction, SignalLeg
 from ceremyn.domain.enums import ProductType, Side
 from ceremyn.oms.exceptions import OMSRiskRejectedError
+
+logger = structlog.get_logger(__name__)
 
 
 class PlaceEquityTradeRequest(BaseModel):
@@ -34,7 +45,7 @@ class PlaceEquityTradeRequest(BaseModel):
     side: Side
     quantity: int = Field(gt=0)
     reference_price: Decimal = Field(gt=0)
-    product: ProductType = ProductType.CNC
+    product: Literal[ProductType.CNC] = ProductType.CNC
     signal_type: SignalAction = SignalAction.ENTER
 
 
@@ -48,11 +59,42 @@ class PlacedOrderView(BaseModel):
     broker_name: str | None
 
 
-def build_trading_router(container: Container) -> APIRouter:
-    router = APIRouter()
+def _admin_dependency(settings: DashboardSettings) -> Callable[[str | None], Role]:
+    def dependency(authorization: str | None = Header(default=None)) -> Role:
+        try:
+            return authorize(bearer_token(authorization), Permission.PLACE_TRADES, settings)
+        except AuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        except ForbiddenError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
 
-    @router.post("/equity", response_model=list[PlacedOrderView], status_code=201)
-    def place_equity_trade(request: PlaceEquityTradeRequest) -> list[PlacedOrderView]:
+    return dependency
+
+
+async def _cache_current_equity_quote(container: Container, tradingsymbol: str) -> None:
+    """Best-effort quote refresh; failure must never manufacture a paper fill."""
+    symbol = f"NSE:{tradingsymbol}"
+    try:
+        quote = (await container.kite_provider.quotes([symbol])).get(symbol)
+    except Exception:
+        logger.info("equity_quote_refresh_unavailable", tradingsymbol=tradingsymbol)
+        return
+    if quote is not None:
+        container.live_engine.cache.set_quote(quote)
+
+
+def build_trading_router(container: Container, settings: DashboardSettings) -> APIRouter:
+    router = APIRouter()
+    place_trades = Depends(_admin_dependency(settings))
+
+    @router.post(
+        "/equity",
+        response_model=list[PlacedOrderView],
+        status_code=201,
+        dependencies=[place_trades],
+    )
+    async def place_equity_trade(request: PlaceEquityTradeRequest) -> list[PlacedOrderView]:
+        await _cache_current_equity_quote(container, request.tradingsymbol)
         contract = EquityInstrument(
             tradingsymbol=request.tradingsymbol,
             exchange=Exchange.NSE,

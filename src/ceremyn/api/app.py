@@ -202,7 +202,9 @@ def create_app(
         # The one place outside a Strategy that may submit a Signal -- still gated by
         # the exact same RiskEngine/GatedBrokerAdapter every strategy-emitted signal
         # goes through (see ceremyn.api.trading's own docstring).
-        app.include_router(build_trading_router(container), prefix=TRADING_PREFIX)
+        app.include_router(
+            build_trading_router(container, dashboard_settings), prefix=TRADING_PREFIX
+        )
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
     app.state.dashboard_service = service

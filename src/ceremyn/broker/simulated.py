@@ -155,15 +155,20 @@ class SimulatedBroker:
     def _build_context(self, now: datetime) -> ExecutionContext:
         if self._market_data is None:
             return ExecutionContext(timestamp=now)
-        underlyings = {order.contract.underlying for order in self._broker.open_orders}
         quotes: dict[str, Quote] = {}
-        for underlying in underlyings:
-            chain = self._market_data.latest_chain(underlying)
-            if chain is None:
-                continue
-            for entry in chain.entries:
-                if entry.quote is not None:
-                    quotes[entry.contract.tradingsymbol] = entry.quote
+        for order in self._broker.open_orders:
+            contract = order.contract
+            # Index-option chains remain the primary data path. An exact-symbol
+            # cache lookup below also permits cash equities to fill only when an
+            # actual market-data source has supplied a quote.
+            chain = self._market_data.latest_chain(contract.underlying)
+            if chain is not None:
+                for entry in chain.entries:
+                    if entry.quote is not None:
+                        quotes[entry.contract.tradingsymbol] = entry.quote
+            quote = self._market_data.latest_quote(contract.tradingsymbol)
+            if quote is not None:
+                quotes[contract.tradingsymbol] = quote
         return ExecutionContext(timestamp=now, quotes=quotes)
 
     def _apply_fill(self, virtual_fill: VirtualFill) -> None:
