@@ -95,6 +95,7 @@ class TestFutureChainEodRepository:
             expiry=date(2025, 7, 31),
             close=Decimal("24580.25"),
             settle=Decimal("24580.25"),
+            lot_size=75,
             volume=15_478_236,
             open_interest=12_456_300,
             oi_change=235_600,
@@ -107,6 +108,7 @@ class TestFutureChainEodRepository:
         chain = await repo.fetch_chain("NIFTY", trade_date)
         assert len(chain) == 1
         assert chain[0].close == Decimal("24580.25")
+        assert chain[0].lot_size == 75
         assert await repo.trade_dates("NIFTY") == [trade_date]
 
 
