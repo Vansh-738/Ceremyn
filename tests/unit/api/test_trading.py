@@ -3,13 +3,19 @@ needed for any of this, so it lives in `tests/unit`, not the Docker-gated
 `tests/integration` -- same rationale as `tests/unit/api/test_execution.py`.
 """
 
+from datetime import UTC, datetime
 from datetime import time as dtime
+from decimal import Decimal
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from ceremyn.api.app import create_app
+from ceremyn.api.trading import _risk_reference_price
 from ceremyn.config import Settings
 from ceremyn.dashboard.config import DashboardSettings
+from ceremyn.domain import Quote
 
 
 def make_settings(**overrides: object) -> Settings:
@@ -141,6 +147,40 @@ def test_place_equity_trade_requires_admin_token_when_auth_is_enabled() -> None:
             "/trading/equity", json=request, headers={"Authorization": "Bearer ADMIN"}
         )
         assert admin.status_code == 201
+
+
+def _quote(price: str) -> Quote:
+    return Quote(
+        tradingsymbol="RELIANCE",
+        timestamp=datetime(2026, 7, 14, 4, 30, tzinfo=UTC),
+        last_price=Decimal(price),
+    )
+
+
+def test_equity_risk_uses_the_larger_of_supplied_and_cached_prices() -> None:
+    assert _risk_reference_price(
+        supplied_price=Decimal("1489"),
+        cached_quote=_quote("1500"),
+        max_deviation_ratio=Decimal("0.05"),
+    ) == Decimal("1500")
+
+
+def test_equity_risk_rejects_lowballed_reference_price() -> None:
+    with pytest.raises(HTTPException, match="configured"):
+        _risk_reference_price(
+            supplied_price=Decimal("14.89"),
+            cached_quote=_quote("1489"),
+            max_deviation_ratio=Decimal("0.05"),
+        )
+
+
+def test_equity_risk_rejects_excessively_high_reference_price() -> None:
+    with pytest.raises(HTTPException, match="configured"):
+        _risk_reference_price(
+            supplied_price=Decimal("2000"),
+            cached_quote=_quote("1489"),
+            max_deviation_ratio=Decimal("0.05"),
+        )
 
 
 def test_only_get_and_post_are_exposed_under_trading() -> None:

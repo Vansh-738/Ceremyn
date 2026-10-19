@@ -3,7 +3,16 @@ from decimal import Decimal
 
 import pytest
 
-from ceremyn.domain import KillSwitchState, SignalAction
+from ceremyn.domain import (
+    EquityInstrument,
+    Exchange,
+    KillSwitchState,
+    PortfolioSnapshot,
+    Side,
+    Signal,
+    SignalAction,
+    SignalLeg,
+)
 from ceremyn.risk import (
     RiskConfigurationError,
     RiskEngine,
@@ -43,6 +52,33 @@ def test_engine_collects_failures_and_required_actions(
     assert decision.approved is False
     assert decision.required_actions
     assert any("margin" in violation for violation in decision.violations)
+
+
+def test_engine_rejects_oversized_equity_using_real_notional(
+    base_settings, utc_now: datetime
+) -> None:
+    """Regression: a zero-priced equity leg used to bypass every size limit."""
+    base_settings.risk.exposure.max_gross_notional = Decimal("10000")
+    base_settings.risk.exposure.max_underlying_concentration_ratio = 1.0
+    equity = EquityInstrument(
+        tradingsymbol="RELIANCE", exchange=Exchange.NSE, underlying="RELIANCE"
+    )
+    signal = Signal(
+        strategy_id="manual",
+        created_at=utc_now,
+        market_timestamp=utc_now,
+        signal_type=SignalAction.ENTER,
+        reason="oversized equity test",
+        legs=(SignalLeg(contract=equity, side=Side.BUY, lots=10),),
+        metadata={"reference_prices": {"RELIANCE": "1500"}},
+    )
+
+    decision = RiskEngine(base_settings).validate(
+        portfolio=PortfolioSnapshot(), signal=signal, evaluated_at=utc_now
+    )
+
+    assert decision.approved is False
+    assert any("gross notional" in violation for violation in decision.violations)
 
 
 def test_engine_blocks_on_kill_switch(base_settings, portfolio, signal, utc_now: datetime) -> None:

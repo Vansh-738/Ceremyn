@@ -33,7 +33,7 @@ from ceremyn.dashboard.permissions import (
     authorize,
     bearer_token,
 )
-from ceremyn.domain import EquityInstrument, Exchange, Signal, SignalAction, SignalLeg
+from ceremyn.domain import EquityInstrument, Exchange, Quote, Signal, SignalAction, SignalLeg
 from ceremyn.domain.enums import ProductType, Side
 from ceremyn.oms.exceptions import OMSRiskRejectedError
 
@@ -83,6 +83,25 @@ async def _cache_current_equity_quote(container: Container, tradingsymbol: str) 
         container.live_engine.cache.set_quote(quote)
 
 
+def _risk_reference_price(
+    *, supplied_price: Decimal, cached_quote: Quote | None, max_deviation_ratio: Decimal
+) -> Decimal:
+    """Size a manual equity trade conservatively and catch fat-fingered prices."""
+    if cached_quote is None or cached_quote.last_price <= 0:
+        return supplied_price
+    deviation_ratio = abs(supplied_price - cached_quote.last_price) / cached_quote.last_price
+    if deviation_ratio > max_deviation_ratio:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "reference_price differs from the current equity quote by more than "
+                f"the configured {max_deviation_ratio:.2%} limit"
+            ),
+        )
+    # The order must never look smaller to risk controls than the market price.
+    return max(supplied_price, cached_quote.last_price)
+
+
 def build_trading_router(container: Container, settings: DashboardSettings) -> APIRouter:
     router = APIRouter()
     place_trades = Depends(_admin_dependency(settings))
@@ -95,6 +114,11 @@ def build_trading_router(container: Container, settings: DashboardSettings) -> A
     )
     async def place_equity_trade(request: PlaceEquityTradeRequest) -> list[PlacedOrderView]:
         await _cache_current_equity_quote(container, request.tradingsymbol)
+        risk_reference_price = _risk_reference_price(
+            supplied_price=request.reference_price,
+            cached_quote=container.live_engine.cache.latest_quote(request.tradingsymbol),
+            max_deviation_ratio=container.settings.risk.equity.max_reference_price_deviation_ratio,
+        )
         contract = EquityInstrument(
             tradingsymbol=request.tradingsymbol,
             exchange=Exchange.NSE,
@@ -105,11 +129,11 @@ def build_trading_router(container: Container, settings: DashboardSettings) -> A
             signal_type=request.signal_type,
             reason=(
                 f"manual trade: {request.side.value} {request.quantity} "
-                f"{request.tradingsymbol} @ {request.reference_price}"
+                f"{request.tradingsymbol} @ {risk_reference_price}"
             ),
             legs=(SignalLeg(contract=contract, side=request.side, lots=request.quantity),),
             metadata={
-                "reference_prices": {request.tradingsymbol: str(request.reference_price)},
+                "reference_prices": {request.tradingsymbol: str(risk_reference_price)},
                 "execution": {"products": {request.tradingsymbol: request.product.value}},
             },
         )

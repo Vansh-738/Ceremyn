@@ -187,6 +187,12 @@ class RiskExposureSettings(BaseModel):
     max_short_option_units: int = Field(default=5000, ge=0)
 
 
+class RiskEquitySettings(BaseModel):
+    """Cash-equity safeguards for prices supplied to manual trade entry points."""
+
+    max_reference_price_deviation_ratio: Decimal = Field(default=Decimal("0.05"), ge=0, le=1)
+
+
 class RiskScoreWeights(BaseModel):
     margin: float = Field(default=1.0, ge=0)
     exposure: float = Field(default=1.0, ge=0)
@@ -211,6 +217,7 @@ class RiskSettings(BaseModel):
     volatility: RiskVolatilitySettings = Field(default_factory=RiskVolatilitySettings)
     event: RiskEventSettings = Field(default_factory=RiskEventSettings)
     exposure: RiskExposureSettings = Field(default_factory=RiskExposureSettings)
+    equity: RiskEquitySettings = Field(default_factory=RiskEquitySettings)
     score_weights: RiskScoreWeights = Field(default_factory=RiskScoreWeights)
 
 
