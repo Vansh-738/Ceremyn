@@ -265,7 +265,15 @@ function renderOverview(c){
  const val=(pf.buying_power||0)+(pf.margin_used||0);
  const pnl=pf.daily_pnl!==undefined?pf.daily_pnl:(m.pnl||0);
  const dd=m.drawdown||o.drawdown||0;
+ const live=state.live||{};const market=(live.underlyings||[])[0];
+ const marketLabel=market?`${market.underlying} · ${market.market_status}`:'Market intelligence is standing by';
  c.innerHTML=`
+ <section class="workspace-hero">
+  <div><div class="hero-eyebrow">Market intelligence workspace</div>
+   <h1>Find the signal.<br/><span>Keep the context.</span></h1>
+   <p>Explainable opportunities, research evidence, and risk posture in one operational view.</p></div>
+  <div class="hero-status"><span class="pulse"></span><div><b>${marketLabel}</b><small>${market?'Live market context':'Connect a data feed to begin monitoring'}</small></div></div>
+ </section>
  <div class="grid kpis">
   ${kpi('Portfolio Value',money(val))}
   ${kpi("Today's P&L",money(pnl),null,signCls(pnl))}
@@ -322,9 +330,9 @@ function opportunityCards(){
    <div class="sub num">Hit rate ${pct(o.hit_rate*100)} · avg ${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}% · n=${o.occurrences}</div>
    ${detail}
    <div style="margin-top:10px;display:flex;gap:8px">
-    <button class="btn" style="flex:1" data-reject="${key}">Reject</button>
+    <button class="btn" style="flex:1" data-reject="${key}">Dismiss</button>
     <button class="btn btn-primary" style="flex:1" data-approve="${key}" data-symbol="${o.tradingsymbol}"
-     data-side="${bullish?'BUY':'SELL'}">Approve</button>
+     data-side="${bullish?'BUY':'SELL'}">Prepare order</button>
    </div></div>`;}).join('');
  return `${opportunityStatusLine()}<div class="section-label">Top Opportunities</div><div class="grid kpis">${items}</div>`;}
 function wireOpportunityButtons(){
@@ -520,26 +528,48 @@ function renderOrders(c){const o=state.orders||{};const rows=o.orders||[];const 
   </div>`;
  wireTradeForm();}
 function renderRisk(c){const r=state.risk||{};const pf=state.portfolio||{};const e=pf.exposure||{};
- const decs=r.decisions||[];
+ const decs=r.decisions||[];const oms=state.oms||{};const violations=r.violation_count||0;
+ const posture=violations?'Risk attention required':'Risk posture is clear';
+ const postureCopy=violations?'Review the latest violations before adding or changing exposure.':'No rule violations are currently recorded. Every proposed order is still evaluated at submission.';
  c.innerHTML=`<div class="grid kpis">
-  ${kpi('Latest Score',fmtNum(r.latest_score??0,1))}
-  ${kpi('Violations',r.violation_count??0,null,(r.violation_count?'neg':'pos'))}
-  ${kpi('Gross Exposure',money(e.gross_notional||0))}
-  ${kpi('Net Exposure',money(e.net_notional||0))}</div>
+  ${kpi('Latest Score',fmtNum(r.latest_score??0,1),'Most recent risk assessment')}
+  ${kpi('Violations',violations,violations?'Action may be required':'No active rule breaches',violations?'neg':'pos')}
+  ${kpi('Gross Exposure',money(e.gross_notional||0),'Total market exposure')}
+  ${kpi('Net Exposure',money(e.net_notional||0),'Directional market exposure')}</div>
+  <section class="risk-banner ${violations?'attention':'clear'}"><div class="risk-icon">${violations?'!':'✓'}</div><div>
+   <div class="risk-banner-title">${posture}</div><p>${postureCopy}</p></div>
+   <span class="badge ${violations?'red':'green'}">${violations?'review needed':'monitoring'}</span></section>
   <div class="grid cols-2">
    ${card('Risk Decisions',decs.length?tbl([['Decision'],['Violations'],['Score','r']],
      decs.slice(0,10).map(d=>`<tr><td><span class="badge ${d.approved?'green':'red'}">${d.approved?'approved':'rejected'}</span></td>
       <td style="color:var(--muted)">${(d.violations||[]).join(', ')||'—'}</td>
       <td class="r">${fmtNum(d.risk_score,1)}</td></tr>`).join(''))
     :empty('No decisions yet — every order is evaluated here before it can route'))}
-   ${card('Alerts',renderAlertList())}</div>`;}
+   ${card('Control Posture',kv(
+     kvrow('Kill switch',`<span class="badge ${oms.kill_switch_armed?'red':'green'}">${oms.kill_switch_armed?'armed':'safe'}</span>`)+
+     kvrow('Reconciliation',`<span class="badge ${oms.reconciled===false?'red':'green'}">${oms.reconciled===false?'drift detected':'clean'}</span>`)+
+     kvrow('Portfolio drawdown',money(pf.drawdown||0))))}</div>
+  ${card('Alerts',renderAlertList())}`;}
 function renderResearch(c){const r=state.research||{};const lb=r.leaderboard||[];const f=state.features||{};
- c.innerHTML=`<div class="grid kpis">${kpi('Experiments',r.experiment_count??0)}
-   ${kpi('Ranked',lb.length)}${kpi('Features',f.feature_count??0)}
-   ${kpi('Feature Cache',pct((f.cache_hit_rate||0)*100))}</div>
-  ${card('Strategy Leaderboard',lb.length?tbl([['#','r'],['Strategy'],['Sharpe','r'],['Return','r']],
-    lb.map(x=>`<tr><td class="r">${x.rank}</td><td>${x.strategy_name}</td>
-     <td class="r">${fmtNum(x.sharpe,2)}</td><td class="r">${pct(x.total_return)}</td></tr>`).join(''))
+ const leader=lb[0];
+ const leaderBody=leader?`<div class="leader-name">${leader.strategy_name}</div>
+   <div class="leader-metrics"><span><b class="pos">${fmtNum(leader.sharpe,2)}</b> Sharpe</span>
+   <span><b class="${signCls(leader.total_return)}">${pct(leader.total_return)}</b> return</span>
+   <span><b>${leader.trade_count}</b> trades</span></div>
+   <div class="sub">Ranked from completed experiments. Treat as research evidence, not a trading recommendation.</div>`
+   :empty('Run a backtest to establish a research baseline.');
+ c.innerHTML=`<div class="grid kpis">${kpi('Experiments',r.experiment_count??0,'Completed research runs')}
+   ${kpi('Ranked',lb.length,'Strategies with results')}${kpi('Features',f.feature_count??0,'Current feature set')}
+   ${kpi('Feature Cache',pct((f.cache_hit_rate||0)*100),'Reuse rate')}</div>
+  <div class="grid cols-2">${card('Current Leader',leaderBody)}
+   ${card('Research Guardrails',kv(
+    kvrow('Ranking metric','Sharpe ratio')+
+    kvrow('Selection basis','Completed experiments only')+
+    kvrow('Decision status','<span class="badge blue">Research only</span>')))}</div>
+  ${card('Strategy Leaderboard',lb.length?tbl([['#','r'],['Strategy'],['Sharpe','r'],['Return','r'],['Max DD','r'],['Trades','r']],
+    lb.map(x=>`<tr><td class="r">${x.rank}</td><td><b>${x.strategy_name}</b></td>
+     <td class="r ${x.sharpe>=0?'pos':'neg'}">${fmtNum(x.sharpe,2)}</td><td class="r ${signCls(x.total_return)}">${pct(x.total_return)}</td>
+     <td class="r neg">${pct(x.max_drawdown)}</td><td class="r">${x.trade_count}</td></tr>`).join(''))
    :empty('No experiments yet — run a backtest to populate the leaderboard'))}
   <div class="grid cols-2">${card('Sharpe',lb.length?chartBox('cSharpe'):empty('No data yet'))}${card('Return',lb.length?chartBox('cRet'):empty('No data yet'))}</div>
   ${card('Latest Features',f.sample&&Object.keys(f.sample).length?kv(

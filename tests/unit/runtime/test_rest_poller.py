@@ -69,7 +69,12 @@ class TestFailureTracking:
         poller = _make_poller()
         await poller.start()
         try:
-            await asyncio.sleep(0.05)  # several 0.01s poll cycles
+            # Coverage / CI instrumentation can make a 10ms task wake late. Wait for
+            # the observable condition rather than relying on a fixed wall-clock sleep.
+            for _ in range(20):
+                if poller.consecutive_failures >= 2:
+                    break
+                await asyncio.sleep(0.01)
         finally:
             await poller.stop()
         assert poller.consecutive_failures >= 2

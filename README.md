@@ -171,6 +171,40 @@ Remove it with `./scripts/ceremyn.sh uninstall`. Once installed, manage it via
 `launchctl` or the wrapper above rather than `scripts/stop_dashboard.sh`, because a
 LaunchAgent will restart the app after a manual kill.
 
+## Interview demo (no credentials or infrastructure)
+
+The fastest way to demonstrate the execution spine end to end is the deterministic
+backtest demo. It uses a synthetic, expiry-day option-chain path, but the same
+`Strategy → RiskEngine → ExecutionSimulator → IndianCostModel` interfaces used by a
+real backtest, paper run, and live-mode runner:
+
+```bash
+.venv/bin/python scripts/run_backtest_demo.py
+```
+
+For a UI walkthrough, start the application and open
+[`/dashboard/`](http://127.0.0.1:8000/dashboard/). Its mounted dashboard API is a
+read-only observability surface for market state, portfolio/risk posture, research
+results, execution health, and alerts. The separately mounted `/trading/equity` endpoint
+is the explicit human-in-the-loop exception documented above; it still enters through
+the same OMS and risk validation pipeline as every strategy signal.
+
+The assistant is an independently mounted, SSE-streaming API at `/llm`. It can produce
+recaps, reports, experiment comparisons, and watchlist-driven explanations from
+read-only dashboard and research data. It never selects a side or submits an order;
+those boundaries are tested and enforced by import contracts.
+
+### What to highlight
+
+- **Safety by construction:** live execution requires configuration, explicit enablement,
+  and a post-startup arming token; every order is validated by the risk engine.
+- **Research credibility:** backtests include Indian trading costs and a non-zero default
+  slippage model, while walk-forward and cross-validation tools prevent overfitting.
+- **Explainability:** patterns and opportunities carry their own historical evidence;
+  the LLM explains deterministic inputs instead of generating trading directions.
+- **Operational maturity:** paper fills, OMS state transitions, retries, idempotency,
+  reconciliation, dashboard metrics, alerts, health checks, and CI are implemented.
+
 ## Development
 
 ```bash
@@ -224,8 +258,8 @@ src/ceremyn/
 | M9 | Live Market Data Engine (streaming, heartbeat, reconnect, snapshots) | ✅ |
 | M10 | Order Management System (state machine, broker adapters, retries, idempotency, reconciliation) | ✅ |
 | M11 | Dashboard & Observability: read-only API + WebSocket, views, metrics, alerts, system health | ✅ |
-| M12 | LLM assistant (reports, reviews, explanations) | — |
-| M13 | Live trading (triple-gated) | — |
+| M12 | LLM assistant (reports, reviews, explanations) | ✅ |
+| M13 | Live trading (triple-gated) | ⚠️ integration-ready; requires broker entitlement and operator approval |
 
 ## Disclaimer
 

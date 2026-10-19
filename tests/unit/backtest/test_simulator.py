@@ -5,6 +5,7 @@ from typing import cast
 
 from ceremyn.backtest.fills import ExecutionContext, PendingOrderState
 from ceremyn.backtest.simulator import ExecutionSimulator, SimulationConfig
+from ceremyn.backtest.slippage import FixedBpsSlippageModel, NoSlippageModel
 from ceremyn.domain import Candle, Order, Quote, Signal, SignalLeg
 from ceremyn.domain.enums import (
     OrderStatus,
@@ -17,8 +18,19 @@ from ceremyn.domain.enums import (
 from tests.unit.backtest.helpers import make_chain
 
 
-def test_market_order_fills_at_ask_for_buy(signal: Signal, timestamp_one: datetime) -> None:
+def test_default_slippage_matches_paper_broker_assumption() -> None:
+    """A confidence-building backtest must not be frictionless by accident."""
     simulator = ExecutionSimulator()
+
+    assert isinstance(simulator.slippage_model, FixedBpsSlippageModel)
+    assert simulator.slippage_model.bps == Decimal("5")
+
+
+def test_market_order_fills_at_ask_for_buy(signal: Signal, timestamp_one: datetime) -> None:
+    # This test is about fill mechanics (does a market order fill at the ask),
+    # not slippage (covered separately in test_slippage.py) -- pin the exact
+    # reference price by opting out of the simulator's own default slippage.
+    simulator = ExecutionSimulator(slippage_model=NoSlippageModel())
     order = simulator.orders_from_signal(signal, created_at=timestamp_one)[0]
     chain = make_chain(timestamp=timestamp_one, last_price="100", bid="99", ask="101")
 
@@ -38,7 +50,9 @@ def test_limit_order_stays_open_until_price_crosses(
     timestamp_one: datetime,
     timestamp_two: datetime,
 ) -> None:
-    simulator = ExecutionSimulator()
+    # Fill-mechanics test (does a limit order wait for the price to cross),
+    # not a slippage test -- pin the exact reference price.
+    simulator = ExecutionSimulator(slippage_model=NoSlippageModel())
     limit_signal = signal.model_copy(
         update={
             "metadata": {

@@ -13,7 +13,7 @@ from ceremyn.backtest.fills import (
     VirtualFill,
     terminal_status,
 )
-from ceremyn.backtest.slippage import NoSlippageModel, SlippageModel
+from ceremyn.backtest.slippage import FixedBpsSlippageModel, SlippageModel
 from ceremyn.domain import Candle, Fill, Order, Quote, Signal
 from ceremyn.domain.enums import OrderStatus, OrderType, ProductType, Side
 
@@ -34,7 +34,13 @@ class ExecutionSimulator:
         commission_model: IndianCostModel | None = None,
     ) -> None:
         self.config = config or SimulationConfig()
-        self.slippage_model = slippage_model or NoSlippageModel()
+        # Matches PaperBrokerConfig's own default (5bps, see paper/broker.py) --
+        # a backtest meant to build confidence before paper trading should
+        # never be MORE optimistic than paper trading itself. Still likely
+        # understates real slippage for wide-spread, thin-strike options; pass
+        # an explicit SlippageModel (or NoSlippageModel(), for a deliberately
+        # frictionless baseline) to override.
+        self.slippage_model = slippage_model or FixedBpsSlippageModel()
         self.commission_model = commission_model or IndianCostModel()
 
     def orders_from_signal(

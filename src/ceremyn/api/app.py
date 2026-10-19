@@ -22,6 +22,7 @@ import contextlib
 from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 import ceremyn
@@ -142,6 +143,10 @@ def create_app(
                     await container.rest_poller.stop()
 
     app = FastAPI(title="Ceremyn", version=ceremyn.__version__, lifespan=lifespan)
+
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse(url="/docs")
 
     @app.get("/health")
     def health() -> dict[str, str]:
