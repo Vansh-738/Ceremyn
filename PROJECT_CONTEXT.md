@@ -63,9 +63,13 @@ architectural direction beyond v1.
 | M15 | Trading Runtime & Production Readiness: new `runtime/` package (`Orchestrator` — live data → strategies → risk → OMS → broker → portfolio, fills/heartbeat/reconciliation polling loop; ships inert with zero strategies by default); `KiteTicker` callbacks drive the real heartbeat/reconnect state machine; OMS orders journaled and restored from `JSONJournalStore` at startup; `KiteBroker` order lookup round-trips Kite's own `tag` field; a shared compensation mechanism unwinds sibling legs of a multi-leg/correlated signal group when one leg is rejected. 936 tests passing at the time. | ✅ |
 | M16 | **Multi-asset migration begins** — Domain & Instrument Generalization: `AssetClass` enum + `EquityInstrument`/`FutureContract`/`ETFInstrument` alongside the existing `OptionContract`; `Position`/`Order`/`SignalLeg`/`Trade`/`ClosedTrade` widened from `OptionContract` to the generic `Instrument` base. Zero behavior change for any of the 9 option strategies. See §17. | ✅ |
 
-**Quality (historical M16 snapshot):** 947 passed, 0 failed, 4 skipped. The current project
-quality gates are tracked in CI; `ruff`, `ruff format --check`, `mypy --strict`, and
-`lint-imports` (20 contracts) are required on every change.
+**Quality (E1 closeout, 2026-10-20):** 1,264 unit tests passed; 96.62% line coverage
+and 89.06% branch coverage across the project. `runtime/rest_poller.py` has 100% line
+coverage (144/144) and 100% branch coverage (24/24), including provider failures,
+risk rejection, broker submission failure, and duplicate-signal idempotency.
+`ruff`, `ruff format --check`, `mypy --strict`, and `lint-imports` (20 contracts)
+all pass. Domain imports no other Ceremyn layer. Docker/integration validation
+remains assigned to CI; these local results cover the unit suite.
 
 **Environment:** Python **3.12.1**, virtualenv at `.venv/`. Docker is **not installed** on the
 dev machine — integration tests (Postgres/Redis) are skipped locally and run in CI.

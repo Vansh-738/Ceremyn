@@ -30,7 +30,7 @@ foundation (see `ARCHITECTURE_DECISIONS.md`).
 - **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
   reviews; architecture tests prevent it from reaching risk or execution code.
 
-> **Interview snapshot:** 1,250 unit tests, 95% coverage, strict type checking, linting,
+> **Interview snapshot:** 1,264 unit tests, 96.62% line coverage, strict type checking, linting,
 > and 20 import-boundary contracts enforced in CI.
 
 ## Safety model
