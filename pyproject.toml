@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ceremyn"
 version = "0.1.0"
-description = "Institutional-grade AI-assisted options trading research platform for Indian markets"
+description = "Risk-first AI-assisted market intelligence platform for Indian equities and options"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }

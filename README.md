@@ -11,11 +11,11 @@ platform's sole purpose.
 
 Ceremyn is not a gambling bot and not a black-box prediction engine. Every opportunity
 it surfaces is backed by an explainable, backtested, risk-managed process. **v1 scope**
-is institutional-grade options trading research for Indian markets (NIFTY & BANKNIFTY
-options): discovering, validating, and operating statistically profitable strategies —
-with risk management and reliability as first-class concerns. Broader market coverage
-is the platform's long-term direction (see `ARCHITECTURE_DECISIONS.md`), built out
-incrementally on top of this same risk-first foundation.
+is Indian-market intelligence across liquid equities and index options: equity-pattern
+discovery and ranking alongside NIFTY & BANKNIFTY options research, validation, and
+strategy operation — with risk management and reliability as first-class concerns.
+Broader asset-class coverage is built incrementally on top of this same risk-first
+foundation (see `ARCHITECTURE_DECISIONS.md`).
 
 ## At a glance
 
@@ -284,4 +284,4 @@ src/ceremyn/
 ## Disclaimer
 
 This software is a research tool. Nothing it produces is investment advice.
-Options trading involves substantial risk of loss.
+Equity and options trading involve substantial risk of loss.
