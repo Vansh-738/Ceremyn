@@ -1,5 +1,9 @@
 # Ceremyn
 
+![CI](https://github.com/Vansh-738/Ceremyn/actions/workflows/ci.yml/badge.svg?branch=main)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+
 **Ceremyn is an AI-powered Market Intelligence Platform.** It continuously analyzes
 markets, surfaces trading opportunities, explains the reasoning behind them, and ranks
 them by expected edge — with execution as one consumer of that intelligence, not the
@@ -12,6 +16,22 @@ options): discovering, validating, and operating statistically profitable strate
 with risk management and reliability as first-class concerns. Broader market coverage
 is the platform's long-term direction (see `ARCHITECTURE_DECISIONS.md`), built out
 incrementally on top of this same risk-first foundation.
+
+## At a glance
+
+- **Explainable intelligence:** technical-pattern discovery and historical hit-rate
+  studies rank opportunities with evidence instead of black-box trade calls.
+- **One execution spine:** identical strategy and risk interfaces power backtests,
+  paper trading, and the triple-gated live route.
+- **Research discipline:** Indian cost modelling, slippage, walk-forward validation,
+  cross-validation, experiments, and strategy leaderboards are first-class modules.
+- **Operational depth:** OMS state transitions, idempotency, retries, reconciliation,
+  real-time monitoring, alerts, and a responsive observability dashboard.
+- **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
+  reviews; architecture tests prevent it from reaching risk or execution code.
+
+> **Interview snapshot:** 1,241 unit tests, 94.92% test coverage, strict type checking,
+> linting, and 21 import-boundary contracts enforced in CI.
 
 ## Safety model
 
