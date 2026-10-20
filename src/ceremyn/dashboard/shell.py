@@ -15,7 +15,7 @@ CSS lives in `shell_styles.py`, split out to keep this file under the project's
 from ceremyn.dashboard.shell_styles import SHELL_CSS
 
 SHELL_HTML = r"""<!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -111,7 +111,7 @@ $("menuBtn").onclick=()=>$("sidebar").classList.toggle('open');
 $("themeBtn").onclick=()=>{const r=document.documentElement;
  const t=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',t);
  $("themeBtn").textContent=t==='dark'?'☾':'☀';try{localStorage.setItem('ceremyn-theme',t)}catch(e){}render();};
-try{const s=localStorage.getItem('ceremyn-theme')||localStorage.getItem('aq-theme');
+try{const s=localStorage.getItem('ceremyn-theme');
  if(s){document.documentElement.setAttribute('data-theme',s);$("themeBtn").textContent=s==='dark'?'☾':'☀';}}catch(e){}
 $("collapseBtn").onclick=()=>{const on=$("sidebar").classList.toggle('collapsed');
  $("collapseBtn").textContent=on?'»':'«';try{localStorage.setItem('ceremyn-sidebar',on?'collapsed':'')}catch(e){}};
