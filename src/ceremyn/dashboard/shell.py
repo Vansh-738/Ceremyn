@@ -54,6 +54,7 @@ SHELL_HTML = r"""<!doctype html>
     <main class="content" id="content"><div class="empty">Connecting to live feed…</div></main>
   </div>
 </div>
+<aside class="opportunity-alerts" id="opportunityAlerts" aria-live="polite"></aside>
 <script>
 const PAGES=[
  ["overview","Overview","M3 12h4l3 8 4-16 3 8h4"],
@@ -74,7 +75,7 @@ let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",orderType:"MARKET",limi
 let tradeBusy=false; let tradeMsg=null;
 let executionForm={token:"",reason:"Manual trading session"};
 let executionBusy=false; let executionMsg=null;
-let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set();
+let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set(); const announcedOpportunities=new Set();
 let scanState={scanning:false,last_scanned_at:null,symbols_scanned:0};
 let analysisSymbol=""; let analysisResult=null; let analysisError=null; let analysisLoading=false;
 
@@ -175,8 +176,15 @@ function loadSystemStatus(){
  }).catch(()=>{});}
 function loadOpportunities(){
  fetch('/opportunities/equity').then(r=>r.ok?r.json():null).then(payload=>{
-  if(payload){opportunities=payload.opportunities||[];scanState=payload;if(active==='markets')render();}
+  if(payload){const next=payload.opportunities||[];next.forEach(o=>{
+    const key=opportunityKey(o);if(!announcedOpportunities.has(key)&&announcedOpportunities.size){announceOpportunity(o);}
+    announcedOpportunities.add(key);});opportunities=next;scanState=payload;renderOpportunityAlerts();if(active==='markets')render();}
  }).catch(()=>{});}
+function announceOpportunity(o){const direction=o.direction==='bullish'?'Bullish':'Bearish';
+ if(Notification.permission==='granted')new Notification('Ceremyn opportunity found',{body:`${o.tradingsymbol} · ${direction} ${humanize(o.pattern_name)}`});}
+function renderOpportunityAlerts(){const root=$("opportunityAlerts");if(!root)return;const visible=opportunities.filter(o=>!dismissedOpps.has(opportunityKey(o))).slice(0,3);
+ root.innerHTML=`<div class="alert-head"><span>Opportunity alerts</span><button id="notifyBtn" class="alert-enable">${Notification.permission==='granted'?'Desktop alerts on':'Enable desktop alerts'}</button></div>${visible.length?visible.map(o=>`<button class="opportunity-alert" data-alert-symbol="${o.tradingsymbol}"><span class="alert-signal ${o.direction==='bullish'?'up':'down'}">${o.direction==='bullish'?'▲':'▼'}</span><span><b>${o.tradingsymbol}</b><small>${humanize(o.pattern_name)} · ${pct(o.hit_rate*100)} hit rate</small></span></button>`).join(''):'<div class="alert-empty">No qualifying setups right now</div>'}`;
+ const n=$("notifyBtn");if(n)n.onclick=async()=>{if(Notification.permission==='default')await Notification.requestPermission();renderOpportunityAlerts();};document.querySelectorAll('[data-alert-symbol]').forEach(b=>b.onclick=()=>{analysisSymbol=b.dataset.alertSymbol;goToPage('analysis');runAnalysis(analysisSymbol);});}
 function runAnalysis(symbol){
  symbol=(symbol||'').trim().toUpperCase();
  if(!symbol)return;
