@@ -30,8 +30,11 @@ foundation (see `ARCHITECTURE_DECISIONS.md`).
 - **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
   reviews; architecture tests prevent it from reaching risk or execution code.
 
-> **Interview snapshot:** 1,286 unit tests, 96.68% line coverage, strict type checking, linting,
-> and 20 import-boundary contracts enforced in CI.
+> **Interview snapshot:** 1,302 unit tests, strict type checking, linting, and 21
+> import-boundary contracts enforced in CI.
+
+> **Reviewer page:** a credential-free walkthrough and reproducible synthetic validation
+> artifact are available at [ceremyn-research-demo.adepteft257.chatgpt.site](https://ceremyn-research-demo.adepteft257.chatgpt.site).
 
 ## Safety model
 

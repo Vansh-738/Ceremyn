@@ -259,4 +259,12 @@ class TestForwardWindowAndReturnFloor:
             )
         )
 
-        assert seen_kwargs == [{"forward_days": 45, "min_avg_forward_return_pct": 20.0}]
+        assert seen_kwargs == [
+            {
+                "forward_days": 45,
+                "min_avg_forward_return_pct": 20.0,
+                "fdr_alpha": 0.1,
+                "fundamentals": {},
+                "require_fundamentals": False,
+            }
+        ]

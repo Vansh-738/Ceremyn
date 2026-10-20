@@ -11,10 +11,13 @@ guarantee as `ceremyn.patterns`/`ceremyn.api.opportunities`: no path to
 execution/risk/OMS.
 """
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ceremyn.api import opportunities
+from ceremyn.api.fundamentals import fundamental_view
 from ceremyn.patterns import analyze_symbol, compute_fibonacci_levels
 
 router = APIRouter()
@@ -55,6 +58,7 @@ class SymbolAnalysis(BaseModel):
     bars_analyzed: int
     last_scanned_at: str
     patterns: list[PatternTrackRecordView]
+    fundamentals: dict[str, Any] | None = None
     fibonacci: FibonacciLevelsView | None
 
 
@@ -90,6 +94,7 @@ def analyze_equity(symbol: str) -> SymbolAnalysis:
     fib = compute_fibonacci_levels(candles, tradingsymbol=symbol)
     latest = candles[-1]
     return SymbolAnalysis(
+        fundamentals=fundamental_view(symbol, latest.timestamp, latest.close),
         tradingsymbol=symbol,
         as_of=latest.timestamp.isoformat(),
         latest_close=float(latest.close),

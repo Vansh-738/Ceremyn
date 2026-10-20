@@ -12,6 +12,8 @@ from ceremyn.backtest.ledger import CashLedgerEntry, ClosedTrade, TradeLedger
 from ceremyn.backtest.statistics import EquityPoint
 from ceremyn.core.timeutils import to_ist
 from ceremyn.domain import (
+    CorporateAction,
+    CorporateActionType,
     Fill,
     Instrument,
     KillSwitchState,
@@ -278,3 +280,35 @@ class BacktestPortfolio:
                     entry_costs=residual_costs,
                 )
             )
+
+    def apply_corporate_action(self, action: CorporateAction, at: datetime) -> None:
+        symbol = action.tradingsymbol
+        position = self.positions.get(symbol)
+        if position is None or position.is_flat:
+            return
+        if action.action_type is CorporateActionType.DIVIDEND:
+            amount = Decimal(position.quantity) * (action.dividend_amount or Decimal(0))
+            self.cash += amount
+            self._realized_pnl += amount
+            self.ledger = self.ledger.add_cash_entry(
+                CashLedgerEntry(timestamp=at, amount=amount, description=f"Dividend {symbol}")
+            )
+            return
+        ratio = action.ratio
+        assert ratio is not None
+        lots = self._open_lots[symbol]
+        if any(Decimal(lot.quantity) * ratio != int(Decimal(lot.quantity) * ratio) for lot in lots):
+            raise ValueError(
+                "fractional corporate-action entitlement requires a cash settlement record"
+            )
+        for lot in lots:
+            lot.quantity = int(Decimal(lot.quantity) * ratio)
+            lot.price /= ratio
+        self.positions[symbol] = position.model_copy(
+            update={
+                "quantity": int(Decimal(position.quantity) * ratio),
+                "avg_price": position.avg_price / ratio,
+            }
+        )
+        if symbol in self._last_prices:
+            self._last_prices[symbol] /= ratio

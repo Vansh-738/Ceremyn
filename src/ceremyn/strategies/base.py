@@ -22,6 +22,7 @@ from ceremyn.domain import (
     StrategyDefinition,
 )
 from ceremyn.domain.enums import SignalAction
+from ceremyn.strategies.bars import BarContext
 
 P = TypeVar("P", bound=BaseModel)
 
@@ -129,6 +130,10 @@ class Strategy(ABC, Generic[P]):
             replay_id=replay_id,
             legs=legs,
         )
+
+    def on_bar(self, ctx: BarContext) -> list[Signal]:
+        """Optional daily-bar interface; option strategies remain unchanged."""
+        return []
 
     @abstractmethod
     def on_chain(self, ctx: StrategyContext) -> list[Signal]:

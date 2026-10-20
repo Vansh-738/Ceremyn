@@ -12,12 +12,13 @@ execution/risk/OMS, the same guarantee `ceremyn.patterns` itself already gives
 
 import asyncio
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from ceremyn.config import OpportunitiesSettings
+from ceremyn.config import OpportunitiesSettings, get_settings
 from ceremyn.core.timeutils import now_utc, to_ist
 from ceremyn.data.providers.nse_indices import fetch_index_constituents
 from ceremyn.data.services.equity_history import (
@@ -26,7 +27,9 @@ from ceremyn.data.services.equity_history import (
 )
 from ceremyn.domain import Candle, Opportunity
 from ceremyn.domain.enums import AssetClass
-from ceremyn.patterns import find_opportunities
+from ceremyn.fundamentals.provider import JSONFundamentalsStore
+from ceremyn.fundamentals.scoring import score
+from ceremyn.patterns.ranking import find_ranked_opportunities as find_opportunities
 
 logger = structlog.get_logger(__name__)
 
@@ -50,6 +53,11 @@ class OpportunityView(BaseModel):
     average_forward_return_pct: float
     forward_days: int
     edge_score: float
+    baseline_hit_rate: float | None = None
+    hit_rate_lift: float | None = None
+    excess_return_pct: float | None = None
+    adjusted_p_value: float | None = None
+    research_use: str = "research_only"
 
 
 class ScanState(BaseModel):
@@ -82,6 +90,11 @@ def _to_view(o: Opportunity) -> OpportunityView:
         average_forward_return_pct=o.average_forward_return_pct,
         forward_days=o.forward_days,
         edge_score=o.edge_score,
+        baseline_hit_rate=o.baseline_hit_rate,
+        hit_rate_lift=o.hit_rate_lift,
+        excess_return_pct=o.excess_return_pct,
+        adjusted_p_value=o.adjusted_p_value,
+        research_use=o.research_use,
     )
 
 
@@ -115,12 +128,24 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
         asset_class_by_symbol = dict.fromkeys(candles_by_symbol, AssetClass.EQUITY)
         # find_opportunities is CPU-bound (no I/O) -- run it off the event loop so
         # a whole-universe scan doesn't freeze every other request for minutes.
+        store = JSONFundamentalsStore(Path(get_settings().fundamentals_path))
+        fundamentals = {}
+        for symbol, candles in candles_by_symbol.items():
+            if candles:
+                result = score(
+                    store.history(symbol), symbol, candles[-1].timestamp, candles[-1].close
+                )
+                if result is not None:
+                    fundamentals[symbol] = result
         opportunities = await asyncio.to_thread(
             find_opportunities,
             candles_by_symbol,
             asset_class_by_symbol,
             forward_days=settings.forward_days,
             min_avg_forward_return_pct=settings.min_avg_forward_return_pct,
+            fdr_alpha=settings.fdr_alpha,
+            fundamentals=fundamentals,
+            require_fundamentals=settings.require_fundamentals,
         )
         views = tuple(_to_view(o) for o in opportunities)
         _last_scan = (to_ist(now_utc()), views, len(candles_by_symbol))
@@ -178,3 +203,15 @@ async def list_equity_opportunities(
         symbols_scanned=symbol_count,
         opportunities=list(views[:limit]),
     )
+
+
+def intelligence_snapshot() -> dict[str, object]:
+    if _last_scan is None:
+        return {"available": False, "opportunities": []}
+    timestamp, views, count = _last_scan
+    return {
+        "available": True,
+        "as_of": timestamp.isoformat(),
+        "symbols_scanned": count,
+        "opportunities": [view.model_dump(mode="json") for view in views],
+    }

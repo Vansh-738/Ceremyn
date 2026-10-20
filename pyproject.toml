@@ -99,6 +99,7 @@ forbidden_modules = [
     "ceremyn.data",
     "ceremyn.execution",
     "ceremyn.features",
+    "ceremyn.fundamentals",
     "ceremyn.live",
     "ceremyn.llm",
     "ceremyn.oms",
@@ -245,3 +246,9 @@ name = "Patterns cannot import broker"
 type = "forbidden"
 source_modules = ["ceremyn.patterns"]
 forbidden_modules = ["ceremyn.broker"]
+
+[[tool.importlinter.contracts]]
+name = "Fundamentals cannot reach trading services"
+type = "forbidden"
+source_modules = ["ceremyn.fundamentals"]
+forbidden_modules = ["ceremyn.execution", "ceremyn.risk", "ceremyn.oms", "ceremyn.broker"]

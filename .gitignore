@@ -33,3 +33,6 @@ htmlcov/
 /logs/
 *.log
 .claude/
+
+# Independently deployed reviewer-site source and local packaging artifacts.
+/interview-site/

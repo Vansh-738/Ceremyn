@@ -29,10 +29,18 @@ class Opportunity(BaseModel):
     average_forward_return_pct: float
     forward_days: int = Field(gt=0)
 
+    baseline_hit_rate: float | None = None
+    hit_rate_lift: float | None = None
+    excess_return_pct: float | None = None
+    adjusted_p_value: float | None = None
+    research_use: str = "research_only"
+
     _aware = field_validator("detected_at")(_require_aware)
 
     @property
     def edge_score(self) -> float:
         """Transparent ranking key: hit rate weighted by the size of the
         historical average move. Not a prediction -- a sort key, nothing more."""
+        if self.hit_rate_lift is not None and self.excess_return_pct is not None:
+            return max(0.0, self.hit_rate_lift) * max(0.0, self.excess_return_pct)
         return self.hit_rate * abs(self.average_forward_return_pct)

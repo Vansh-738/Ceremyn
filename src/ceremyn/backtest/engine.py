@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ceremyn.backtest.events import (
     BacktestEvent,
+    BarEvent,
     CandleEvent,
     MarketSignalEvent,
     OptionChainEvent,
@@ -17,6 +18,7 @@ from ceremyn.backtest.events import (
 from ceremyn.backtest.fills import ExecutionContext, PendingOrderState
 from ceremyn.backtest.portfolio import BacktestPortfolio, PortfolioConfig
 from ceremyn.backtest.simulator import ExecutionSimulator, SimulationConfig
+from ceremyn.core.timeutils import to_ist
 from ceremyn.data.services.chain_analytics import atm_iv, iv_rank
 from ceremyn.domain import (
     Candle,
@@ -54,6 +56,7 @@ class BacktestEngine:
         self.config = config or BacktestConfig()
         self.portfolio = portfolio or BacktestPortfolio(self.config.portfolio)
         self.simulator = simulator or ExecutionSimulator(config=self.config.simulation)
+        self._bar_times: dict[str, datetime] = {}
         self.latest_chain: OptionChainSnapshot | None = None
         # Every chain event ever seen, keyed by expiry — lets a strategy that needs a second
         # expiry's chain at the same instant (e.g. a calendar spread) see it via
@@ -74,6 +77,9 @@ class BacktestEngine:
         self._iv_history: dict[str, list[float]] = defaultdict(list)
 
     def process_event(self, event: BacktestEvent) -> None:
+        if isinstance(event, BarEvent):
+            self._process_bar(event)
+            return
         if isinstance(event, QuoteEvent):
             self.quotes[event.quote.tradingsymbol] = event.quote
         elif isinstance(event, CandleEvent):
@@ -183,3 +189,57 @@ class BacktestEngine:
 
     def _pending_order_view(self) -> tuple[Order, ...]:
         return tuple(state.order for states in self.pending_orders.values() for state in states)
+
+    def _process_bar(self, event: BarEvent) -> None:
+        bar = event.context.candles[-1]
+        symbol = bar.tradingsymbol
+        previous = self._bar_times.get(symbol)
+        if previous == event.timestamp:
+            return
+        if previous is not None and previous > event.timestamp:
+            raise ValueError("bar events must be chronological")
+        self._bar_times[symbol] = event.timestamp
+        for action in event.actions:
+            if action.tradingsymbol != symbol or action.ex_date != to_ist(event.timestamp).date():
+                raise ValueError("corporate action does not match bar")
+            self.portfolio.apply_corporate_action(action, event.timestamp)
+            for strategy_id, pending in self.pending_orders.items():
+                self.pending_orders[strategy_id] = [
+                    p for p in pending if p.order.contract.tradingsymbol != symbol
+                ]
+        # Only this symbol is executable. Signals from this close wait for another bar.
+        opening = Quote(
+            tradingsymbol=symbol, timestamp=event.timestamp, last_price=bar.open, volume=bar.volume
+        )
+        self._advance_pending_orders(
+            context=ExecutionContext(timestamp=event.timestamp, quotes={symbol: opening})
+        )
+        self.quotes[symbol] = opening.model_copy(update={"last_price": bar.close})
+        self.portfolio.mark_to_market(
+            timestamp=event.timestamp,
+            last_prices=self._last_prices(),
+            pending_orders=self._pending_order_view(),
+        )
+        context = event.context.model_copy(
+            update={
+                "portfolio": self.portfolio.snapshot(),
+                "positions": self.portfolio.snapshot().positions,
+            }
+        )
+        # One pending order per symbol avoids duplicate daily submissions during a halt.
+        if any(
+            s.order.contract.tradingsymbol == symbol
+            for states in self.pending_orders.values()
+            for s in states
+        ):
+            return
+        for signal in self.strategy.on_bar(context):
+            decision = self.risk_engine.evaluate(
+                self.portfolio.snapshot(), signal, evaluated_at=event.timestamp
+            )
+            self.risk_decisions.append(decision)
+            if decision.approved:
+                for order in self.simulator.orders_from_signal(signal, created_at=event.timestamp):
+                    self.pending_orders[signal.strategy_id].append(
+                        PendingOrderState(order=order, remaining_quantity=order.quantity)
+                    )

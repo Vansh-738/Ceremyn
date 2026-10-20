@@ -1,9 +1,13 @@
 """Indian transaction cost model."""
 
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ceremyn.config import get_settings
+from ceremyn.core.timeutils import to_ist
+from ceremyn.domain import EquityInstrument, Instrument
 from ceremyn.domain.enums import Side
 
 PAISE = Decimal("0.01")
@@ -27,6 +31,7 @@ class IndianCostConfig(BaseModel):
 class CostBreakdown(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    depository: Decimal = Decimal("0")
     brokerage: Decimal = Decimal("0")
     stt: Decimal = Decimal("0")
     exchange_transaction_charges: Decimal = Decimal("0")
@@ -37,7 +42,8 @@ class CostBreakdown(BaseModel):
     @property
     def total(self) -> Decimal:
         return _money(
-            self.brokerage
+            self.depository
+            + self.brokerage
             + self.stt
             + self.exchange_transaction_charges
             + self.gst
@@ -49,6 +55,8 @@ class CostBreakdown(BaseModel):
 class IndianCostModel:
     def __init__(self, config: IndianCostConfig | None = None) -> None:
         self.config = config or IndianCostConfig()
+        self.equity = get_settings().equity_costs
+        self._dp_charged: set[tuple[str, date]] = set()
 
     def calculate(self, *, side: Side, quantity: int, price: Decimal) -> CostBreakdown:
         turnover = price * quantity
@@ -67,4 +75,34 @@ class IndianCostModel:
             gst=gst,
             sebi_charges=sebi,
             stamp_duty=stamp,
+        )
+
+    def calculate_for(
+        self,
+        *,
+        instrument: Instrument,
+        timestamp: datetime,
+        side: Side,
+        quantity: int,
+        price: Decimal,
+    ) -> CostBreakdown:
+        if not isinstance(instrument, EquityInstrument):
+            return self.calculate(side=side, quantity=quantity, price=price)
+        turnover = price * quantity
+        cfg = self.equity
+        exchange = _money(turnover * cfg.exchange_rate)
+        sebi = _money(turnover * cfg.sebi_rate)
+        key = (instrument.tradingsymbol, to_ist(timestamp).date())
+        dp = Decimal(0)
+        if side is Side.SELL and key not in self._dp_charged:
+            dp = cfg.dp_sell_charge
+            self._dp_charged.add(key)
+        return CostBreakdown(
+            depository=dp,
+            brokerage=cfg.brokerage,
+            stt=_money(turnover * cfg.stt_rate),
+            exchange_transaction_charges=exchange,
+            sebi_charges=sebi,
+            gst=_money((cfg.brokerage + exchange + sebi) * cfg.gst_rate),
+            stamp_duty=_money(turnover * cfg.stamp_buy_rate) if side is Side.BUY else Decimal(0),
         )

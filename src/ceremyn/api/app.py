@@ -28,6 +28,7 @@ from pydantic import BaseModel
 import ceremyn
 from ceremyn.api.analysis import router as analysis_router
 from ceremyn.api.execution import build_execution_router
+from ceremyn.api.fundamentals import router as fundamentals_router
 from ceremyn.api.llm import build_llm_router
 from ceremyn.api.llm_runtime import build_assistant
 from ceremyn.api.opportunities import router as opportunities_router
@@ -119,6 +120,13 @@ def create_app(
             and bool(container.settings.kite.api_key)
             and bool(container.settings.kite.access_token.get_secret_value())
         )
+        equity_bars_started = (
+            container is not None
+            and settings.equity_bars.enabled
+            and bool(settings.equity_bars.symbols)
+            and bool(container.settings.kite.api_key)
+            and bool(container.settings.kite.access_token.get_secret_value())
+        )
         if container is not None:
             EventBridge().register(container.event_bus, _FrameSink(manager))
             await container.orchestrator.start()
@@ -126,6 +134,8 @@ def create_app(
                 await container.rest_poller.start()
             if equity_quotes_started:
                 await container.equity_quote_job.start()
+            if equity_bars_started:
+                await container.equity_bar_job.start()
         task = asyncio.create_task(run_broadcaster(service, differ, manager, dashboard_settings))
         # Off by default (see OpportunitiesSettings) -- a real scan means real,
         # repeated NSE network calls, which must never happen implicitly just
@@ -146,6 +156,8 @@ def create_app(
                 with contextlib.suppress(asyncio.CancelledError):
                     await opportunities_task
             if container is not None:
+                if equity_bars_started:
+                    await container.equity_bar_job.stop()
                 if equity_quotes_started:
                     await container.equity_quote_job.stop()
                 await container.orchestrator.stop()
@@ -215,6 +227,7 @@ def create_app(
         app.include_router(
             build_trading_router(container, dashboard_settings), prefix=TRADING_PREFIX
         )
+    app.include_router(fundamentals_router, prefix="/fundamentals")
     app.state.dashboard_manager = manager
     app.state.dashboard_differ = differ
     app.state.dashboard_service = service

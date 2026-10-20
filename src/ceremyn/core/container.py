@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from ceremyn.paper.engine import PaperTradingEngine
     from ceremyn.research.experiment_manager import ExperimentManager
     from ceremyn.research.experiment_store import JSONExperimentStore
+    from ceremyn.runtime.equity_bars import EquityBarJob
     from ceremyn.runtime.orchestrator import RuntimeOrchestrator
     from ceremyn.runtime.rest_poller import RestPricePoller
     from ceremyn.strategies.base import Strategy
@@ -379,6 +380,28 @@ class Container:
             oms_engine=self.oms_engine,
             strategies=self.active_runtime_strategies,
             poll_interval_seconds=self.settings.runtime.poll_interval_seconds,
+        )
+
+    @cached_property
+    def equity_bar_job(self) -> "EquityBarJob":
+        from ceremyn.data.services.equity_history import fetch_all_equity_candles
+        from ceremyn.runtime.bars import BarStrategyDriver
+        from ceremyn.runtime.equity_bars import EquityBarJob
+        from ceremyn.strategies import create
+
+        definition = StrategyDefinition(
+            id="equity_pattern_runtime",
+            strategy_type="equity_pattern",
+            name="Daily equity pattern",
+            underlyings=self.settings.equity_bars.symbols,
+        )
+        return EquityBarJob(
+            settings=self.settings.equity_bars,
+            driver=BarStrategyDriver(create(definition), self.oms_engine),
+            history_loader=fetch_all_equity_candles,
+            provider=self.kite_provider,
+            cache=self.live_engine.cache,
+            calendar=self.calendar,
         )
 
     @cached_property

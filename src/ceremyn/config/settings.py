@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ceremyn.config.equity import EquityCostSettings
 from ceremyn.config.modes import TradingMode
 
 
@@ -95,6 +96,13 @@ class DataSettings(BaseModel):
     snapshot_interval_minutes: int = 5
 
 
+class EquityBarSettings(BaseModel):
+    enabled: bool = False
+    symbols: tuple[str, ...] = ()
+    max_daily_move: Decimal = Field(default=Decimal("0.3"), gt=0, lt=1)
+    max_entry_gap: Decimal = Field(default=Decimal("0.05"), gt=0, lt=1)
+
+
 class EquityQuoteSettings(BaseModel):
     """Opt-in snapshots for the most liquid NSE equities; one request per cycle."""
 
@@ -112,6 +120,8 @@ class OpportunitiesSettings(BaseModel):
     a test spins up an app). Enable explicitly once you actually want it."""
 
     scan_enabled: bool = False
+    require_fundamentals: bool = False
+    fdr_alpha: float = Field(default=0.1, gt=0, lt=1)
     # "watchlist" = the small built-in liquid names; "nifty500" = NSE's own
     # published NIFTY 500 constituent list (index-vetted, but market-cap-tiered
     # by construction, and only ever the CURRENT list -- applying it across a
@@ -255,6 +265,9 @@ class Settings(BaseSettings):
     kite: KiteSettings = Field(default_factory=KiteSettings)
     anthropic: AnthropicSettings = Field(default_factory=AnthropicSettings)
     data: DataSettings = Field(default_factory=DataSettings)
+    equity_bars: EquityBarSettings = Field(default_factory=EquityBarSettings)
+    fundamentals_path: str = "data/fundamentals.json"
+    equity_costs: EquityCostSettings = Field(default_factory=EquityCostSettings)
     equity_quotes: EquityQuoteSettings = Field(default_factory=EquityQuoteSettings)
     opportunities: OpportunitiesSettings = Field(default_factory=OpportunitiesSettings)
     risk: RiskSettings = Field(default_factory=RiskSettings)

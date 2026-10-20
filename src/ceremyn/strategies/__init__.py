@@ -10,6 +10,7 @@ from ceremyn.strategies import (  # noqa: F401
     broken_wing_butterfly,
     bull_put_spread,
     calendar_spread,
+    equity_pattern,
     expiry_day_theta,
     iron_condor,
     iron_fly,

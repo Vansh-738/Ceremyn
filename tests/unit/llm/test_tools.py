@@ -127,3 +127,19 @@ def test_manage_watchlist_is_session_scoped() -> None:
 def test_unknown_tool_raises() -> None:
     with pytest.raises(LLMToolError):
         run_tool("delete_everything", {}, make_context())
+
+
+def test_intelligence_tools_are_read_only_and_preserve_sources() -> None:
+    from dataclasses import replace
+
+    ctx = replace(
+        make_context(),
+        opportunities=lambda: {"available": True, "opportunities": []},
+        fundamentals=lambda symbol: {"symbol": symbol, "available": False},
+    )
+    assert run_tool("get_opportunities", {}, ctx).data["available"] is True
+    result = run_tool("get_fundamentals", {"symbol": "test"}, ctx)
+    assert result.data == {"symbol": "TEST", "available": False}
+    assert "publication" in result.source.lower()
+    with pytest.raises(LLMToolError):
+        run_tool("get_fundamentals", {}, ctx)

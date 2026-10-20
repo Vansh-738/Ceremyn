@@ -5,7 +5,10 @@ already satisfies directly, so no adapter is needed for it at all).
 """
 
 from datetime import UTC, datetime
+from typing import Any
 
+from ceremyn.api.fundamentals import fundamental_view
+from ceremyn.api.opportunities import get_cached_candles, intelligence_snapshot
 from ceremyn.core.container import Container
 from ceremyn.core.timeutils import now_ist, now_utc
 from ceremyn.dashboard.backend import DashboardService
@@ -116,6 +119,13 @@ class _RecapAdapter:
         )
 
 
+def _fundamentals_for_latest(symbol: str) -> dict[str, Any]:
+    candles = get_cached_candles(symbol)
+    if not candles:
+        return {"available": False, "reason": "No completed price scan for this symbol"}
+    return fundamental_view(symbol, candles[-1].timestamp, candles[-1].close)
+
+
 def build_assistant(container: Container, dashboard_service: DashboardService) -> Assistant:
     """The composition edge: wraps `container`'s engines (plus the already-built
     `dashboard_service`) into the `Assistant`'s read-only dependencies. `container.llm_client`
@@ -129,4 +139,6 @@ def build_assistant(container: Container, dashboard_service: DashboardService) -
         watchlist=container.watchlist_store,
         conversation=container.conversation_store,
         event_bus=container.event_bus,
+        opportunities=intelligence_snapshot,
+        fundamentals=_fundamentals_for_latest,
     )

@@ -251,7 +251,9 @@ class OrderManagementEngine:
             self.metrics.record_duplicate()
         self.metrics.record_broker_health(success=True)
         if fill is not None:
-            costs = self.commission_model.calculate(
+            costs = self.commission_model.calculate_for(
+                instrument=updated.order.contract,
+                timestamp=fill.timestamp,
                 side=updated.order.side,
                 quantity=fill.quantity,
                 price=fill.price,
@@ -464,7 +466,9 @@ class OrderManagementEngine:
         self._children = {parent: list(child_ids) for parent, child_ids in state.children.items()}
         self.idempotency.seed(state.idempotency_seed)
         for replay in rebuild_portfolio_fills(self.journal.store, self.orders):
-            costs = self.commission_model.calculate(
+            costs = self.commission_model.calculate_for(
+                instrument=replay.order.contract,
+                timestamp=replay.fill.timestamp,
                 side=replay.order.side,
                 quantity=replay.fill.quantity,
                 price=replay.fill.price,

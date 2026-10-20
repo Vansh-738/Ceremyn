@@ -55,11 +55,15 @@ class Assistant:
         conversation: ConversationStore,
         event_bus: EventBus | None = None,
         max_tool_iterations: int = MAX_TOOL_ITERATIONS,
+        opportunities: Callable[[], dict[str, Any]] | None = None,
+        fundamentals: Callable[[str], dict[str, Any]] | None = None,
     ) -> None:
         # `client_factory` is called (and cached) only the first time a turn actually needs
         # to reach Claude — never at construction — so a missing Anthropic API key never
         # breaks building the assistant itself, same as `execution.gated_broker
         # .GatedBrokerAdapter`'s lazy `live_factory`.
+        self._opportunities = opportunities
+        self._fundamentals = fundamentals
         self._client_factory = client_factory
         self._client: ClaudeClient | None = None
         self._dashboard = dashboard
@@ -156,6 +160,8 @@ class Assistant:
             recap=self._recap,
             watchlist=self._watchlist,
             session_id=session_id,
+            opportunities=self._opportunities,
+            fundamentals=self._fundamentals,
         )
 
     async def _run_seeded(

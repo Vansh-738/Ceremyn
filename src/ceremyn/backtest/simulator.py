@@ -126,7 +126,9 @@ class ExecutionSimulator:
             reference_price=reference_price,
             spread=quote.spread if quote is not None else None,
         )
-        costs = self.commission_model.calculate(
+        costs = self.commission_model.calculate_for(
+            instrument=pending.order.contract,
+            timestamp=context.timestamp,
             side=pending.order.side,
             quantity=available_quantity,
             price=slipped,

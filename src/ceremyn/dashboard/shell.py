@@ -322,17 +322,17 @@ function opportunityCards(){
  const items=visible.map(o=>{
   const key=opportunityKey(o);const bullish=o.direction==='bullish';const isOpen=openOppDetails.has(key);
   const detail=isOpen?`<div class="sub num" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-    Potential move: <span class="${o.average_forward_return_pct>=0?'pos':'neg'}">${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}%</span>
+    Historical move: <span class="${o.average_forward_return_pct>=0?'pos':'neg'}">${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}%</span>
     over ${o.forward_days} trading day${o.forward_days===1?'':'s'} (historical average, n=${o.occurrences})</div>`:'';
   return `<div class="card kpi" data-oppkey="${key}" style="cursor:pointer">${CORNERS}
    <div class="label">${o.tradingsymbol}<span class="badge ${bullish?'green':'red'}" style="float:right">${o.direction}</span></div>
    <div class="val" style="font-size:16px">${humanize(o.pattern_name)}</div>
    <div class="sub num">Hit rate ${pct(o.hit_rate*100)} · avg ${o.average_forward_return_pct>=0?'+':''}${fmtNum(o.average_forward_return_pct,1)}% · n=${o.occurrences}</div>
+   <div class="sub">${o.hit_rate_lift!=null?'Lift '+pct(o.hit_rate_lift*100)+' · adjusted p '+fmtNum(o.adjusted_p_value,3):'Legacy evidence'} · ${bullish?'Long research':'Avoid / exit research'}</div>
    ${detail}
    <div style="margin-top:10px;display:flex;gap:8px">
     <button class="btn" style="flex:1" data-reject="${key}">Dismiss</button>
-    <button class="btn btn-primary" style="flex:1" data-approve="${key}" data-symbol="${o.tradingsymbol}"
-     data-side="${bullish?'BUY':'SELL'}">Prepare order</button>
+    ${bullish?`<button class="btn btn-primary" style="flex:1" data-approve="${key}" data-symbol="${o.tradingsymbol}" data-side="BUY">Prepare order</button>`:'<span class="sub">No cash short entry</span>'}
    </div></div>`;}).join('');
  return `${opportunityStatusLine()}<div class="section-label">Top Opportunities</div><div class="grid kpis">${items}</div>`;}
 function wireOpportunityButtons(){
@@ -393,6 +393,12 @@ function fibonacciCard(r){
    ${money(f.swing_end)} (${new Date(f.swing_end_at).toLocaleDateString('en-IN')})
   </div>
   <div class="kv">${rows}</div>`);}
+function fundamentalsBody(f){
+ if(!f||!f.available)return empty('No imported financial statements. Add publication-dated CSV filings to enable these checks.');
+ const s=f.score;
+ if(!s)return empty('Statements available; two consecutive annual periods are needed to compare results.');
+ const esc=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ return `<div class="sub">As of ${esc(f.as_of.slice(0,10))} · ${esc(s.source)}</div><p>${s.checks_passed.length} passed · ${s.checks_failed.length} failed · ${s.checks_missing.length} unavailable</p><p>${s.checks_passed.map(esc).join(' · ')}</p><p class="neg">${s.red_flags.map(esc).join(' · ')}</p>`;}
 function analysisResultBody(){
  if(!analysisResult)return '';
  const r=analysisResult;
@@ -413,6 +419,7 @@ function analysisResultBody(){
    ${kpi('Bars Analyzed',r.bars_analyzed)}
   </div>
   ${fibonacciCard(r)}
+  ${card('Fundamentals',fundamentalsBody(r.fundamentals))}
   ${card(r.tradingsymbol+' — Pattern Track Record',
     rows?tbl([['Pattern'],['Direction'],['Source'],['Now'],['Hit Rate','r'],['Avg Move','r'],['N','r'],['Opp. Grade']],rows)
     :empty("No patterns detected across this stock's history."))}

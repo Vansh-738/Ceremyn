@@ -33,6 +33,8 @@ class ToolContext:
     recap: RecapReader
     watchlist: WatchlistStore
     session_id: str
+    opportunities: Callable[[], dict[str, Any]] | None = None
+    fundamentals: Callable[[str], dict[str, Any]] | None = None
 
 
 ToolFunction = Callable[[ToolContext, dict[str, Any]], ToolResult]
@@ -134,6 +136,19 @@ def _manage_watchlist(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
     return ToolResult(
         data=snapshot.model_dump(mode="json"), source="Assistant watchlist (session-local)"
     )
+
+
+def _get_opportunities(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
+    data = ctx.opportunities() if ctx.opportunities else {"available": False}
+    return ToolResult(data=data, source="Completed equity opportunity scan")
+
+
+def _get_fundamentals(ctx: ToolContext, args: dict[str, Any]) -> ToolResult:
+    symbol = str(args.get("symbol", "")).strip().upper()
+    if not symbol:
+        raise LLMToolError("symbol is required")
+    data = ctx.fundamentals(symbol) if ctx.fundamentals else {"available": False}
+    return ToolResult(data=data, source="Publication-dated imported fundamentals")
 
 
 TOOL_DEFINITIONS: tuple[dict[str, Any], ...] = (
@@ -243,7 +258,26 @@ TOOL_DEFINITIONS: tuple[dict[str, Any], ...] = (
     },
 )
 
+TOOL_DEFINITIONS += (
+    {
+        "name": "get_opportunities",
+        "description": "Read equity research, baseline lift and adjusted significance.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_fundamentals",
+        "description": "Read dated financial statements and accounting checks for a symbol.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"symbol": {"type": "string"}},
+            "required": ["symbol"],
+        },
+    },
+)
+
 TOOL_DISPATCH: dict[str, ToolFunction] = {
+    "get_opportunities": _get_opportunities,
+    "get_fundamentals": _get_fundamentals,
     "get_portfolio_overview": _get_portfolio_overview,
     "get_portfolio_detail": _get_portfolio_detail,
     "get_positions": _get_positions,
