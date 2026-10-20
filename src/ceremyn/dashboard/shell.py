@@ -28,22 +28,14 @@ SHELL_HTML = r"""<!doctype html>
 </head>
 <body>
 <div class="app">
-  <aside class="sidebar" id="sidebar">
-    <div class="brand">
-      <div class="mark">◆</div>
-      <div class="brand-text"><div class="name">Ceremyn</div><div class="sub">Market Intelligence</div></div>
-    </div>
-    <nav class="nav" id="nav"></nav>
-    <div class="sidefoot">
-      <span id="verFoot">—</span>
-      <button class="collapse-btn" id="collapseBtn" title="Collapse sidebar">«</button>
-    </div>
-  </aside>
-  <div class="main">
-    <header class="topbar">
-      <button class="menu-btn" id="menuBtn" title="Toggle navigation" aria-label="Toggle navigation">☰</button>
-      <div class="page-title" id="pageTitle">Overview</div>
-      <div class="spacer"></div>
+  <header class="commandbar">
+    <a class="wordmark" href="#overview" aria-label="Ceremyn overview"><span class="mark">◆</span><span>CEREMYN</span></a>
+    <aside class="sidebar" id="sidebar">
+      <nav class="nav" id="nav"></nav>
+      <span id="verFoot" class="build-tag">—</span>
+      <button class="collapse-btn" id="collapseBtn" title="Collapse navigation">More</button>
+    </aside>
+    <div class="command-status">
       <div class="status-chips">
        <span class="chip" id="wsChip"><span class="dot"></span>Connecting</span>
        <span class="chip" id="runChip"><span class="dot"></span>Runtime</span>
@@ -51,6 +43,13 @@ SHELL_HTML = r"""<!doctype html>
       </div>
       <span class="clock num" id="clock">--:--:--</span>
       <button class="theme-btn" id="themeBtn" title="Toggle theme">☀</button>
+    </div>
+  </header>
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" title="Toggle navigation" aria-label="Toggle navigation">☰</button>
+      <div><div class="eyebrow">Workspace</div><div class="page-title" id="pageTitle">Overview</div></div>
+      <div class="spacer"></div><div class="market-strip">Live research and controlled execution</div>
     </header>
     <main class="content" id="content"><div class="empty">Connecting to live feed…</div></main>
   </div>
