@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from ceremyn.api.app import create_app
 from ceremyn.config import Settings, TradingMode
+from ceremyn.dashboard.config import DashboardSettings
 
 SECRET = "super-secret-token"
 
@@ -18,6 +19,10 @@ def make_settings(**overrides: object) -> Settings:
 
 def make_live_settings(**overrides: object) -> Settings:
     return make_settings(trading_mode=TradingMode.LIVE, live_trading_enabled=True, **overrides)
+
+
+def live_dashboard_settings() -> DashboardSettings:
+    return DashboardSettings(auth_enabled=True, admin_token="ADMIN")
 
 
 def test_status_defaults_to_disarmed_and_simulated() -> None:
@@ -51,8 +56,14 @@ def test_arm_with_correct_token_but_gates_closed_is_conflict() -> None:
 
 
 def test_arm_with_correct_token_and_gates_open_succeeds() -> None:
-    with TestClient(create_app(make_live_settings())) as client:
-        response = client.post("/execution/arm", json={"token": SECRET, "reason": "ops approved"})
+    with TestClient(
+        create_app(make_live_settings(), dashboard_settings=live_dashboard_settings())
+    ) as client:
+        response = client.post(
+            "/execution/arm",
+            json={"token": SECRET, "reason": "ops approved"},
+            headers={"Authorization": "Bearer ADMIN"},
+        )
         assert response.status_code == 200
         assert response.json() == {
             "armed": True,
@@ -63,11 +74,27 @@ def test_arm_with_correct_token_and_gates_open_succeeds() -> None:
 
 
 def test_disarm_requires_no_token_and_always_succeeds() -> None:
-    with TestClient(create_app(make_live_settings())) as client:
-        client.post("/execution/arm", json={"token": SECRET, "reason": "ops approved"})
-        response = client.post("/execution/disarm", json={"reason": "end of day"})
+    with TestClient(
+        create_app(make_live_settings(), dashboard_settings=live_dashboard_settings())
+    ) as client:
+        client.post(
+            "/execution/arm",
+            json={"token": SECRET, "reason": "ops approved"},
+            headers={"Authorization": "Bearer ADMIN"},
+        )
+        response = client.post(
+            "/execution/disarm",
+            json={"reason": "end of day"},
+            headers={"Authorization": "Bearer ADMIN"},
+        )
         assert response.status_code == 200
         assert response.json()["armed"] is False
+
+
+def test_live_arming_requires_dashboard_authentication() -> None:
+    with TestClient(create_app(make_live_settings())) as client:
+        response = client.post("/execution/arm", json={"token": SECRET})
+    assert response.status_code == 503
 
 
 def test_disarm_with_empty_body_succeeds() -> None:

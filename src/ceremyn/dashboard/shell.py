@@ -73,6 +73,8 @@ const pageFromHash=()=>{const h=location.hash.replace('#','');return PAGE_IDS.in
 let active=pageFromHash(); let logFilter="all"; let logSearch="";
 let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",orderType:"MARKET",limitPrice:"",confirmLive:false};
 let tradeBusy=false; let tradeMsg=null;
+let executionForm={token:"",reason:"Manual trading session"};
+let executionBusy=false; let executionMsg=null;
 let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set();
 let scanState={scanning:false,last_scanned_at:null,symbols_scanned:0};
 let analysisSymbol=""; let analysisResult=null; let analysisError=null; let analysisLoading=false;
@@ -461,6 +463,10 @@ function tradeFormCard(){
   ?'Live broker is armed. This order can use real funds.'
   :'Live order routing is locked. Configure both live gates and arm the runtime before submitting.'}</div>`
   :'<div class="sub" style="margin-top:10px">Paper mode is active. No real-money order can be sent.</div>';
+ const executionControls=live?`<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px"><h3>Live execution control</h3>
+  ${livePermitted?`<div class="sub">The live broker is armed for this process.</div><button class="btn" id="disarmBtn"${executionBusy?' disabled':''} style="margin-top:10px">${executionBusy?'Disarming…':'Disarm live trading'}</button>`:
+  `<div class="grid cols-2" style="gap:10px 14px"><div><label class="k" style="display:block;margin-bottom:4px">Arming token</label><input class="input" id="armToken" type="password" autocomplete="off" placeholder="Runtime arming token" value="${executionForm.token}"/></div><div><label class="k" style="display:block;margin-bottom:4px">Reason</label><input class="input" id="armReason" placeholder="Why are you enabling live trading?" value="${executionForm.reason}"/></div></div><button class="btn" id="armBtn"${executionBusy?' disabled':''} style="margin-top:10px">${executionBusy?'Arming…':'Arm live trading'}</button>`}
+  ${executionMsg?`<div class="sub ${executionMsg.ok?'pos':'neg'}" style="margin-top:10px">${executionMsg.text}</div>`:''}</div>`:'';
  return card('Place Manual Trade',`
   <div class="grid cols-2" style="gap:10px 14px">
    <div><label class="k" style="display:block;margin-bottom:4px">Symbol</label>
@@ -488,6 +494,7 @@ function tradeFormCard(){
    <span style="font-size:11.5px;color:var(--muted)">Routes through the same risk engine as every strategy · mode: <b>${mode}</b></span>
   </div>
   ${liveNotice}
+  ${executionControls}
   ${tradeMsg?`<div class="sub ${tradeMsg.ok?'pos':'neg'}" style="margin-top:10px">${tradeMsg.text}</div>`:''}`);
 }
 function wireTradeForm(){
@@ -499,6 +506,20 @@ function wireTradeForm(){
  const lp=$("tradeLimitPrice");if(lp)lp.oninput=(e)=>{tradeForm.limitPrice=e.target.value;};
  const lc=$("tradeLiveConfirm");if(lc)lc.onchange=(e)=>{tradeForm.confirmLive=e.target.checked;};
  const sb=$("tradeSubmitBtn");if(sb)sb.onclick=submitTrade;
+ const at=$("armToken");if(at)at.oninput=(e)=>{executionForm.token=e.target.value;};
+ const ar=$("armReason");if(ar)ar.oninput=(e)=>{executionForm.reason=e.target.value;};
+ const ab=$("armBtn");if(ab)ab.onclick=()=>updateExecution('arm');
+ const db=$("disarmBtn");if(db)db.onclick=()=>updateExecution('disarm');
+}
+function updateExecution(action){
+ if(action==='arm'&&!executionForm.token){executionMsg={ok:false,text:'Enter the runtime arming token.'};render();return;}
+ if(!confirm(action==='arm'?'Arm live trading for this running process?':'Disarm live trading now?'))return;
+ executionBusy=true;executionMsg=null;render();
+ const payload=action==='arm'?{token:executionForm.token,reason:executionForm.reason}:{reason:'Manual dashboard disarm'};
+ fetch('/execution/'+action,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},TOKEN?{Authorization:'Bearer '+TOKEN}:{}),body:JSON.stringify(payload)})
+  .then(async(r)=>{const body=await r.json().catch(()=>null);if(r.ok){state.execution=body;executionForm.token='';executionMsg={ok:true,text:body.armed?'Live trading is armed for this process.':'Live trading is disarmed.'};}else{executionMsg={ok:false,text:(body&&body.detail)||`Request failed (${r.status})`};}})
+  .catch(()=>{executionMsg={ok:false,text:'Network error — could not reach the execution API.'};})
+  .finally(()=>{executionBusy=false;render();});
 }
 function submitTrade(){
  const symbol=(tradeForm.symbol||'').trim().toUpperCase();

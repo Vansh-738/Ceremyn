@@ -209,7 +209,7 @@ def create_app(
         # Separate from /dashboard by construction: the dashboard router is built above
         # from read-only sources alone and never sees the gate or a broker.
         app.include_router(
-            build_execution_router(container.live_trading_gate, settings),
+            build_execution_router(container.live_trading_gate, settings, dashboard_settings),
             prefix=EXECUTION_PREFIX,
         )
         # Also separate from /dashboard and /execution: the assistant is read-only and
