@@ -88,6 +88,37 @@ def test_place_equity_trade_defaults_to_cnc_product() -> None:
         assert order["product"] == "CNC"
 
 
+def test_place_equity_trade_accepts_a_limit_price() -> None:
+    with TestClient(create_app(make_permissive_settings())) as client:
+        response = client.post(
+            "/trading/equity",
+            json={
+                "tradingsymbol": "RELIANCE",
+                "side": "BUY",
+                "quantity": 5,
+                "reference_price": "1489.25",
+                "order_type": "LIMIT",
+                "limit_price": "1480.00",
+            },
+        )
+    assert response.status_code == 201
+
+
+def test_limit_order_requires_a_limit_price() -> None:
+    with TestClient(create_app(make_permissive_settings())) as client:
+        response = client.post(
+            "/trading/equity",
+            json={
+                "tradingsymbol": "RELIANCE",
+                "side": "BUY",
+                "quantity": 5,
+                "reference_price": "1489.25",
+                "order_type": "LIMIT",
+            },
+        )
+    assert response.status_code == 422
+
+
 def test_place_equity_trade_missing_reference_price_is_unprocessable() -> None:
     with TestClient(create_app(make_permissive_settings())) as client:
         response = client.post(
@@ -164,6 +195,28 @@ def test_place_equity_trade_requires_admin_token_when_auth_is_enabled() -> None:
             "/trading/equity", json=request, headers={"Authorization": "Bearer ADMIN"}
         )
         assert admin.status_code == 201
+
+
+def test_live_trade_requires_an_explicit_confirmation() -> None:
+    dashboard_settings = DashboardSettings(auth_enabled=True, admin_token="ADMIN")
+    with TestClient(
+        create_app(
+            make_permissive_settings(trading_mode="live", live_trading_enabled=True),
+            dashboard_settings=dashboard_settings,
+        )
+    ) as client:
+        response = client.post(
+            "/trading/equity",
+            json={
+                "tradingsymbol": "RELIANCE",
+                "side": "BUY",
+                "quantity": 10,
+                "reference_price": "1489.25",
+            },
+            headers={"Authorization": "Bearer ADMIN"},
+        )
+    assert response.status_code == 422
+    assert "confirm_live_execution" in response.json()["detail"]
 
 
 def _quote(price: str) -> Quote:

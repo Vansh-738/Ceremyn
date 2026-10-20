@@ -71,7 +71,7 @@ const PAGE_IDS=PAGES.map(p=>p[0]);
 const labelFor=(id)=>{const p=PAGES.find(p=>p[0]===id);return p?p[1]:'Overview';};
 const pageFromHash=()=>{const h=location.hash.replace('#','');return PAGE_IDS.includes(h)?h:'overview';};
 let active=pageFromHash(); let logFilter="all"; let logSearch="";
-let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",product:"CNC"};
+let tradeForm={symbol:"",side:"BUY",quantity:"",price:"",orderType:"MARKET",limitPrice:"",confirmLive:false};
 let tradeBusy=false; let tradeMsg=null;
 let opportunities=[]; const dismissedOpps=new Set(); const openOppDetails=new Set();
 let scanState={scanning:false,last_scanned_at:null,symbols_scanned:0};
@@ -452,6 +452,15 @@ function expBody(e){const by=e.by_underlying||{};const keys=Object.keys(by);
   <span class="v">${money(by[k])}</span></div>`).join('')+`</div>`;}
 function tradeFormCard(){
  const mode=(state.sys&&state.sys.effective_mode)||'paper';
+ const live=mode==='live';
+ const livePermitted=!!(state.execution&&state.execution.live_trading_permitted);
+ const submitBlocked=live&&!livePermitted;
+ const limitField=tradeForm.orderType==='LIMIT'?`<div><label class="k" style="display:block;margin-bottom:4px">Limit price (₹)</label>
+    <input class="input" id="tradeLimitPrice" type="number" min="0" step="0.05" placeholder="1480.00" value="${tradeForm.limitPrice}"/></div>`:'';
+ const liveNotice=live?`<div class="sub ${livePermitted?'neg':'amber'}" style="margin-top:10px">${livePermitted
+  ?'Live broker is armed. This order can use real funds.'
+  :'Live order routing is locked. Configure both live gates and arm the runtime before submitting.'}</div>`
+  :'<div class="sub" style="margin-top:10px">Paper mode is active. No real-money order can be sent.</div>';
  return card('Place Manual Trade',`
   <div class="grid cols-2" style="gap:10px 14px">
    <div><label class="k" style="display:block;margin-bottom:4px">Symbol</label>
@@ -465,16 +474,20 @@ function tradeFormCard(){
     <input class="input" id="tradeQty" type="number" min="1" step="1" placeholder="10" value="${tradeForm.quantity}"/></div>
    <div><label class="k" style="display:block;margin-bottom:4px">Reference price (₹)</label>
     <input class="input" id="tradePrice" type="number" min="0" step="0.05" placeholder="1489.25" value="${tradeForm.price}"/></div>
-   <div><label class="k" style="display:block;margin-bottom:4px">Product</label>
-    <select class="input" id="tradeProduct">
-     <option value="CNC" ${tradeForm.product==='CNC'?'selected':''}>CNC — delivery</option>
-     <option value="MIS" ${tradeForm.product==='MIS'?'selected':''}>MIS — intraday</option>
+   <div><label class="k" style="display:block;margin-bottom:4px">Order type</label>
+    <select class="input" id="tradeOrderType">
+     <option value="MARKET" ${tradeForm.orderType==='MARKET'?'selected':''}>MARKET</option>
+     <option value="LIMIT" ${tradeForm.orderType==='LIMIT'?'selected':''}>LIMIT</option>
     </select></div>
+   ${limitField}
   </div>
+  <div class="sub" style="margin-top:8px">Cash equity delivery only (CNC). The reference price is used for risk validation; it is not a limit price.</div>
+  ${live?`<label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:12px;color:var(--muted)"><input id="tradeLiveConfirm" type="checkbox" ${tradeForm.confirmLive?'checked':''}/><span>I understand this is a real-money order and it will be sent to the connected broker.</span></label>`:''}
   <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-   <button class="btn btn-primary" id="tradeSubmitBtn"${tradeBusy?' disabled':''}>${tradeBusy?'Submitting…':'Submit order'}</button>
+   <button class="btn btn-primary" id="tradeSubmitBtn"${tradeBusy||submitBlocked?' disabled':''}>${tradeBusy?'Submitting…':live?'Submit live order':'Submit paper order'}</button>
    <span style="font-size:11.5px;color:var(--muted)">Routes through the same risk engine as every strategy · mode: <b>${mode}</b></span>
   </div>
+  ${liveNotice}
   ${tradeMsg?`<div class="sub ${tradeMsg.ok?'pos':'neg'}" style="margin-top:10px">${tradeMsg.text}</div>`:''}`);
 }
 function wireTradeForm(){
@@ -482,7 +495,9 @@ function wireTradeForm(){
  const sd=$("tradeSide");if(sd)sd.onchange=(e)=>{tradeForm.side=e.target.value;};
  const qt=$("tradeQty");if(qt)qt.oninput=(e)=>{tradeForm.quantity=e.target.value;};
  const pr=$("tradePrice");if(pr)pr.oninput=(e)=>{tradeForm.price=e.target.value;};
- const pd=$("tradeProduct");if(pd)pd.onchange=(e)=>{tradeForm.product=e.target.value;};
+ const ot=$("tradeOrderType");if(ot)ot.onchange=(e)=>{tradeForm.orderType=e.target.value;render();};
+ const lp=$("tradeLimitPrice");if(lp)lp.oninput=(e)=>{tradeForm.limitPrice=e.target.value;};
+ const lc=$("tradeLiveConfirm");if(lc)lc.onchange=(e)=>{tradeForm.confirmLive=e.target.checked;};
  const sb=$("tradeSubmitBtn");if(sb)sb.onclick=submitTrade;
 }
 function submitTrade(){
@@ -493,17 +508,25 @@ function submitTrade(){
  if(!qty||qty<=0){tradeMsg={ok:false,text:'Quantity must be a positive whole number.'};render();return;}
  if(!price||price<=0){tradeMsg={ok:false,text:'Reference price must be greater than zero.'};render();return;}
  const mode=(state.sys&&state.sys.effective_mode)||'paper';
- if(!confirm(`Submit ${tradeForm.side} ${qty} ${symbol} @ ₹${price} (${tradeForm.product}) in ${mode.toUpperCase()} mode?`))return;
+ const live=mode==='live';
+ if(live&&!state.execution?.live_trading_permitted){tradeMsg={ok:false,text:'Live routing is locked. Configure and arm the runtime first.'};render();return;}
+ if(live&&!tradeForm.confirmLive){tradeMsg={ok:false,text:'Confirm that you want to use real funds before submitting.'};render();return;}
+ if(tradeForm.orderType==='LIMIT'&&(!parseFloat(tradeForm.limitPrice)||parseFloat(tradeForm.limitPrice)<=0)){
+  tradeMsg={ok:false,text:'Enter a valid limit price.'};render();return;
+ }
+ if(!confirm(`Submit ${tradeForm.side} ${qty} ${symbol} as a ${tradeForm.orderType} order in ${mode.toUpperCase()} mode?`))return;
  tradeBusy=true;tradeMsg=null;render();
  fetch('/trading/equity',{method:'POST',
   headers:Object.assign({'Content-Type':'application/json'},TOKEN?{Authorization:'Bearer '+TOKEN}:{}),
   body:JSON.stringify({tradingsymbol:symbol,side:tradeForm.side,quantity:qty,
-   reference_price:String(price),product:tradeForm.product})
+   reference_price:String(price),product:'CNC',order_type:tradeForm.orderType,
+   limit_price:tradeForm.orderType==='LIMIT'?String(tradeForm.limitPrice):null,
+   confirm_live_execution:live&&tradeForm.confirmLive})
  }).then(async(r)=>{
   const body=await r.json().catch(()=>null);
   if(r.ok){const first=(body&&body[0])||{};
     tradeMsg={ok:true,text:`Submitted — ${first.execution_state||'accepted'} (order ${first.oms_order_id||'—'})`};
-    tradeForm.quantity='';tradeForm.price='';}
+    tradeForm.quantity='';tradeForm.price='';tradeForm.limitPrice='';tradeForm.confirmLive=false;}
   else{tradeMsg={ok:false,text:(body&&body.detail)||`Request failed (${r.status})`};}
  }).catch(()=>{tradeMsg={ok:false,text:'Network error — could not reach the trading API.'};})
  .finally(()=>{tradeBusy=false;render();});

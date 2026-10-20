@@ -21,7 +21,7 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ceremyn.config.modes import TradingMode
 from ceremyn.core.container import Container
@@ -35,7 +35,7 @@ from ceremyn.dashboard.permissions import (
     bearer_token,
 )
 from ceremyn.domain import EquityInstrument, Exchange, Quote, Signal, SignalAction, SignalLeg
-from ceremyn.domain.enums import ProductType, Side
+from ceremyn.domain.enums import OrderType, ProductType, Side
 from ceremyn.oms.exceptions import OMSRiskRejectedError
 
 logger = structlog.get_logger(__name__)
@@ -47,7 +47,18 @@ class PlaceEquityTradeRequest(BaseModel):
     quantity: int = Field(gt=0)
     reference_price: Decimal = Field(gt=0)
     product: Literal[ProductType.CNC] = ProductType.CNC
+    order_type: Literal[OrderType.MARKET, OrderType.LIMIT] = OrderType.MARKET
+    limit_price: Decimal | None = Field(default=None, gt=0)
     signal_type: SignalAction = SignalAction.ENTER
+    confirm_live_execution: bool = False
+
+    @model_validator(mode="after")
+    def _require_limit_price(self) -> "PlaceEquityTradeRequest":
+        if self.order_type is OrderType.LIMIT and self.limit_price is None:
+            raise ValueError("limit_price is required for a LIMIT order")
+        if self.order_type is OrderType.MARKET and self.limit_price is not None:
+            raise ValueError("limit_price is only valid for a LIMIT order")
+        return self
 
 
 class PlacedOrderView(BaseModel):
@@ -119,6 +130,14 @@ def build_trading_router(container: Container, settings: DashboardSettings) -> A
                 status_code=403,
                 detail="manual equity orders require dashboard authentication in live mode",
             )
+        if (
+            container.settings.effective_mode is TradingMode.LIVE
+            and not request.confirm_live_execution
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="set confirm_live_execution=true to submit a real-money order",
+            )
         await _cache_current_equity_quote(container, request.tradingsymbol)
         risk_reference_price = _risk_reference_price(
             supplied_price=request.reference_price,
@@ -140,7 +159,15 @@ def build_trading_router(container: Container, settings: DashboardSettings) -> A
             legs=(SignalLeg(contract=contract, side=request.side, lots=request.quantity),),
             metadata={
                 "reference_prices": {request.tradingsymbol: str(risk_reference_price)},
-                "execution": {"products": {request.tradingsymbol: request.product.value}},
+                "execution": {
+                    "products": {request.tradingsymbol: request.product.value},
+                    "order_types": {request.tradingsymbol: request.order_type.value},
+                    "limit_prices": (
+                        {request.tradingsymbol: str(request.limit_price)}
+                        if request.limit_price is not None
+                        else {}
+                    ),
+                },
             },
         )
         try:
