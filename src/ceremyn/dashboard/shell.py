@@ -57,14 +57,10 @@ SHELL_HTML = r"""<!doctype html>
 <aside class="opportunity-alerts" id="opportunityAlerts" aria-live="polite"></aside>
 <script>
 const PAGES=[
- ["overview","Overview","M3 12h4l3 8 4-16 3 8h4"],
- ["markets","Markets","M3 17l6-6 4 4 8-8"],
- ["analysis","Analysis","M12 2a10 10 0 100 20 10 10 0 000-20z M12 7a5 5 0 100 10 5 5 0 000-10z M12 11a1 1 0 100 2 1 1 0 000-2z"],
- ["portfolio","Portfolio","M3 3v18h18 M7 15l4-4 3 3 5-6"],
- ["orders","Orders","M4 6h16 M4 12h16 M4 18h10"],
- ["risk","Risk","M12 3l9 16H3z M12 10v4 M12 17h.01"],
- ["research","Research","M11 4a7 7 0 100 14 7 7 0 000-14z M21 21l-4.3-4.3"],
- ["system","System","M12 8a4 4 0 100 8 4 4 0 000-8z M12 2v3 M12 19v3 M2 12h3 M19 12h3"],
+ ["overview","Desk","M3 12h4l3 8 4-16 3 8h4"],
+ ["markets","Opportunities","M3 17l6-6 4 4 8-8"],
+ ["orders","Trade","M4 6h16 M4 12h16 M4 18h10"],
+ ["risk","Guardrails","M12 3l9 16H3z M12 10v4 M12 17h.01"],
 ];
 const state={}; const series={equity:[],pnl:[],exposure:[]}; const MAXP=120;
 const PAGE_IDS=PAGES.map(p=>p[0]);
