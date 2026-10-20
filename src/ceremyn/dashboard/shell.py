@@ -233,9 +233,23 @@ function barsChart(id,x,y,color){const t=themeColors();
   font:{color:t.font,size:11},xaxis:{gridcolor:t.grid},yaxis:{gridcolor:t.grid}},
  {displayModeBar:false,responsive:true});}
 
+function renderTerminal(c){
+ const pf=state.portfolio||{},m=state.metrics||{},live=state.live||{},u=(live.underlyings||[])[0]||{};
+ const pnl=pf.daily_pnl??m.pnl??0;const visible=opportunities.filter(o=>!dismissedOpps.has(opportunityKey(o))).slice(0,4);
+ const scanner=visible.length?visible.map(o=>`<button class="terminal-signal" data-terminal-symbol="${o.tradingsymbol}"><span class="sig-dir ${o.direction==='bullish'?'pos':'neg'}">${o.direction==='bullish'?'▲':'▼'}</span><span><b>${o.tradingsymbol}</b><small>${humanize(o.pattern_name)}</small></span><strong>${pct(o.hit_rate*100)}</strong></button>`).join(''):'<div class="empty">Scanner is watching the market for qualified setups.</div>';
+ c.innerHTML=`<section class="terminal-head"><div><span class="terminal-kicker">CEREMYN / LIVE DESK</span><h1>Market command center</h1><p>Research signals, risk posture, and order controls in one place.</p></div><div class="terminal-actions"><button class="btn" id="terminalScan">Open scanner</button><button class="btn btn-primary" id="terminalTrade">Place order</button></div></section>
+ <section class="terminal-grid"><div class="terminal-panel market-panel"><div class="panel-title">Market pulse <span class="badge ${u.market_status==='open'?'green':'amber'}">${u.market_status||'waiting'}</span></div><div class="spot">${u.underlying||'NIFTY'} <strong>${u.spot?fmtNum(u.spot,2):'--'}</strong></div><div class="market-meta">ATM ${u.atm_strike?fmtNum(u.atm_strike,0):'--'} · PCR ${u.pcr?fmtNum(u.pcr,2):'--'} · ${u.latency_ms?fmtNum(u.latency_ms,0)+'ms':'feed pending'}</div></div>
+ <div class="terminal-panel"><div class="panel-title">Session P&L</div><div class="terminal-value ${signCls(pnl)}">${pnl>=0?'+':''}${money(pnl)}</div><div class="market-meta">Drawdown ${pct(m.drawdown||0)} · ${pf.position_count||0} open positions</div></div>
+ <div class="terminal-panel"><div class="panel-title">Buying power</div><div class="terminal-value">${money(pf.buying_power||0)}</div><div class="market-meta">Margin used ${money(pf.margin_used||0)}</div></div></section>
+ <section class="terminal-work"><div class="terminal-module scanner"><div class="module-head"><div><span>Scanner</span><small>${scanState.scanning?'Scanning eligible instruments':'Evidence-backed opportunities'}</small></div><button class="text-action" id="terminalAll">View all</button></div>${scanner}</div>
+ <div class="terminal-module chart-module"><div class="module-head"><div><span>Equity trajectory</span><small>Portfolio value through this session</small></div><span class="badge blue">LIVE</span></div>${chartBox('terminalEquity')}</div>
+ <div class="terminal-module guard-module"><div class="module-head"><div><span>Execution guardrails</span><small>Orders remain risk-validated</small></div></div><div class="guard-row"><span>Trading mode</span><b>${(state.sys||{}).effective_mode||'paper'}</b></div><div class="guard-row"><span>Risk violations</span><b>${(state.risk||{}).violation_count||0}</b></div><div class="guard-row"><span>Runtime</span><b>${(state.sys||{}).runtime_ready?'Ready':'Starting'}</b></div></div></section>`;
+ line('terminalEquity',series.equity,'rgb(92,167,255)');
+ $("terminalTrade").onclick=()=>goToPage('orders');$("terminalScan").onclick=()=>goToPage('markets');$("terminalAll").onclick=()=>goToPage('markets');document.querySelectorAll('[data-terminal-symbol]').forEach(b=>b.onclick=()=>{analysisSymbol=b.dataset.terminalSymbol;goToPage('analysis');runAnalysis(analysisSymbol);});}
+
 function render(){
  const c=$("content");
- if(active==='overview')return renderOverview(c);
+ if(active==='overview')return renderTerminal(c);
  if(active==='markets')return renderMarkets(c);
  if(active==='analysis')return renderAnalysis(c);
  if(active==='portfolio')return renderPortfolio(c);
