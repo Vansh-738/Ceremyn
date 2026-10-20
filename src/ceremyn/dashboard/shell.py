@@ -111,7 +111,7 @@ $("menuBtn").onclick=()=>$("sidebar").classList.toggle('open');
 $("themeBtn").onclick=()=>{const r=document.documentElement;
  const t=r.getAttribute('data-theme')==='dark'?'light':'dark';r.setAttribute('data-theme',t);
  $("themeBtn").textContent=t==='dark'?'☾':'☀';try{localStorage.setItem('ceremyn-theme',t)}catch(e){}render();};
-try{const s=localStorage.getItem('ceremyn-theme');
+try{const s=localStorage.getItem('ceremyn-workbench-theme');
  if(s){document.documentElement.setAttribute('data-theme',s);$("themeBtn").textContent=s==='dark'?'☾':'☀';}}catch(e){}
 $("collapseBtn").onclick=()=>{const on=$("sidebar").classList.toggle('collapsed');
  $("collapseBtn").textContent=on?'»':'«';try{localStorage.setItem('ceremyn-sidebar',on?'collapsed':'')}catch(e){}};
