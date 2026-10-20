@@ -22,7 +22,7 @@ SHELL_HTML = r"""<!doctype html>
 <title>Ceremyn</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 </style>
 </head>
@@ -271,10 +271,10 @@ function renderOverview(c){
  const marketLabel=market?`${market.underlying} · ${market.market_status}`:'Market intelligence is standing by';
  c.innerHTML=`
  <section class="workspace-hero">
-  <div><div class="hero-eyebrow">Market intelligence workspace</div>
-   <h1>Find the signal.<br/><span>Keep the context.</span></h1>
-   <p>Explainable opportunities, research evidence, and risk posture in one operational view.</p></div>
-  <div class="hero-status"><span class="pulse"></span><div><b>${marketLabel}</b><small>${market?'Live market context':'Connect a data feed to begin monitoring'}</small></div></div>
+  <div><div class="hero-eyebrow">Operator console / ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
+   <h1>See the market.<br/><span>Know the risk.</span></h1>
+   <p>Research evidence, portfolio posture, and execution controls in one disciplined workspace.</p></div>
+  <div class="hero-status"><span class="pulse"></span><div><b>${marketLabel}</b><small>${market?'Live market context':'Waiting for verified market data'}</small></div></div>
  </section>
  <div class="grid kpis">
   ${kpi('Portfolio Value',money(val))}
