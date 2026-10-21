@@ -81,7 +81,11 @@ async function selectSymbol(value) {
       request("/analysis/equity/" + encodeURIComponent(symbol) + "/candles")]);
     if (sequence !== analysisRequest) return;
     T.analysis = analysis; T.candles = history.candles;
-  } catch (error) { if (sequence === analysisRequest) T.analysisError = error.message; }
+  } catch (error) {
+    if (sequence === analysisRequest) T.analysisError = error.status === 503
+      ? "Daily history is being prepared. Try this symbol again when the scan completes."
+      : error.message;
+  }
   finally { if (sequence === analysisRequest) { T.loading = false; renderChart(); renderEvidence(); } }
 }
 function setWorkspace(workspace) {
