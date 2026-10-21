@@ -21,7 +21,8 @@ execution was not armed during verification. This is a targeted code review with
 project-wide automated checks, not an exhaustive security or trading certification.
 
 Postgres/Redis integration tests and the Docker build were not run locally because
-Docker is unavailable. CI defines separate jobs for these checks.
+Docker is unavailable. All three jobs (quality, integration, and Docker) passed in
+[CI for the terminal rebuild](https://github.com/Vansh-738/Ceremyn/actions/runs/39576435623).
 
 ## Fixed in this change
 
