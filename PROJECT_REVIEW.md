@@ -102,6 +102,12 @@ The browser reports request failures and last successful scan time, but cannot i
 missing backend failure metadata. Browser opportunity alerts currently require an
 open tab; reliable off-tab delivery needs a server-side delivery queue and receipts.
 
+The final live check also observed an API request exceed a 10-second timeout while
+background processing and quote-feed failures were occurring. A subsequent request
+completed in roughly four seconds. Moving preparation into threads does not establish
+acceptable latency under load; profile event-loop stalls and logging/CPU contention,
+then isolate heavy scanning and verify response-time budgets under feed failures.
+
 ### Medium — raw equity history has no corporate-action adjustment stage
 
 [`data/services/equity_history.py`](src/ceremyn/data/services/equity_history.py)
