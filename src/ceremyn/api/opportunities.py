@@ -27,6 +27,7 @@ from ceremyn.data.services.equity_history import (
 )
 from ceremyn.domain import Candle, Opportunity
 from ceremyn.domain.enums import AssetClass
+from ceremyn.domain.fundamentals import FundamentalScore
 from ceremyn.fundamentals.provider import JSONFundamentalsStore
 from ceremyn.fundamentals.scoring import score
 from ceremyn.patterns.ranking import find_ranked_opportunities as find_opportunities
@@ -108,6 +109,19 @@ async def _scan_universe(settings: OpportunitiesSettings) -> set[str] | None:
     return None
 
 
+def _score_fundamentals(
+    candles_by_symbol: dict[str, tuple[Candle, ...]], path: Path
+) -> dict[str, FundamentalScore]:
+    store = JSONFundamentalsStore(path)
+    fundamentals = {}
+    for symbol, candles in candles_by_symbol.items():
+        if candles:
+            result = score(store.history(symbol), symbol, candles[-1].timestamp, candles[-1].close)
+            if result is not None:
+                fundamentals[symbol] = result
+    return fundamentals
+
+
 async def run_scan_once(settings: OpportunitiesSettings) -> None:
     """One full scan, storing its result for the endpoint to serve. Errors are
     logged and swallowed -- a failed scan must not crash the background loop or
@@ -122,21 +136,15 @@ async def run_scan_once(settings: OpportunitiesSettings) -> None:
         candles_by_symbol = await fetch_all_equity_candles(start, end, symbols=symbols)
         # A liquidity floor within the chosen universe -- thin daily turnover is
         # what makes a stock cheap to move, even one that's index-vetted.
-        candles_by_symbol = filter_by_min_avg_turnover(
-            candles_by_symbol, settings.min_avg_daily_turnover
+        candles_by_symbol = await asyncio.to_thread(
+            filter_by_min_avg_turnover, candles_by_symbol, settings.min_avg_daily_turnover
         )
         asset_class_by_symbol = dict.fromkeys(candles_by_symbol, AssetClass.EQUITY)
         # find_opportunities is CPU-bound (no I/O) -- run it off the event loop so
         # a whole-universe scan doesn't freeze every other request for minutes.
-        store = JSONFundamentalsStore(Path(get_settings().fundamentals_path))
-        fundamentals = {}
-        for symbol, candles in candles_by_symbol.items():
-            if candles:
-                result = score(
-                    store.history(symbol), symbol, candles[-1].timestamp, candles[-1].close
-                )
-                if result is not None:
-                    fundamentals[symbol] = result
+        fundamentals = await asyncio.to_thread(
+            _score_fundamentals, candles_by_symbol, Path(get_settings().fundamentals_path)
+        )
         opportunities = await asyncio.to_thread(
             find_opportunities,
             candles_by_symbol,
@@ -186,6 +194,17 @@ def get_last_scan_settings() -> OpportunitiesSettings | None:
 
 def get_last_scanned_at() -> datetime | None:
     return _last_scan[0] if _last_scan is not None else None
+
+
+def get_qualified_pattern_keys(symbol: str) -> frozenset[tuple[str, str]]:
+    """Qualification comes from the scan-wide corrected ranking, not a local re-test."""
+    if _last_scan is None:
+        return frozenset()
+    return frozenset(
+        (view.pattern_name, view.direction)
+        for view in _last_scan[1]
+        if view.tradingsymbol == symbol
+    )
 
 
 @router.get("/equity", response_model=ScanState)

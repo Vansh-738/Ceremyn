@@ -95,6 +95,25 @@ class TestAnalyzeEquity:
             response = client.get("/analysis/equity/RELIANCE")
         assert response.status_code == 503
 
+    def test_chart_history_returns_real_bounded_chronological_bars(self) -> None:
+        _seed_cache({"RELIANCE": _monotonic("RELIANCE", 60)}, OpportunitiesSettings())
+        with TestClient(create_app(make_settings())) as client:
+            response = client.get("/analysis/equity/reliance/candles?limit=3")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["tradingsymbol"] == "RELIANCE"
+        assert body["source"] == "NSE bhavcopy"
+        assert [bar["close"] for bar in body["candles"]] == [157.0, 158.0, 159.0]
+        assert body["candles"][0]["timestamp"].endswith("+00:00")
+
+    def test_chart_history_unavailable_is_explicit(self) -> None:
+        with TestClient(create_app(make_settings())) as client:
+            assert client.get("/analysis/equity/RELIANCE/candles").status_code == 503
+        _seed_cache({"RELIANCE": _monotonic("RELIANCE", 60)}, OpportunitiesSettings())
+        with TestClient(create_app(make_settings())) as client:
+            assert client.get("/analysis/equity/UNKNOWN/candles").status_code == 404
+            assert client.get("/analysis/equity/RELIANCE/candles?limit=999").status_code == 422
+
     def test_unknown_symbol_returns_404(self) -> None:
         _seed_cache({"RELIANCE": _oscillating_with_doji("RELIANCE", 60)}, OpportunitiesSettings())
         with TestClient(create_app(make_settings())) as client:
@@ -144,6 +163,31 @@ class TestAnalyzeEquity:
             response = client.get("/analysis/equity/test")
         assert response.status_code == 200
         assert response.json()["tradingsymbol"] == "TEST"
+
+    def test_qualification_uses_the_actual_cross_market_ranking(self) -> None:
+        candles = _oscillating_with_doji("TEST", 60)
+        _seed_cache({"TEST": candles}, OpportunitiesSettings(forward_days=5))
+        with TestClient(create_app(make_settings())) as client:
+            before = client.get("/analysis/equity/TEST").json()["patterns"]
+            assert not any(pattern["is_opportunity_grade"] for pattern in before)
+            target = before[0]
+            view = opportunities_module.OpportunityView(
+                tradingsymbol="TEST",
+                asset_class="equity",
+                pattern_name=target["pattern_name"],
+                direction=target["direction"],
+                detected_at=candles[-1].timestamp.isoformat(),
+                occurrences=20,
+                hit_rate=0.8,
+                average_forward_return_pct=1.0,
+                forward_days=5,
+                edge_score=1.0,
+            )
+            opportunities_module._last_scan = (START, (view,), 1)
+            after = client.get("/analysis/equity/TEST").json()["patterns"]
+        qualified = [p for p in after if p["is_opportunity_grade"]]
+        assert len(qualified) == 1
+        assert qualified[0]["pattern_name"] == target["pattern_name"]
 
     def test_includes_fibonacci_levels_when_swing_structure_exists(self) -> None:
         candles = _smooth_swing("TEST", 60)

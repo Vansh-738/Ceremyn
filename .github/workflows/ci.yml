@@ -28,6 +28,11 @@ jobs:
         run: cmp CLAUDE.md AGENTS.md
       - name: Unit tests
         run: pytest tests/unit -q --cov --cov-report=xml --cov-fail-under=85
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Terminal regression tests
+        run: node --test tests/frontend/*.test.cjs
 
   integration:
     runs-on: ubuntu-latest

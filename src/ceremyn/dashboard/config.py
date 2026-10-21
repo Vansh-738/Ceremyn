@@ -17,7 +17,7 @@ class DashboardSettings(BaseSettings):
     )
 
     title: str = "Ceremyn Observability"
-    # When False (dev), every request is granted the VIEWER role. When True (prod),
+    # When False (dev), every request is granted the ADMIN role. When True (prod),
     # a valid bearer token is required.
     auth_enabled: bool = False
     admin_token: str = ""

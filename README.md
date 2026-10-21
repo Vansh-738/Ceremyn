@@ -30,8 +30,9 @@ foundation (see `ARCHITECTURE_DECISIONS.md`).
 - **AI with strict boundaries:** the LLM produces read-only explanations, reports, and
   reviews; architecture tests prevent it from reaching risk or execution code.
 
-> **Interview snapshot:** 1,302 unit tests, strict type checking, linting, and 21
-> import-boundary contracts enforced in CI.
+> **Validation snapshot (21 October 2026):** 1,311 Python unit tests, seven browser-logic
+> tests, strict type checking, linting, and 21 import-boundary contracts.
+> See [PROJECT_REVIEW.md](PROJECT_REVIEW.md) for the review scope and unresolved live-use gaps.
 
 > **Reviewer page:** a credential-free walkthrough and reproducible synthetic validation
 > artifact are available at [ceremyn-research-demo.adepteft257.chatgpt.site](https://ceremyn-research-demo.adepteft257.chatgpt.site).
@@ -90,8 +91,7 @@ is never used to fabricate a fill.
 detector in `ceremyn.patterns` (candlestick, swing structure, Cup-and-Handle, Double
 Top/Bottom, Head-and-Shoulders) and ranks what fired on the latest bar by its own real
 historical hit rate — same guarantee as `ceremyn.patterns` itself, no path to
-execution/risk/OMS. It's what the dashboard's Markets page shows under "Top
-Opportunities."
+execution/risk/OMS. It feeds the terminal's opportunity scanner.
 
 Off by default (`CEREMYN_OPPORTUNITIES__SCAN_ENABLED=false`) — a real scan is a real,
 repeated NSE bhavcopy fetch, so it shouldn't run implicitly. Turn it on in `.env`:
@@ -126,7 +126,8 @@ on still doesn't clear this bar. Each pattern's statistics are drawn from
 live at that size: a full whole-market scan (~500 real trading days) completes in
 well under 5 minutes.
 
-It then runs as a background task (never blocking the dashboard/WebSocket), once at
+It then runs as a background task, with scan preparation and ranking offloaded from
+the request event loop, once at
 startup and every `CEREMYN_OPPORTUNITIES__SCAN_INTERVAL_HOURS` (default 6) after that —
 bhavcopy only updates once per trading day, so scanning more often wouldn't find
 anything new. For a one-off scan from the command line instead, see
@@ -134,12 +135,13 @@ anything new. For a one-off scan from the command line instead, see
 
 ## Analyzing one stock
 
-`GET /analysis/equity/{symbol}` (and the dashboard's Analysis page) is a deliberate
+`GET /analysis/equity/{symbol}` (and the terminal's symbol search) is a deliberate
 one-symbol "tell me everything you know" lookup — every pattern ever detected across
 that stock's full history, not just what's currently ranked in the market-wide scan.
 Each one is labelled `active_now` (fired on the latest bar) and `is_opportunity_grade`
-(would it have cleared `find_opportunities`' own quality bar), so a weaker or inactive
-pattern is still shown, just honestly flagged rather than hidden.
+(accepted by the last completed, market-wide corrected ranking), so a weaker or inactive
+pattern is still shown, just honestly flagged rather than hidden. Historical per-symbol
+statistics are descriptive; qualification comes from the market-wide scan.
 
 It reuses the opportunity scan's own already-fetched, already-liquidity-filtered candle
 cache, so a lookup is instant — no new network fetch. That means it needs a completed
@@ -211,6 +213,19 @@ results, execution health, and alerts. The separately mounted `/trading/equity` 
 is the explicit human-in-the-loop exception documented above; it still enters through
 the same OMS and risk validation pipeline as every strategy signal.
 
+The terminal has three working areas: an opportunity scanner, a chart with research
+evidence and account activity, and a persistent order ticket. Search an NSE symbol
+to load real cached daily candles. The chart labels daily data separately from live
+quotes; it displays an empty state until the first scan completes. Order drafts stay
+in place during incoming updates, and submission requires reviewing the exact order
+and execution mode first. Browser notifications announce newly qualifying setups
+while the tab is open; the first completed scan establishes a baseline.
+
+Presentation lives in `dashboard/assets/`: markup, design tokens, pure helpers,
+data renderers, order interactions, and transport are separate files. The Python
+shell only assembles the packaged resources. The layout adapts from three columns
+to one, offers light and dark themes, and respects reduced-motion preferences.
+
 The assistant is an independently mounted, SSE-streaming API at `/llm`. It can produce
 recaps, reports, experiment comparisons, and watchlist-driven explanations from
 read-only dashboard and research data. It never selects a side or submits an order;
@@ -234,6 +249,7 @@ those boundaries are tested and enforced by import contracts.
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy                          # strict type-checking
 .venv/bin/lint-imports                  # architecture contracts
+node --test tests/frontend/terminal.test.cjs  # order validation and alert deduplication
 ```
 
 Integration tests need the Docker services: `pytest tests/integration -m integration`.

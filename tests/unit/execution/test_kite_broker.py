@@ -239,6 +239,20 @@ def test_lookup_order_no_match_returns_none() -> None:
     assert broker.lookup_order(unrelated) is None
 
 
+def test_lookup_recovers_full_length_hash_from_short_broker_tag() -> None:
+    command = make_submit_command().model_copy(update={"request_hash": "a1b2c3d4" * 8})
+    kite = FakeKite()
+    KiteBroker(kite).submit(command)
+    assert kite.place_order_kwargs is not None
+    assert len(kite.place_order_kwargs["tag"]) == 20
+    # A fresh adapter has no local knowledge of the accepted submission.
+    found = KiteBroker(kite).lookup_order(command)
+    assert found is not None
+    assert found.external_order_id == "KITE-1"
+    unrelated = command.model_copy(update={"request_hash": "f" * 64})
+    assert KiteBroker(kite).lookup_order(unrelated) is None
+
+
 def test_input_exception_maps_to_non_retryable() -> None:
     from kiteconnect.exceptions import InputException
 

@@ -160,8 +160,11 @@ class KiteBroker:
         # even after a process restart. `request_hash` alone is sufficient: it already
         # incorporates `correlation_id` (see `OrderPlanner.request_hash`), so no separate
         # correlation match is needed.
+        # Compare the same wire representation used by submit(). Production hashes
+        # are 64 characters; Kite only receives their first 20 characters.
+        tag = command.request_hash[:20]
         for snapshot in self.fetch_orders():
-            if snapshot.request_hash == command.request_hash:
+            if snapshot.request_hash == tag:
                 return snapshot
         return None
 

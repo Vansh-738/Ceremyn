@@ -31,7 +31,8 @@ USAGE
 }
 
 is_launchd_managed() {
-    launchctl list 2>/dev/null | grep -q "$APP_LABEL"
+    # Consume the whole pipe: grep -q can SIGPIPE launchctl under pipefail.
+    launchctl list 2>/dev/null | grep -F "$APP_LABEL" >/dev/null
 }
 
 is_process_running() {

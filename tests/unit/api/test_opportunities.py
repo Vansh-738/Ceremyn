@@ -77,6 +77,27 @@ def _reset_scan_state() -> None:
 
 
 class TestListEquityOpportunities:
+    async def test_scan_preparation_runs_off_the_request_event_loop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import threading
+
+        main_thread = threading.get_ident()
+        worker_threads: list[int] = []
+        original_filter = opportunities_module.filter_by_min_avg_turnover
+
+        def capture_filter(
+            candles: dict[str, tuple[Candle, ...]], floor: Decimal
+        ) -> dict[str, tuple[Candle, ...]]:
+            worker_threads.append(threading.get_ident())
+            return original_filter(candles, floor)
+
+        monkeypatch.setattr(opportunities_module, "fetch_all_equity_candles", _fake_fetch)
+        monkeypatch.setattr(opportunities_module, "filter_by_min_avg_turnover", capture_filter)
+        monkeypatch.setattr(opportunities_module, "find_opportunities", lambda *a, **k: ())
+        await opportunities_module.run_scan_once(OpportunitiesSettings(universe="watchlist"))
+        assert worker_threads and all(worker != main_thread for worker in worker_threads)
+
     def test_empty_before_any_scan_completes(self) -> None:
         with TestClient(create_app(make_settings())) as client:
             response = client.get("/opportunities/equity")

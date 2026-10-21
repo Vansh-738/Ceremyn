@@ -1,8 +1,8 @@
-"""Read-only authentication and authorization.
+"""Shared bearer-token authentication and role authorization.
 
-The dashboard only ever reads. Access is gated by an operator-provisioned bearer token
-mapped to a role; there are no login, account-creation, or write flows. When
-``auth_enabled`` is False (dev), every caller is granted the VIEWER role.
+Dashboard data routes are read-only. Trading and LLM routes reuse these permissions
+with their own explicit write operations. When ``auth_enabled`` is False (local
+development), every caller is granted ADMIN; this is not a public deployment mode.
 """
 
 from enum import StrEnum

@@ -13,7 +13,7 @@ execution/risk/OMS.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from ceremyn.api import opportunities
@@ -62,6 +62,49 @@ class SymbolAnalysis(BaseModel):
     fibonacci: FibonacciLevelsView | None
 
 
+class CandleView(BaseModel):
+    timestamp: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
+class CandleHistoryView(BaseModel):
+    tradingsymbol: str
+    timeframe: str = "1d"
+    source: str = "NSE bhavcopy"
+    candles: list[CandleView]
+
+
+@router.get("/equity/{symbol}/candles", response_model=CandleHistoryView)
+def equity_candles(symbol: str, limit: int = Query(default=250, ge=2, le=500)) -> CandleHistoryView:
+    """Chart the completed scanner's actual history without another network fetch."""
+    symbol = symbol.strip().upper()
+    if opportunities.get_last_scanned_at() is None:
+        raise HTTPException(
+            status_code=503, detail="Daily history awaits the first completed scan."
+        )
+    candles = opportunities.get_cached_candles(symbol)
+    if not candles:
+        raise HTTPException(status_code=404, detail=f"No cached daily history for {symbol}.")
+    return CandleHistoryView(
+        tradingsymbol=symbol,
+        candles=[
+            CandleView(
+                timestamp=c.timestamp.isoformat(),
+                open=float(c.open),
+                high=float(c.high),
+                low=float(c.low),
+                close=float(c.close),
+                volume=c.volume,
+            )
+            for c in candles[-limit:]
+        ],
+    )
+
+
 @router.get("/equity/{symbol}", response_model=SymbolAnalysis)
 def analyze_equity(symbol: str) -> SymbolAnalysis:
     symbol = symbol.strip().upper()
@@ -93,6 +136,7 @@ def analyze_equity(symbol: str) -> SymbolAnalysis:
     )
     fib = compute_fibonacci_levels(candles, tradingsymbol=symbol)
     latest = candles[-1]
+    qualified = opportunities.get_qualified_pattern_keys(symbol)
     return SymbolAnalysis(
         fundamentals=fundamental_view(symbol, latest.timestamp, latest.close),
         tradingsymbol=symbol,
@@ -111,7 +155,7 @@ def analyze_equity(symbol: str) -> SymbolAnalysis:
                 hit_rate=r.hit_rate,
                 average_forward_return_pct=r.average_forward_return_pct,
                 forward_days=r.forward_days,
-                is_opportunity_grade=r.is_opportunity_grade,
+                is_opportunity_grade=(r.pattern_name, r.direction.value) in qualified,
             )
             for r in records
         ],

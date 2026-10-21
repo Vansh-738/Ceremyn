@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Ceremyn / Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>/* TERMINAL_CSS */</style>
+</head>
+<body>
+<a href="#workspace" class="skip">Skip to workspace</a>
+<header class="app-header">
+  <a class="brand" href="#terminal" aria-label="Ceremyn terminal">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M25 6H12L5 16l7 10h13M21 11h-7l-4 5 4 5h7" /></svg>
+    <span>ceremyn<span class="edition"> / TERMINAL</span></span>
+  </a>
+  <nav class="workspace-nav" aria-label="Workspace">
+    <button data-workspace="terminal" class="active">Terminal</button>
+    <button data-workspace="research">Research</button>
+    <button data-workspace="system">System</button>
+  </nav>
+  <div class="header-tools">
+    <span id="connection" class="connection"><i></i>Connecting</span>
+    <button id="themeButton" class="icon-button" aria-label="Switch colour theme" title="Switch colour theme">◐</button>
+    <button id="alertsButton" class="icon-button notification-button" aria-label="Open alerts" title="Open alerts">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="alertCount">0</span>
+    </button>
+    <span id="modeBadge" class="mode-badge">CHECKING MODE</span>
+  </div>
+</header>
+<section class="market-tape" aria-label="Market prices" id="marketTape"></section>
+<main id="workspace" class="workspace" tabindex="-1">
+  <section class="scanner panel" aria-labelledby="scannerTitle">
+    <header class="panel-header"><h2 id="scannerTitle">Opportunity radar</h2><span class="eyebrow">01</span></header>
+    <div class="scanner-intro"><span class="scan-orbit" aria-hidden="true">⌁</span><div><b>Find your next setup.</b><p>Qualified patterns. Historical evidence.</p></div></div>
+    <form id="searchForm" class="symbol-search" role="search">
+      <label class="sr-only" for="symbolSearch">Search NSE symbol</label>
+      <input id="symbolSearch" autocomplete="off" maxlength="30" placeholder="Search NSE symbol…">
+      <button type="submit" aria-label="Analyze symbol" title="Analyze symbol">↗</button>
+    </form>
+    <div class="segmented scanner-filters" aria-label="Opportunity direction">
+      <button data-filter="all" class="active" aria-pressed="true">All</button>
+      <button data-filter="bullish" aria-pressed="false">Bullish</button>
+      <button data-filter="bearish" aria-pressed="false">Bearish</button>
+    </div>
+    <div class="scanner-meta"><span id="scanCount">Awaiting scan</span><button id="refreshScan" class="text-button" title="Refresh scan results">Refresh ↻</button></div>
+    <div id="scannerList" class="scanner-list"></div>
+    <footer class="scanner-footer"><span class="status-dot"></span><span id="scanStatus">Connecting to scanner</span><small>Daily candles · research signals</small></footer>
+  </section>
+  <section class="centre">
+    <div class="account-strip" id="accountStrip"></div>
+    <section class="chart-panel panel" aria-label="Market research chart">
+      <header class="instrument-header">
+        <div class="instrument-avatar" id="instrumentAvatar">C</div>
+        <div><h1 id="instrumentTitle">Portfolio equity</h1><span id="instrumentMeta" class="subtle">Recorded account history</span></div>
+        <div class="instrument-value"><strong id="instrumentValue">—</strong><span id="instrumentChange"></span></div>
+      </header>
+      <div class="chart-toolbar">
+        <div class="segmented" aria-label="Chart range"><button data-range="30">1M</button><button data-range="90">3M</button><button data-range="0" class="active">All</button></div>
+        <span id="chartSource" class="eyebrow">ACCOUNT HISTORY</span>
+        <button id="portfolioChart" class="text-button">↶ Portfolio</button>
+      </div>
+      <div id="priceChart" class="price-chart"></div>
+      <div class="chart-caption"><span id="chartCaption">Only recorded data is plotted.</span><span>INR</span></div>
+    </section>
+    <section id="evidencePanel" class="evidence panel" hidden></section>
+    <section class="activity panel">
+      <header class="activity-header"><div class="activity-tabs" role="tablist" aria-label="Account activity">
+        <button role="tab" id="tab-positions" data-tab="positions" aria-controls="activityBody" aria-selected="true" class="active">Positions</button>
+        <button role="tab" id="tab-orders" data-tab="orders" aria-controls="activityBody" aria-selected="false">Orders</button>
+        <button role="tab" id="tab-alerts" data-tab="alerts" aria-controls="activityBody" aria-selected="false">Alerts <span id="activityAlertCount"></span></button>
+      </div><span class="eyebrow" id="activityMeta"></span></header>
+      <div id="activityBody" role="tabpanel" aria-labelledby="tab-positions"></div>
+    </section>
+  </section>
+  <aside class="ticket-column">
+    <section class="ticket panel" aria-labelledby="ticketTitle">
+      <header class="panel-header"><h2 id="ticketTitle">Order ticket</h2><span class="eyebrow">NSE · CNC</span></header>
+      <form id="orderForm" class="order-form">
+        <div class="side-control" aria-label="Order side"><button type="button" data-side="BUY" class="active buy" aria-pressed="true">Buy / Long</button><button type="button" data-side="SELL" class="sell" aria-pressed="false">Sell / Exit</button></div>
+        <label for="orderSymbol">Instrument</label><input id="orderSymbol" required maxlength="30" autocomplete="off" placeholder="e.g. RELIANCE">
+        <label for="orderType">Order type</label><select id="orderType"><option value="MARKET">Market order</option><option value="LIMIT">Limit order</option></select>
+        <div class="field-pair"><div><label for="orderQty">Quantity</label><input id="orderQty" type="number" min="1" step="1" required placeholder="0"></div><div><label for="orderPrice">Risk price · ₹</label><input id="orderPrice" type="number" min="0.01" step="any" required placeholder="0.00"></div></div>
+        <div id="limitField" hidden><label for="limitPrice">Limit price · ₹</label><input id="limitPrice" type="number" min="0.01" step="any" placeholder="0.00"></div>
+        <p class="field-help">Use a current quote for risk sizing. A risk price does not set your execution price.</p>
+        <div class="order-estimate"><span>Estimated notional</span><strong id="orderEstimate">₹0.00</strong></div>
+        <div class="order-buying-power"><span>Available funds</span><span id="orderFunds">—</span></div>
+        <p id="ticketMode" class="mode-note">Verifying execution mode…</p>
+        <button id="reviewOrder" class="primary-button" type="submit" disabled>Review order <span>↗</span></button>
+        <p class="ticket-footnote">Delivery equities · validated by the risk engine</p>
+        <p id="orderMessage" role="status" class="form-message"></p>
+      </form>
+    </section>
+    <section class="risk-panel panel"><header class="panel-header"><h2>Risk & execution</h2><span class="shield">◇</span></header><div id="riskSummary"></div><button id="executionButton" class="secondary-button">Execution controls <span>↗</span></button></section>
+    <section class="alert-teaser"><span class="eyebrow">STAY IN THE LOOP</span><h3>Your next setup, surfaced.</h3><p>In-app alerts for new qualifying opportunities.</p><button id="enableNotifications" class="text-button">Enable desktop alerts ↗</button><small id="notificationNote"></small></section>
+  </aside>
+  <section id="auxWorkspace" class="aux-workspace panel" hidden></section>
+</main>
+<footer class="statusbar"><span><i id="footerDot" class="status-dot"></i><span id="footerStatus">Connecting</span></span><span id="scanTime">Scan timestamp unavailable</span><span id="clock">— IST</span></footer>
+<dialog id="reviewDialog" aria-labelledby="reviewTitle"><form method="dialog"><button class="dialog-close icon-button" aria-label="Close order review">×</button></form><span class="eyebrow">CHECK YOUR ORDER</span><h2 id="reviewTitle">Review order</h2><div id="reviewDetails"></div><label class="confirmation" id="liveConfirmation"><input id="confirmLive" type="checkbox">I approve using real funds for this order.</label><p id="reviewError" role="alert"></p><button id="confirmOrder" class="primary-button">Confirm order</button></dialog>
+<dialog id="executionDialog" aria-labelledby="executionTitle"><form method="dialog"><button class="dialog-close icon-button" aria-label="Close execution controls">×</button></form><span class="eyebrow">SESSION CONTROLS</span><h2 id="executionTitle">Live execution</h2><div id="executionStatus"></div><form id="armForm"><label for="armToken">Runtime arming token</label><input id="armToken" type="password" autocomplete="off" required><label for="armReason">Session reason</label><input id="armReason" required maxlength="200" placeholder="Manual trading session"><button id="armButton" class="secondary-button">Arm live execution</button></form><button id="disarmButton" class="danger-button">Disarm live execution</button><p id="executionMessage" role="status"></p></dialog>
+<div id="toast" role="status" class="toast" hidden></div>
+<noscript>JavaScript is required to connect the terminal to market data.</noscript>
+<script>/* TERMINAL_JS */</script>
+</body>
+</html>

@@ -43,10 +43,10 @@ class TestMountedDashboard:
             response = client.get("/dashboard/")
             assert response.status_code == 200
             body = response.text
-            # Professional shell markers (not the old minimal demo).
             assert 'data-theme="dark"' in body
-            assert 'class="sidebar"' in body
-            assert "Markets" in body
+            assert 'id="orderForm"' in body
+            assert 'id="scannerList"' in body
+            assert 'id="priceChart"' in body
             assert "plotly" in body.lower()
 
     def test_dashboard_json_endpoints(self) -> None:
